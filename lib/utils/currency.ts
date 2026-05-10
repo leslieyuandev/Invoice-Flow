@@ -1,4 +1,5 @@
 export const SUPPORTED_CURRENCIES = [
+  { code: "MYR", symbol: "RM", name: "Malaysian Ringgit" },
   { code: "USD", symbol: "$", name: "US Dollar" },
   { code: "EUR", symbol: "€", name: "Euro" },
   { code: "GBP", symbol: "£", name: "British Pound" },
@@ -6,7 +7,6 @@ export const SUPPORTED_CURRENCIES = [
   { code: "CAD", symbol: "CA$", name: "Canadian Dollar" },
   { code: "AUD", symbol: "A$", name: "Australian Dollar" },
   { code: "SGD", symbol: "S$", name: "Singapore Dollar" },
-  { code: "MYR", symbol: "RM", name: "Malaysian Ringgit" },
 ] as const;
 
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]["code"];

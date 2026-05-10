@@ -21,7 +21,7 @@ export const lineItemSchema = z.object({
   amount: z.number(),
 });
 
-export const createInvoiceSchema = z.object({
+const invoiceBaseSchema = z.object({
   invoiceNumber: z
     .string()
     .min(1, "Invoice number is required")
@@ -45,20 +45,24 @@ export const createInvoiceSchema = z.object({
     .array(lineItemSchema)
     .min(1, "At least one line item is required")
     .max(100, "Too many line items"),
-}).refine(
-  (data) => data.dueDate >= data.issueDate,
-  { message: "Due date must be on or after issue date", path: ["dueDate"] }
-).refine(
-  (data) => {
-    if (data.discountType && (data.discountValue === undefined || data.discountValue === null)) {
-      return false;
-    }
-    return true;
-  },
-  { message: "Discount value is required when discount type is set", path: ["discountValue"] }
-);
+});
 
-export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
+export const createInvoiceSchema = invoiceBaseSchema
+  .refine(
+    (data) => data.dueDate >= data.issueDate,
+    { message: "Due date must be on or after issue date", path: ["dueDate"] }
+  )
+  .refine(
+    (data) => {
+      if (data.discountType && (data.discountValue === undefined || data.discountValue === null)) {
+        return false;
+      }
+      return true;
+    },
+    { message: "Discount value is required when discount type is set", path: ["discountValue"] }
+  );
+
+export const updateInvoiceSchema = invoiceBaseSchema.partial().extend({
   status: z.enum(["DRAFT", "SENT", "VIEWED", "PAID", "OVERDUE", "CANCELLED"]).optional(),
 });
 

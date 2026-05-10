@@ -31,12 +31,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const { channel, recipientEmail, customMessage } = parsed.data as {
-    channel: string;
-    recipientEmail?: string;
-    recipientPhone?: string;
-    customMessage?: string;
-  };
+  const { channel, recipientEmail, recipientPhone, message: customMessage } = parsed.data;
 
   try {
     if (channel === "email") {

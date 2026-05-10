@@ -18,6 +18,7 @@ export async function createClientAction(formData: unknown) {
     data: { ...parsed.data, userId: session.user.id },
   });
 
+  revalidatePath("/clients");
   revalidatePath("/invoices/new");
   return { data: client };
 }
@@ -26,7 +27,9 @@ export async function updateClientAction(clientId: string, formData: unknown) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const existing = await db.client.findFirst({ where: { id: clientId, userId: session.user.id } });
+  const existing = await db.client.findFirst({
+    where: { id: clientId, userId: session.user.id, deletedAt: null },
+  });
   if (!existing) return { error: "Not found" };
 
   const parsed = updateClientSchema.safeParse(formData);
@@ -35,6 +38,7 @@ export async function updateClientAction(clientId: string, formData: unknown) {
   }
 
   const client = await db.client.update({ where: { id: clientId }, data: parsed.data });
+  revalidatePath("/clients");
   revalidatePath("/invoices/new");
   return { data: client };
 }
@@ -44,7 +48,7 @@ export async function getClientsAction() {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   return db.client.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, deletedAt: null },
     orderBy: { name: "asc" },
   });
 }
@@ -54,16 +58,24 @@ export async function deleteClientAction(clientId: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const existing = await db.client.findFirst({
-    where: { id: clientId, userId: session.user.id },
-    include: { _count: { select: { invoices: true } } },
+    where: { id: clientId, userId: session.user.id, deletedAt: null },
   });
-
   if (!existing) return { error: "Not found" };
-  if (existing._count.invoices > 0) {
+
+  // Check for active (non-deleted) invoices
+  const activeInvoiceCount = await db.invoice.count({
+    where: { clientId, deletedAt: null },
+  });
+  if (activeInvoiceCount > 0) {
     return { error: "Cannot delete a client with existing invoices" };
   }
 
-  await db.client.delete({ where: { id: clientId } });
+  await db.client.update({
+    where: { id: clientId },
+    data: { deletedAt: new Date() },
+  });
+
+  revalidatePath("/clients");
   revalidatePath("/invoices/new");
   return { data: null };
 }

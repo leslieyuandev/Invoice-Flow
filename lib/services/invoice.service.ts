@@ -5,7 +5,7 @@ import type { InvoiceWithRelations, InvoiceListItem, DashboardMetrics } from "@/
 
 export async function getInvoicesByUser(userId: string): Promise<InvoiceListItem[]> {
   return db.invoice.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     select: {
       id: true,
       invoiceNumber: true,
@@ -26,13 +26,13 @@ export async function getInvoiceById(
   userId: string
 ): Promise<InvoiceWithRelations | null> {
   return db.invoice.findFirst({
-    where: { id: invoiceId, userId },
+    where: { id: invoiceId, userId, deletedAt: null },
     include: { lineItems: { orderBy: { sortOrder: "asc" } }, client: true },
   });
 }
 
 export async function createInvoice(userId: string, input: CreateInvoiceInput) {
-  const client = await db.client.findFirst({ where: { id: input.clientId, userId } });
+  const client = await db.client.findFirst({ where: { id: input.clientId, userId, deletedAt: null } });
   if (!client) throw new Error("Client not found");
 
   const financials = calculateInvoiceFinancials(
@@ -82,6 +82,72 @@ export async function createInvoice(userId: string, input: CreateInvoiceInput) {
   });
 }
 
+export async function updateInvoice(invoiceId: string, userId: string, input: CreateInvoiceInput) {
+  const existing = await db.invoice.findFirst({
+    where: { id: invoiceId, userId, deletedAt: null },
+  });
+  if (!existing) throw new Error("Invoice not found");
+
+  const client = await db.client.findFirst({ where: { id: input.clientId, userId, deletedAt: null } });
+  if (!client) throw new Error("Client not found");
+
+  const financials = calculateInvoiceFinancials(
+    input.lineItems,
+    input.taxRate,
+    input.discountType,
+    input.discountValue
+  );
+
+  // Delete old line items and recreate
+  await db.lineItem.deleteMany({ where: { invoiceId } });
+
+  return db.invoice.update({
+    where: { id: invoiceId },
+    data: {
+      clientId: input.clientId,
+      invoiceNumber: input.invoiceNumber,
+      issueDate: input.issueDate,
+      dueDate: input.dueDate,
+      currency: input.currency,
+      senderName: input.senderName,
+      senderEmail: input.senderEmail || null,
+      senderAddress: input.senderAddress || null,
+      senderPhone: input.senderPhone || null,
+      senderLogoUrl: input.senderLogoUrl || null,
+      clientName: client.name,
+      clientEmail: client.email,
+      clientAddress: [client.addressLine1, client.city, client.country].filter(Boolean).join(", "),
+      clientCompany: client.company || null,
+      subtotal: financials.subtotal,
+      taxRate: input.taxRate,
+      taxAmount: financials.taxAmount,
+      discountType: input.discountType ?? null,
+      discountValue: input.discountValue ?? null,
+      discountAmount: financials.discountAmount,
+      total: financials.total,
+      notes: input.notes || null,
+      terms: input.terms || null,
+      lineItems: {
+        create: input.lineItems.map((item, idx) => ({
+          sortOrder: idx,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: dollarsToCents(item.unitPrice),
+          amount: dollarsToCents(item.quantity * item.unitPrice),
+        })),
+      },
+    },
+    include: { lineItems: true, client: true },
+  });
+}
+
+export async function softDeleteInvoice(invoiceId: string, userId: string) {
+  return db.invoice.updateMany({
+    where: { id: invoiceId, userId, status: { in: ["DRAFT", "CANCELLED"] }, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+}
+
 export async function updateInvoiceStatus(
   invoiceId: string,
   userId: string,
@@ -92,7 +158,7 @@ export async function updateInvoiceStatus(
   if (status === "PAID") data.paidAt = new Date();
 
   return db.invoice.updateMany({
-    where: { id: invoiceId, userId },
+    where: { id: invoiceId, userId, deletedAt: null },
     data,
   });
 }
@@ -100,16 +166,16 @@ export async function updateInvoiceStatus(
 export async function getDashboardMetrics(userId: string): Promise<DashboardMetrics> {
   const [allInvoices, now] = [
     await db.invoice.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       select: { status: true, total: true, dueDate: true },
     }),
     new Date(),
   ];
 
-  // Auto-detect overdue invoices without a background job
   const overdueIds = await db.invoice.findMany({
     where: {
       userId,
+      deletedAt: null,
       status: { in: ["SENT", "VIEWED"] },
       dueDate: { lt: now },
     },
@@ -130,9 +196,6 @@ export async function getDashboardMetrics(userId: string): Promise<DashboardMetr
   const outstanding = allInvoices
     .filter((i) => ["SENT", "VIEWED", "OVERDUE"].includes(i.status))
     .reduce((s, i) => s + i.total, 0);
-
-  const thisMonth = new Date();
-  thisMonth.setDate(1);
 
   return {
     totalRevenue,

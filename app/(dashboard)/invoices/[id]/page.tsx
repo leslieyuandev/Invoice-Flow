@@ -1,0 +1,104 @@
+import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Pencil } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { getInvoiceById } from "@/lib/services/invoice.service";
+import { centsToDollars, formatCurrency } from "@/lib/utils/calculations";
+import { InvoicePreview } from "@/components/invoice/preview/InvoicePreview";
+import { InvoiceActions } from "@/components/invoice/InvoiceActions";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { Button } from "@/components/ui/button";
+import type { InvoiceFormData, InvoiceFinancials } from "@/types";
+
+type PageProps = { params: Promise<{ id: string }> };
+
+export default async function InvoiceDetailPage({ params }: PageProps) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { id } = await params;
+  const invoice = await getInvoiceById(id, session.user.id);
+  if (!invoice) notFound();
+
+  // Convert DB cents → form-compatible dollars for InvoicePreview
+  const previewData: Partial<InvoiceFormData> = {
+    invoiceNumber: invoice.invoiceNumber,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    clientId: invoice.clientId,
+    senderName: invoice.senderName,
+    senderEmail: invoice.senderEmail ?? "",
+    senderAddress: invoice.senderAddress ?? "",
+    senderPhone: invoice.senderPhone ?? "",
+    senderLogoUrl: invoice.senderLogoUrl ?? "",
+    taxRate: Number(invoice.taxRate),
+    discountType: invoice.discountType ?? undefined,
+    discountValue: invoice.discountValue ? Number(invoice.discountValue) : undefined,
+    notes: invoice.notes ?? "",
+    terms: invoice.terms ?? "",
+    lineItems: invoice.lineItems.map((item) => ({
+      id: item.id,
+      description: item.description,
+      quantity: Number(item.quantity),
+      unitPrice: centsToDollars(item.unitPrice),
+      amount: centsToDollars(item.amount),
+    })),
+  };
+
+  const financials: InvoiceFinancials = {
+    subtotal: invoice.subtotal,
+    taxAmount: invoice.taxAmount,
+    discountAmount: invoice.discountAmount ?? 0,
+    total: invoice.total,
+  };
+
+  const lineItemAmounts = invoice.lineItems.map((item) => item.amount);
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <header className="flex items-center justify-between h-16 px-6 border-b border-surface-200 bg-white shrink-0 gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/invoices">
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
+          </Button>
+          <div className="h-4 w-px bg-surface-200" />
+          <h1 className="text-base font-semibold text-surface-900 truncate">{invoice.invoiceNumber}</h1>
+          <StatusBadge status={invoice.status} />
+          <span className="text-sm text-surface-500 hidden md:block">
+            {formatCurrency(invoice.total, invoice.currency)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {invoice.status === "DRAFT" && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/invoices/${invoice.id}/edit`}>
+                <Pencil className="w-4 h-4" />
+                Edit
+              </Link>
+            </Button>
+          )}
+          <InvoiceActions
+            invoiceId={invoice.id}
+            invoiceNumber={invoice.invoiceNumber}
+            status={invoice.status}
+            clientEmail={invoice.clientEmail}
+            clientPhone={invoice.client?.phone ?? undefined}
+          />
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-hidden">
+        <InvoicePreview
+          data={previewData}
+          financials={financials}
+          client={invoice.client}
+          lineItemAmounts={lineItemAmounts}
+        />
+      </div>
+    </div>
+  );
+}

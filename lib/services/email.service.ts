@@ -4,7 +4,10 @@ import { formatCurrency } from "@/lib/utils/calculations";
 import { formatDate } from "@/lib/utils/date";
 import { generateInvoicePDF } from "./pdf.service";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
+  return new Resend(process.env.RESEND_API_KEY);
+}
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "invoices@resend.dev";
 
 const MAX_RETRIES = 3;
@@ -33,7 +36,7 @@ export async function sendInvoiceEmail(options: SendEmailOptions): Promise<void>
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await resend.emails.send({
+      const { error } = await getResend().emails.send({
         from: `${invoice.senderName} <${FROM_EMAIL}>`,
         to: [recipientEmail],
         subject: `Invoice ${invoice.invoiceNumber} from ${invoice.senderName}`,
@@ -109,7 +112,7 @@ function buildEmailHtml({
         <tr><td style="color:#64748b">Due Date</td><td>${formatDate(invoice.dueDate)}</td></tr>
         <tr class="total-row"><td>Amount Due</td><td>${fmt(invoice.total)}</td></tr>
       </table>
-      <a class="cta" href="${process.env.NEXT_PUBLIC_APP_URL}/invoices/${invoice.id}/preview">View Invoice Online</a>
+      <a class="cta" href="${process.env.NEXT_PUBLIC_APP_URL}/invoices/${invoice.id}">View Invoice Online</a>
     </div>
     <div class="footer">
       <p>${invoice.senderName}${invoice.senderEmail ? ` · ${invoice.senderEmail}` : ""}</p>

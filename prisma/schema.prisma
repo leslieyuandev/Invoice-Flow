@@ -55,6 +55,7 @@ model User {
   emailVerified DateTime?
   name          String?
   passwordHash  String?
+  phone         String?
 
   companyName     String?
   companyAddress  String?
@@ -63,14 +64,18 @@ model User {
   companyWebsite  String?
   logoUrl         String?
 
-  defaultCurrency     String  @default("USD")
-  defaultTaxRate      Decimal @default(0) @db.Decimal(5, 2)
-  defaultPaymentTerms String?
+  defaultCurrency        String  @default("MYR")
+  defaultTaxRate         Decimal @default(0) @db.Decimal(5, 2)
+  defaultPaymentTerms    Int?    @default(30)
+  defaultNotes           String? @db.Text
+  defaultTerms           String? @db.Text
+  invoiceNumberPrefix    String  @default("INV")
 
-  accounts Account[]
-  sessions Session[]
-  clients  Client[]
-  invoices Invoice[]
+  accounts          Account[]
+  sessions          Session[]
+  clients           Client[]
+  invoices          Invoice[]
+  lineItemTemplates LineItemTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,6 +96,8 @@ model Client {
   postalCode   String?
   country      String?
 
+  deletedAt DateTime?
+
   invoices Invoice[]
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -99,6 +106,7 @@ model Client {
 
   @@index([userId])
   @@index([userId, email])
+  @@index([userId, deletedAt])
 }
 
 enum InvoiceStatus {
@@ -122,7 +130,7 @@ model Invoice {
 
   invoiceNumber String
   status        InvoiceStatus @default(DRAFT)
-  currency      String        @default("USD")
+  currency      String        @default("MYR")
 
   issueDate DateTime
   dueDate   DateTime
@@ -156,6 +164,8 @@ model Invoice {
   paidAt   DateTime?
   viewedAt DateTime?
 
+  deletedAt DateTime?
+
   lineItems LineItem[]
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -168,6 +178,7 @@ model Invoice {
   @@index([userId])
   @@index([userId, status])
   @@index([userId, dueDate])
+  @@index([userId, deletedAt])
   @@index([clientId])
 }
 
@@ -187,4 +198,19 @@ model LineItem {
   updatedAt DateTime @updatedAt
 
   @@index([invoiceId, sortOrder])
+}
+
+model LineItemTemplate {
+  id          String  @id @default(cuid())
+  userId      String
+  name        String
+  description String  @default("")
+  unitPrice   Int     // stored in cents
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
