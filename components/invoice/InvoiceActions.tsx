@@ -28,17 +28,29 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
     window.open(`/api/invoices/${invoiceId}/pdf`, "_blank");
     if (status === "DRAFT") {
       setSentLoading(true);
-      await markAsSentAction(invoiceId);
-      setSentLoading(false);
-      router.refresh();
+      try {
+        await markAsSentAction(invoiceId);
+        toast.success("Invoice marked as sent");
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to update status");
+      } finally {
+        setSentLoading(false);
+      }
     }
   }
 
   async function handleMarkSent() {
     setSentLoading(true);
-    await markAsSentAction(invoiceId);
-    setSentLoading(false);
-    router.refresh();
+    try {
+      await markAsSentAction(invoiceId);
+      toast.success("Invoice marked as sent");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setSentLoading(false);
+    }
   }
 
   async function handleMarkPaid() {
