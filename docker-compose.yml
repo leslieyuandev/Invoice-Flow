@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL (local dev database) ─────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-invoice_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-invoice_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-invoice_app}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-invoice_user} -d ${POSTGRES_DB:-invoice_app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Next.js application ──────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-invoice_user}:${POSTGRES_PASSWORD:-invoice_pass}@db:5432/${POSTGRES_DB:-invoice_app}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./public:/app/public
+
+volumes:
+  postgres_data:

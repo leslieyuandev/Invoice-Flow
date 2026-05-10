@@ -1,0 +1,121 @@
+import { Resend } from "resend";
+import type { InvoiceWithRelations } from "@/types";
+import { formatCurrency } from "@/lib/utils/calculations";
+import { formatDate } from "@/lib/utils/date";
+import { generateInvoicePDF } from "./pdf.service";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "invoices@resend.dev";
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface SendEmailOptions {
+  invoice: InvoiceWithRelations;
+  recipientEmail: string;
+  customMessage?: string;
+}
+
+export async function sendInvoiceEmail(options: SendEmailOptions): Promise<void> {
+  const { invoice, recipientEmail, customMessage } = options;
+
+  // Generate PDF once; retry only the email delivery
+  const pdfBuffer = await generateInvoicePDF(invoice);
+  const fmt = (c: number) => formatCurrency(c, invoice.currency);
+
+  const html = buildEmailHtml({ invoice, customMessage, fmt });
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await resend.emails.send({
+        from: `${invoice.senderName} <${FROM_EMAIL}>`,
+        to: [recipientEmail],
+        subject: `Invoice ${invoice.invoiceNumber} from ${invoice.senderName}`,
+        html,
+        attachments: [
+          {
+            filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+            content: pdfBuffer.toString("base64"),
+          },
+        ],
+      });
+
+      if (error) throw new Error(error.message);
+      return; // success
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (attempt < MAX_RETRIES) {
+        // Exponential backoff: 1s, 2s, 4s
+        await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+
+  throw new Error(`Failed to send invoice email after ${MAX_RETRIES} attempts: ${lastError?.message}`);
+}
+
+function buildEmailHtml({
+  invoice,
+  customMessage,
+  fmt,
+}: {
+  invoice: InvoiceWithRelations;
+  customMessage?: string;
+  fmt: (cents: number) => string;
+}): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice ${invoice.invoiceNumber}</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .header { background: #4f46e5; padding: 32px 40px; }
+    .header-title { color: #fff; font-size: 22px; font-weight: 700; margin: 0; }
+    .header-sub { color: #c7d2fe; font-size: 14px; margin: 4px 0 0; }
+    .body { padding: 36px 40px; }
+    .greeting { font-size: 15px; margin-bottom: 20px; }
+    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; }
+    .details-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
+    .details-table td { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .details-table td:last-child { text-align: right; font-weight: 600; }
+    .total-row td { font-size: 16px; font-weight: 700; color: #4f46e5; border-bottom: none; padding-top: 16px; }
+    .cta { display: block; text-align: center; background: #4f46e5; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 0 auto 28px; width: fit-content; }
+    .footer { background: #f8fafc; padding: 20px 40px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">Invoice ${invoice.invoiceNumber}</p>
+      <p class="header-sub">From ${invoice.senderName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Hi ${invoice.clientName},</p>
+      ${customMessage ? `<div class="message-box">${customMessage}</div>` : `<p style="font-size:14px;color:#475569;margin-bottom:28px;">Please find your invoice attached to this email.</p>`}
+      <table class="details-table">
+        <tr><td style="color:#64748b">Invoice Number</td><td>${invoice.invoiceNumber}</td></tr>
+        <tr><td style="color:#64748b">Issue Date</td><td>${formatDate(invoice.issueDate)}</td></tr>
+        <tr><td style="color:#64748b">Due Date</td><td>${formatDate(invoice.dueDate)}</td></tr>
+        <tr class="total-row"><td>Amount Due</td><td>${fmt(invoice.total)}</td></tr>
+      </table>
+      <a class="cta" href="${process.env.NEXT_PUBLIC_APP_URL}/invoices/${invoice.id}/preview">View Invoice Online</a>
+    </div>
+    <div class="footer">
+      <p>${invoice.senderName}${invoice.senderEmail ? ` · ${invoice.senderEmail}` : ""}</p>
+      <p>This is an automated invoice email. Please do not reply directly to this email.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}

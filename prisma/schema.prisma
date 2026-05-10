@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── NextAuth required tables ────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core domain ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  passwordHash  String?
+
+  companyName     String?
+  companyAddress  String?
+  companyEmail    String?
+  companyPhone    String?
+  companyWebsite  String?
+  logoUrl         String?
+
+  defaultCurrency     String  @default("USD")
+  defaultTaxRate      Decimal @default(0) @db.Decimal(5, 2)
+  defaultPaymentTerms String?
+
+  accounts Account[]
+  sessions Session[]
+  clients  Client[]
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id     String @id @default(cuid())
+  userId String
+
+  name         String
+  email        String
+  phone        String?
+  company      String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+
+  invoices Invoice[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, email])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Invoice {
+  id       String @id @default(cuid())
+  userId   String
+  clientId String
+
+  invoiceNumber String
+  status        InvoiceStatus @default(DRAFT)
+  currency      String        @default("USD")
+
+  issueDate DateTime
+  dueDate   DateTime
+
+  // All monetary amounts stored in cents to avoid floating-point errors
+  subtotal       Int
+  taxRate        Decimal      @db.Decimal(5, 2)
+  taxAmount      Int
+  discountType   DiscountType?
+  discountValue  Decimal?     @db.Decimal(10, 2)
+  discountAmount Int?
+  total          Int
+
+  // Sender snapshot — copied from User at creation; historically immutable
+  senderName    String
+  senderEmail   String?
+  senderAddress String?
+  senderPhone   String?
+  senderLogoUrl String?
+
+  // Client snapshot — denormalized for fast PDF rendering
+  clientName    String
+  clientEmail   String
+  clientAddress String?
+  clientCompany String?
+
+  notes String? @db.Text
+  terms String? @db.Text
+
+  sentAt   DateTime?
+  paidAt   DateTime?
+  viewedAt DateTime?
+
+  lineItems LineItem[]
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, invoiceNumber])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, dueDate])
+  @@index([clientId])
+}
+
+model LineItem {
+  id        String @id @default(cuid())
+  invoiceId String
+
+  sortOrder   Int     @default(0)
+  description String
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Int
+  amount      Int
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId, sortOrder])
+}
