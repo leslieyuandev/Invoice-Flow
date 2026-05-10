@@ -42,6 +42,17 @@ export async function updateInvoiceAction(invoiceId: string, formData: unknown) 
   return { data: { id: invoiceId } };
 }
 
+export async function markAsSentAction(invoiceId: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  await updateInvoiceStatus(invoiceId, session.user.id, "SENT");
+  revalidatePath("/");
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${invoiceId}`);
+  return { data: null };
+}
+
 export async function markAsPaidAction(invoiceId: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

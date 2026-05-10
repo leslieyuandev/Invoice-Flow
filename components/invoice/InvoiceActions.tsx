@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Download, Send, CheckCircle, Trash2 } from "lucide-react";
+import { Download, Send, CheckCircle, Trash2, SendHorizonal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { markAsPaidAction, deleteInvoiceAction } from "@/actions/invoice";
+import { markAsSentAction, markAsPaidAction, deleteInvoiceAction } from "@/actions/invoice";
 import { SendDialog } from "./SendDialog";
 import type { InvoiceStatus } from "@/types";
 
@@ -19,12 +19,26 @@ interface InvoiceActionsProps {
 
 export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, clientPhone }: InvoiceActionsProps) {
   const router = useRouter();
+  const [sentLoading, setSentLoading] = useState(false);
   const [paidLoading, setPaidLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
 
-  function handleDownload() {
+  async function handleDownload() {
     window.open(`/api/invoices/${invoiceId}/pdf`, "_blank");
+    if (status === "DRAFT") {
+      setSentLoading(true);
+      await markAsSentAction(invoiceId);
+      setSentLoading(false);
+      router.refresh();
+    }
+  }
+
+  async function handleMarkSent() {
+    setSentLoading(true);
+    await markAsSentAction(invoiceId);
+    setSentLoading(false);
+    router.refresh();
   }
 
   async function handleMarkPaid() {
@@ -52,7 +66,7 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleDownload}>
+      <Button variant="outline" size="sm" onClick={handleDownload} loading={sentLoading}>
         <Download className="w-4 h-4" />
         Download PDF
       </Button>
@@ -61,6 +75,13 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
         <Button variant="outline" size="sm" onClick={() => setSendOpen(true)}>
           <Send className="w-4 h-4" />
           Send
+        </Button>
+      )}
+
+      {status === "DRAFT" && (
+        <Button size="sm" variant="outline" onClick={handleMarkSent} loading={sentLoading}>
+          <SendHorizonal className="w-4 h-4" />
+          Mark as Sent
         </Button>
       )}
 

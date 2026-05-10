@@ -40,23 +40,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         recipientEmail: recipientEmail ?? invoice.clientEmail,
         customMessage,
       });
+      await updateInvoiceStatus(id, session.user.id, "SENT");
+      return NextResponse.json({ data: null, message: "Invoice sent successfully" });
     } else if (channel === "whatsapp") {
-      // WhatsApp deep-link: generate PDF URL for client to download
-      // A real implementation would use WhatsApp Business API (Twilio/Meta)
+      await updateInvoiceStatus(id, session.user.id, "SENT");
+      const phone = (parsed.data.recipientPhone ?? "").replace(/\D/g, "");
+      const text = `Hi ${invoice.clientName}, please find Invoice ${invoice.invoiceNumber} (${invoice.currency} ${(invoice.total / 100).toFixed(2)}) at: ${process.env.NEXT_PUBLIC_APP_URL}/api/invoices/${id}/pdf`;
       return NextResponse.json({
-        data: {
-          whatsappUrl: `https://wa.me/${parsed.data.recipientPhone}?text=${encodeURIComponent(
-            `Hi ${invoice.clientName}, please find Invoice ${invoice.invoiceNumber} (${invoice.currency} ${(invoice.total / 100).toFixed(2)}) at: ${process.env.NEXT_PUBLIC_APP_URL}/api/invoices/${id}/pdf`
-          )}`,
-        },
+        data: { whatsappUrl: `https://wa.me/${phone}?text=${encodeURIComponent(text)}` },
         message: "WhatsApp link generated",
       });
     }
-
-    // Mark invoice as SENT after successful dispatch
-    await updateInvoiceStatus(id, session.user.id, "SENT");
-
-    return NextResponse.json({ data: null, message: "Invoice sent successfully" });
   } catch (err) {
     console.error("Send invoice failed:", err);
     const message = err instanceof Error ? err.message : "Failed to send invoice";

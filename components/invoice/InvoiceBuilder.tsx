@@ -15,9 +15,10 @@ import { MetadataSection } from "./form/MetadataSection";
 import { LineItemsTable } from "./form/LineItemsTable";
 import { FinancialSummary } from "./form/FinancialSummary";
 import { InvoicePreview } from "./preview/InvoicePreview";
+import { SendDialog } from "./SendDialog";
 import { useInvoiceCalculations } from "@/hooks/useInvoiceCalculations";
 import { createInvoiceSchema } from "@/lib/validations/invoice";
-import { createInvoiceAction, updateInvoiceAction } from "@/actions/invoice";
+import { createInvoiceAction, updateInvoiceAction, markAsSentAction } from "@/actions/invoice";
 import { generateInvoiceNumber } from "@/lib/utils/date";
 import type { InvoiceFormData } from "@/types";
 import type { Client, LineItemTemplate } from "@prisma/client";
@@ -56,6 +57,8 @@ export function InvoiceBuilder({
 }: InvoiceBuilderProps) {
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(true);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoiceId ?? null);
 
   const defaults = userDefaults ?? {
     senderName: "",
@@ -129,7 +132,9 @@ export function InvoiceBuilder({
       toast.error(result?.error ?? "Failed to save invoice");
       return null;
     }
-    return result.data!.id;
+    const id = result.data!.id;
+    setSavedInvoiceId(id);
+    return id;
   }
 
   async function onSubmit(data: InvoiceFormData) {
@@ -146,6 +151,7 @@ export function InvoiceBuilder({
     if (!id) return;
 
     window.open(`/api/invoices/${id}/pdf`, "_blank");
+    await markAsSentAction(id);
     router.push(`/invoices/${id}`);
   }
 
@@ -157,9 +163,7 @@ export function InvoiceBuilder({
     const id = await saveInvoice(data);
     if (!id) return;
 
-    // Navigate to detail page then the user can use the Send button there
-    // OR open the send dialog if we already have an id
-    router.push(`/invoices/${id}`);
+    setSendDialogOpen(true);
   }
 
   const title = mode === "edit" ? "Edit Invoice" : "New Invoice";
@@ -299,6 +303,18 @@ export function InvoiceBuilder({
           </div>
         )}
       </div>
+
+      {savedInvoiceId && (
+        <SendDialog
+          open={sendDialogOpen}
+          onClose={() => setSendDialogOpen(false)}
+          invoiceId={savedInvoiceId}
+          invoiceNumber={watchedValues.invoiceNumber ?? ""}
+          defaultEmail={selectedClient?.email ?? ""}
+          defaultPhone={selectedClient?.phone ?? ""}
+          onSent={() => router.push(`/invoices/${savedInvoiceId}`)}
+        />
+      )}
     </div>
   );
 }
