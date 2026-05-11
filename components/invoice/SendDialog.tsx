@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 interface SendDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface SendDialogProps {
 export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEmail, defaultPhone, onSent }: SendDialogProps) {
   const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -70,7 +72,7 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title="Send Invoice" description={`Deliver ${invoiceNumber} to your client`}>
+      <DialogContent title={t("sendDialog.title")} description={`Deliver ${invoiceNumber} to your client`}>
         <div className="flex gap-2 my-3">
           {(["email", "whatsapp"] as const).map((ch) => (
             <button
@@ -93,7 +95,7 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
         <form onSubmit={handleSubmit} className="space-y-3">
           {channel === "email" ? (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="recipientEmail" required>Recipient email</Label>
+              <Label htmlFor="recipientEmail" required>{t("sendDialog.recipientEmail")}</Label>
               <Input
                 id="recipientEmail"
                 name="recipientEmail"
@@ -104,7 +106,7 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="recipientPhone" required>WhatsApp number</Label>
+              <Label htmlFor="recipientPhone" required>{t("sendDialog.whatsappNumber")}</Label>
               <Input
                 id="recipientPhone"
                 name="recipientPhone"
@@ -117,20 +119,20 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="message">Custom message (optional)</Label>
+            <Label htmlFor="message">{t("sendDialog.customMessage")}</Label>
             <textarea
               id="message"
               name="message"
               rows={3}
-              placeholder="Add a personal note to accompany the invoice…"
+              placeholder={t("sendDialog.customMessagePlaceholder")}
               className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>{t("sendDialog.cancel")}</Button>
             <Button type="submit" size="sm" loading={loading}>
-              {channel === "email" ? "Send email" : "Open WhatsApp"}
+              {channel === "email" ? t("sendDialog.sendEmail") : t("sendDialog.openWhatsapp")}
             </Button>
           </div>
         </form>

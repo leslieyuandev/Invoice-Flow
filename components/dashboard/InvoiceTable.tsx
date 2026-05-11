@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils/date";
 import { StatusBadge } from "./StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { markAsPaidAction, deleteInvoiceAction } from "@/actions/invoice";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceListItem } from "@/types";
 
 interface InvoiceTableProps {
@@ -18,6 +19,7 @@ interface InvoiceTableProps {
 
 export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   async function handleMarkPaid(id: string, num: string) {
@@ -51,8 +53,8 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
         <div className="w-12 h-12 rounded-full bg-surface-100 flex items-center justify-center mb-4">
           <FileText className="w-6 h-6 text-surface-400" />
         </div>
-        <p className="text-sm font-medium text-surface-700">No invoices yet</p>
-        <p className="text-xs text-surface-500 mt-1">Create your first invoice to get started</p>
+        <p className="text-sm font-medium text-surface-700">{t("table.empty.title")}</p>
+        <p className="text-xs text-surface-500 mt-1">{t("table.empty.subtitle")}</p>
       </div>
     );
   }
@@ -62,13 +64,13 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-surface-100">
-            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Invoice</th>
-            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Client</th>
-            <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Issued</th>
-            <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Due</th>
-            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Status</th>
-            <th className="text-right py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Amount</th>
-            <th className="py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">Actions</th>
+            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.invoice")}</th>
+            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.client")}</th>
+            <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.issued")}</th>
+            <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.due")}</th>
+            <th className="text-left py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.status")}</th>
+            <th className="text-right py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.amount")}</th>
+            <th className="py-3 px-4 text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("table.actions")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-surface-50">
@@ -92,7 +94,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     <Link
                       href={`/invoices/${invoice.id}/edit`}
                       className="p-1.5 rounded-md text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                      title="Edit"
+                      title={t("actions.edit")}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Link>
@@ -103,7 +105,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       onClick={() => handleMarkPaid(invoice.id, invoice.invoiceNumber)}
                       disabled={loadingId === `paid-${invoice.id}`}
                       className="p-1.5 rounded-md text-surface-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                      title="Mark as paid"
+                      title={t("actions.markPaid")}
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
                     </button>
@@ -114,7 +116,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                       onClick={() => handleDelete(invoice.id, invoice.invoiceNumber)}
                       disabled={loadingId === `del-${invoice.id}`}
                       className="p-1.5 rounded-md text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                      title="Delete"
+                      title={t("actions.delete")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

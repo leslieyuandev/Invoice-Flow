@@ -21,6 +21,7 @@ import { LineItemRow } from "./LineItemRow";
 import { TemplatePicker } from "./TemplatePicker";
 import { useLineItemDrag } from "@/hooks/useLineItemDrag";
 import { centsToDollars } from "@/lib/utils/calculations";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceFormData } from "@/types";
 import type { LineItemTemplate } from "@prisma/client";
 
@@ -34,6 +35,7 @@ interface LineItemsTableProps {
 export function LineItemsTable({ form, lineItemAmounts, currency, templates = [] }: LineItemsTableProps) {
   const { control } = form;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { t } = useTranslation();
 
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -52,10 +54,10 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
       {/* Column headers — hidden on mobile */}
       <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_auto] gap-2 px-1">
         <div className="w-4" />
-        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">Description</span>
-        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">Qty</span>
-        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">Unit Price</span>
-        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide text-right">Amount</span>
+        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("lineItems.description")}</span>
+        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("lineItems.qty")}</span>
+        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("lineItems.unitPrice")}</span>
+        <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide text-right">{t("lineItems.amount")}</span>
         <div className="w-7" />
       </div>
 
@@ -90,7 +92,7 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
           onClick={() => append({ description: "", quantity: 1, unitPrice: 0, amount: 0 })}
         >
           <Plus className="w-4 h-4" />
-          Add Line Item
+          {t("lineItems.addLineItem")}
         </Button>
         {templates.length > 0 && (
           <Button
@@ -101,7 +103,7 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
             onClick={() => setPickerOpen(true)}
           >
             <BookOpen className="w-4 h-4" />
-            Use Template
+            {t("lineItems.useTemplate")}
           </Button>
         )}
       </div>

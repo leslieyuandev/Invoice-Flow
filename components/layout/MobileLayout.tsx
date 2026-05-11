@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
+    <LanguageProvider>
     <div className="flex h-screen overflow-hidden bg-surface-50">
       <Sidebar
         mobileOpen={sidebarOpen}
@@ -33,5 +35,6 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </div>
+    </LanguageProvider>
   );
 }

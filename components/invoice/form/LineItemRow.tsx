@@ -7,6 +7,7 @@ import { GripVertical, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils/calculations";
 import { cn } from "@/lib/utils/cn";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceFormData } from "@/types";
 
 interface LineItemRowProps {
@@ -22,6 +23,7 @@ interface LineItemRowProps {
 export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, isOnly }: LineItemRowProps) {
   const { register, formState: { errors } } = form;
   const rowErrors = errors.lineItems?.[index];
+  const { t } = useTranslation();
 
   const {
     attributes,
@@ -65,7 +67,7 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
         {/* Description — full width on mobile, own grid cell on desktop */}
         <Input
           {...register(`lineItems.${index}.description`)}
-          placeholder="Service or product description"
+          placeholder={t("lineItems.descriptionPlaceholder")}
           error={rowErrors?.description?.message}
         />
 
@@ -74,7 +76,7 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
         <div className="grid grid-cols-3 gap-2 md:contents">
           {/* Qty */}
           <div>
-            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Qty</p>
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">{t("lineItems.qty")}</p>
             <Input
               type="number"
               step="0.001"
@@ -87,7 +89,7 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
 
           {/* Unit price */}
           <div>
-            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Unit Price</p>
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">{t("lineItems.unitPrice")}</p>
             <Input
               type="number"
               step="0.01"
@@ -100,7 +102,7 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
 
           {/* Amount (read-only) */}
           <div className="flex flex-col items-end md:flex-row md:items-center md:justify-end md:mt-1">
-            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Amt</p>
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">{t("lineItems.amount")}</p>
             <span className="text-sm font-medium tabular-nums text-surface-700">
               {formatCurrency(amount, currency)}
             </span>

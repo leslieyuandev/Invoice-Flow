@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ClientDialog } from "@/components/clients/ClientDialog";
 import { UserPlus, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceFormData } from "@/types";
 import type { Client } from "@prisma/client";
 
@@ -24,6 +25,7 @@ export function ClientSection({ form, clients: initialClients }: ClientSectionPr
   const selectedClient = clients.find((c) => c.id === selectedId);
   const [open, setOpen] = useState(false);
   const [addClientOpen, setAddClientOpen] = useState(false);
+  const { t } = useTranslation();
 
   function handleNewClient(newClient: Client) {
     setClients((prev) => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
@@ -35,7 +37,7 @@ export function ClientSection({ form, clients: initialClients }: ClientSectionPr
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1.5">
-        <Label required>Bill To</Label>
+        <Label required>{t("builder.billTo")}</Label>
         {/* Custom dropdown with client list */}
         <div className="relative">
           <button
@@ -48,7 +50,7 @@ export function ClientSection({ form, clients: initialClients }: ClientSectionPr
             )}
           >
             <span className={selectedClient ? "text-surface-800" : "text-surface-400"}>
-              {selectedClient ? selectedClient.name : "Select a client…"}
+              {selectedClient ? selectedClient.name : t("client.selectClient")}
             </span>
             <ChevronDown className="w-4 h-4 text-surface-400 shrink-0" />
           </button>
@@ -56,7 +58,7 @@ export function ClientSection({ form, clients: initialClients }: ClientSectionPr
           {open && (
             <div className="absolute z-50 mt-1 w-full rounded-md border border-surface-200 bg-white shadow-card-lg max-h-52 overflow-y-auto animate-slide-in-right">
               {clients.length === 0 ? (
-                <p className="p-3 text-sm text-surface-500 text-center">No clients yet</p>
+                <p className="p-3 text-sm text-surface-500 text-center">{t("client.noClients")}</p>
               ) : (
                 clients.map((client) => (
                   <button
@@ -105,7 +107,7 @@ export function ClientSection({ form, clients: initialClients }: ClientSectionPr
         onClick={() => { setOpen(false); setAddClientOpen(true); }}
       >
         <UserPlus className="w-4 h-4" />
-        Add New Client
+        {t("client.addNewClient")}
       </Button>
 
       <ClientDialog

@@ -8,6 +8,7 @@ import { InvoicePreview } from "@/components/invoice/preview/InvoicePreview";
 import { InvoiceActions } from "@/components/invoice/InvoiceActions";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { getServerT } from "@/lib/i18n/server";
 import type { InvoiceFormData, InvoiceFinancials } from "@/types";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -19,6 +20,8 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
   const { id } = await params;
   const invoice = await getInvoiceById(id, session.user.id);
   if (!invoice) notFound();
+
+  const t = await getServerT();
 
   // Convert DB cents → form-compatible dollars for InvoicePreview
   const previewData: Partial<InvoiceFormData> = {
@@ -62,7 +65,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/invoices">
               <ArrowLeft className="w-4 h-4" />
-              Back
+              {t("actions.back")}
             </Link>
           </Button>
           <div className="h-4 w-px bg-surface-200" />
@@ -77,7 +80,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
             <Button variant="outline" size="sm" asChild>
               <Link href={`/invoices/${invoice.id}/edit`}>
                 <Pencil className="w-4 h-4" />
-                Edit
+                {t("actions.edit")}
               </Link>
             </Button>
           )}

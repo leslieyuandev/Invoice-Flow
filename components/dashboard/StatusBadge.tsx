@@ -1,14 +1,8 @@
-import { Badge } from "@/components/ui/badge";
-import type { InvoiceStatus } from "@/types";
+"use client";
 
-const labelMap: Record<InvoiceStatus, string> = {
-  DRAFT:     "Draft",
-  SENT:      "Sent",
-  VIEWED:    "Viewed",
-  PAID:      "Paid",
-  OVERDUE:   "Overdue",
-  CANCELLED: "Cancelled",
-};
+import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
+import type { InvoiceStatus } from "@/types";
 
 const variantMap: Record<InvoiceStatus, "draft" | "sent" | "viewed" | "paid" | "overdue" | "cancelled"> = {
   DRAFT:     "draft",
@@ -20,5 +14,6 @@ const variantMap: Record<InvoiceStatus, "draft" | "sent" | "viewed" | "paid" | "
 };
 
 export function StatusBadge({ status }: { status: InvoiceStatus }) {
-  return <Badge variant={variantMap[status]}>{labelMap[status]}</Badge>;
+  const { t } = useTranslation();
+  return <Badge variant={variantMap[status]}>{t(`status.${status}`)}</Badge>;
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClientAction, updateClientAction } from "@/actions/client";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Client } from "@prisma/client";
 
 interface ClientDialogProps {
@@ -18,6 +19,7 @@ interface ClientDialogProps {
 
 export function ClientDialog({ open, onClose, client, onSuccess }: ClientDialogProps) {
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,42 +53,42 @@ export function ClientDialog({ open, onClose, client, onSuccess }: ClientDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title={client ? "Edit Client" : "Add Client"}>
+      <DialogContent title={client ? t("clientDialog.editClient") : t("clientDialog.addClient")}>
         <form onSubmit={handleSubmit} className="space-y-3 mt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="name" required>Name</Label>
+              <Label htmlFor="name" required>{t("clientDialog.name")}</Label>
               <Input id="name" name="name" required defaultValue={client?.name ?? ""} placeholder="Jane Smith" />
             </div>
             <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="email" required>Email</Label>
+              <Label htmlFor="email" required>{t("clientDialog.email")}</Label>
               <Input id="email" name="email" type="email" required defaultValue={client?.email ?? ""} placeholder="jane@example.com" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="company">{t("clientDialog.company")}</Label>
               <Input id="company" name="company" defaultValue={client?.company ?? ""} placeholder="Acme Inc." />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t("clientDialog.phone")}</Label>
               <Input id="phone" name="phone" defaultValue={client?.phone ?? ""} placeholder="+60 12 345 6789" />
             </div>
             <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="addressLine1">Address</Label>
+              <Label htmlFor="addressLine1">{t("clientDialog.address")}</Label>
               <Input id="addressLine1" name="addressLine1" defaultValue={client?.addressLine1 ?? ""} placeholder="123 Main St" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">{t("clientDialog.city")}</Label>
               <Input id="city" name="city" defaultValue={client?.city ?? ""} placeholder="Kuala Lumpur" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">{t("clientDialog.country")}</Label>
               <Input id="country" name="country" defaultValue={client?.country ?? ""} placeholder="Malaysia" />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>{t("clientDialog.cancel")}</Button>
             <Button type="submit" size="sm" loading={loading}>
-              {client ? "Save changes" : "Add client"}
+              {client ? t("clientDialog.saveChanges") : t("clientDialog.addClientBtn")}
             </Button>
           </div>
         </form>

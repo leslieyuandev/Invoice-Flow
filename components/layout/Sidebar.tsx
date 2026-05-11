@@ -1,16 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-
-const links = [
-  { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/invoices", label: "Invoices",  icon: FileText },
-  { href: "/clients",  label: "Clients",   icon: Users },
-  { href: "/settings", label: "Settings",  icon: Settings },
-];
+import { useTranslation } from "@/lib/i18n/LanguageContext";
+import type { Locale } from "@/lib/i18n/translations";
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -21,6 +16,20 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { locale, setLocale, t } = useTranslation();
+
+  const links = [
+    { href: "/",         label: t("nav.dashboard"), icon: LayoutDashboard },
+    { href: "/invoices", label: t("nav.invoices"),  icon: FileText },
+    { href: "/clients",  label: t("nav.clients"),   icon: Users },
+    { href: "/settings", label: t("nav.settings"),  icon: Settings },
+  ];
+
+  function switchLocale(l: Locale) {
+    setLocale(l);
+    router.refresh();
+  }
 
   return (
     <>
@@ -97,6 +106,50 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
             );
           })}
         </nav>
+
+        {/* Language toggle */}
+        <div className={cn(
+          "p-3 border-t border-surface-100",
+          collapsed ? "flex justify-center" : ""
+        )}>
+          {collapsed ? (
+            <button
+              type="button"
+              onClick={() => switchLocale(locale === "en" ? "zh" : "en")}
+              title={locale === "en" ? "切换到中文" : "Switch to English"}
+              className="p-1.5 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100 transition-colors"
+            >
+              <Languages className="w-4 h-4" />
+            </button>
+          ) : (
+            <div className="flex gap-0.5 rounded-lg bg-surface-100 p-0.5">
+              <button
+                type="button"
+                onClick={() => switchLocale("en")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  locale === "en"
+                    ? "bg-white text-surface-900 shadow-sm"
+                    : "text-surface-500 hover:text-surface-700"
+                )}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => switchLocale("zh")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  locale === "zh"
+                    ? "bg-white text-surface-900 shadow-sm"
+                    : "text-surface-500 hover:text-surface-700"
+                )}
+              >
+                中文
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
     </>
   );

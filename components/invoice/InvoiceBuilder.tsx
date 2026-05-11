@@ -20,6 +20,7 @@ import { useInvoiceCalculations } from "@/hooks/useInvoiceCalculations";
 import { createInvoiceSchema } from "@/lib/validations/invoice";
 import { createInvoiceAction, updateInvoiceAction, markAsSentAction } from "@/actions/invoice";
 import { generateInvoiceNumber } from "@/lib/utils/date";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceFormData } from "@/types";
 import type { Client, LineItemTemplate } from "@prisma/client";
 
@@ -60,6 +61,7 @@ export function InvoiceBuilder({
   invoiceId,
 }: InvoiceBuilderProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [showPreview, setShowPreview] = useState(true);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoiceId ?? null);
@@ -173,7 +175,7 @@ export function InvoiceBuilder({
     setSendDialogOpen(true);
   }
 
-  const title = mode === "edit" ? "Edit Invoice" : "New Invoice";
+  const title = mode === "edit" ? t("builder.editInvoice") : t("builder.newInvoice");
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -181,7 +183,7 @@ export function InvoiceBuilder({
       <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-surface-200 bg-white shrink-0 gap-2">
         <div className="min-w-0">
           <h1 className="text-base font-semibold text-surface-900 truncate">{title}</h1>
-          <p className="text-xs text-surface-500 hidden sm:block">Fill in the details — the preview updates live</p>
+          <p className="text-xs text-surface-500 hidden sm:block">{t("builder.preview.subtitle")}</p>
         </div>
         <div className="flex items-center gap-1 md:gap-2 shrink-0">
           <Button
@@ -192,7 +194,7 @@ export function InvoiceBuilder({
             onClick={() => setShowPreview((s) => !s)}
           >
             {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            <span className="hidden lg:inline">{showPreview ? "Hide Preview" : "Show Preview"}</span>
+            <span className="hidden lg:inline">{showPreview ? t("builder.hidePreview") : t("builder.showPreview")}</span>
           </Button>
           <Button
             type="button"
@@ -203,7 +205,7 @@ export function InvoiceBuilder({
             disabled={!canSend}
           >
             <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Download PDF</span>
+            <span className="hidden sm:inline">{t("builder.downloadPdf")}</span>
           </Button>
           <Button
             type="button"
@@ -213,7 +215,7 @@ export function InvoiceBuilder({
             disabled={!canSend}
           >
             <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Send</span>
+            <span className="hidden sm:inline">{t("builder.send")}</span>
           </Button>
           <Button
             type="submit"
@@ -221,7 +223,7 @@ export function InvoiceBuilder({
             loading={form.formState.isSubmitting}
           >
             <Save className="w-4 h-4" />
-            <span className="hidden sm:inline">{mode === "edit" ? "Update" : "Save"}</span>
+            <span className="hidden sm:inline">{mode === "edit" ? t("builder.update") : t("builder.save")}</span>
           </Button>
         </div>
       </div>
@@ -237,24 +239,24 @@ export function InvoiceBuilder({
             className="p-4 md:p-6 space-y-6 pb-28 md:pb-10"
           >
             <Card>
-              <CardHeader><CardTitle>Invoice Details</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.invoiceDetails")}</CardTitle></CardHeader>
               <CardContent>
                 <MetadataSection form={form} defaultPaymentTerms={defaults.defaultPaymentTerms} />
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>From</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.from")}</CardTitle></CardHeader>
               <CardContent><SenderSection form={form} /></CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Bill To</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.billTo")}</CardTitle></CardHeader>
               <CardContent><ClientSection form={form} clients={clients} /></CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Line Items</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.lineItems")}</CardTitle></CardHeader>
               <CardContent>
                 <LineItemsTable
                   form={form}
@@ -266,30 +268,30 @@ export function InvoiceBuilder({
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Totals</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.totals")}</CardTitle></CardHeader>
               <CardContent>
                 <FinancialSummary form={form} financials={financials} currency={currency} />
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Notes & Terms</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("builder.notesTerms")}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-surface-700">Notes</label>
+                  <label className="text-sm font-medium text-surface-700">{t("builder.notes")}</label>
                   <textarea
                     {...form.register("notes")}
                     rows={3}
-                    placeholder="Any additional notes visible to the client…"
+                    placeholder={t("builder.notesPlaceholder")}
                     className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-surface-700">Payment Terms</label>
+                  <label className="text-sm font-medium text-surface-700">{t("builder.paymentTerms")}</label>
                   <textarea
                     {...form.register("terms")}
                     rows={4}
-                    placeholder="Payment instructions…"
+                    placeholder={t("builder.paymentTermsPlaceholder")}
                     className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
                   />
                 </div>

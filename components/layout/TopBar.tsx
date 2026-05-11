@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
 import { UserMenu } from "./UserMenu";
+import { getServerT } from "@/lib/i18n/server";
 
 interface TopBarProps {
   title: string;
@@ -11,6 +12,7 @@ interface TopBarProps {
 
 export async function TopBar({ title, subtitle }: TopBarProps) {
   const session = await auth();
+  const t = await getServerT();
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b border-surface-200 bg-white shrink-0">
@@ -22,7 +24,7 @@ export async function TopBar({ title, subtitle }: TopBarProps) {
         <Button asChild size="sm">
           <Link href="/invoices/new">
             <Plus className="w-4 h-4" />
-            New Invoice
+            {t("topbar.newInvoice")}
           </Link>
         </Button>
         <UserMenu name={session?.user?.name} email={session?.user?.email} />
