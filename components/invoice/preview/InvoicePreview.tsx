@@ -13,10 +13,11 @@ interface InvoicePreviewProps {
   financials: InvoiceFinancials;
   client?: Client;
   lineItemAmounts: number[];
+  showDueDate?: boolean;
 }
 
 // This component mirrors the PDF layout exactly — same data, CSS-rendered.
-export function InvoicePreview({ data, financials, client, lineItemAmounts }: InvoicePreviewProps) {
+export function InvoicePreview({ data, financials, client, lineItemAmounts, showDueDate = true }: InvoicePreviewProps) {
   const currency = data.currency ?? "USD";
   const fmt = (cents: number) => formatCurrency(cents, currency);
   const symbol = getCurrencySymbol(currency);
@@ -100,12 +101,14 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts }: In
                 {data.issueDate ? formatDate(data.issueDate) : "—"}
               </p>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1">Due Date</p>
-              <p className="text-sm text-surface-700">
-                {data.dueDate ? formatDate(data.dueDate) : "—"}
-              </p>
-            </div>
+            {showDueDate && (
+              <div>
+                <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1">Due Date</p>
+                <p className="text-sm text-surface-700">
+                  {data.dueDate ? formatDate(data.dueDate) : "—"}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -115,7 +118,7 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts }: In
         {/* ── Line items table ──────────────────────────────────────── */}
         <div>
           <div className="grid grid-cols-[1fr_60px_80px_80px] gap-2 px-2 mb-1">
-            {["Description", "Qty", "Unit Price", "Amount"].map((h) => (
+            {["Item", "Qty", "Price", "Amount"].map((h) => (
               <span key={h} className="text-[10px] font-bold text-surface-400 uppercase tracking-widest text-right first:text-left">
                 {h}
               </span>
@@ -127,8 +130,13 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts }: In
               <p className="text-sm text-surface-400 italic py-4 text-center">Add line items…</p>
             ) : (
               (data.lineItems ?? []).map((item, i) => (
-                <div key={i} className="grid grid-cols-[1fr_60px_80px_80px] gap-2 py-2.5 px-2 text-sm">
-                  <span className="text-surface-800 break-words">{item.description || <span className="text-surface-300 italic">—</span>}</span>
+                <div key={i} className="grid grid-cols-[1fr_60px_80px_80px] gap-2 py-2.5 px-2 text-sm items-start">
+                  <div>
+                    <p className="font-semibold text-surface-900">{item.description || <span className="text-surface-300 italic font-normal">—</span>}</p>
+                    {item.notes && (
+                      <p className="text-xs text-surface-500 mt-0.5 whitespace-pre-line leading-relaxed">{item.notes}</p>
+                    )}
+                  </div>
                   <span className="text-right text-surface-600 tabular-nums">{item.quantity || 0}</span>
                   <span className="text-right text-surface-600 tabular-nums">
                     {symbol}{(Number(item.unitPrice) || 0).toFixed(2)}

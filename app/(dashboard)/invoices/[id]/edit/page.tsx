@@ -34,6 +34,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
         defaultPaymentTerms: true,
         defaultNotes: true,
         defaultTerms: true,
+        showDueDate: true,
       },
     }),
     db.invoice.findMany({
@@ -63,6 +64,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
     lineItems: invoice.lineItems.map((item) => ({
       id: item.id,
       description: item.description,
+      notes: item.notes ?? undefined,
       quantity: Number(item.quantity),
       unitPrice: centsToDollars(item.unitPrice),
       amount: centsToDollars(item.amount),
@@ -81,6 +83,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
     defaultNotes: user?.defaultNotes ?? "",
     defaultTerms: user?.defaultTerms ?? "",
     invoiceNumberPrefix: "INV",
+    showDueDate: user?.showDueDate ?? true,
   };
 
   return (

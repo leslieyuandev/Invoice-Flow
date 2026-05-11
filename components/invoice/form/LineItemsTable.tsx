@@ -18,11 +18,12 @@ import {
 import { Plus, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LineItemRow } from "./LineItemRow";
+import { LineItemDialog } from "./LineItemDialog";
 import { TemplatePicker } from "./TemplatePicker";
 import { useLineItemDrag } from "@/hooks/useLineItemDrag";
 import { centsToDollars } from "@/lib/utils/calculations";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
-import type { InvoiceFormData } from "@/types";
+import type { InvoiceFormData, LineItemFormData } from "@/types";
 import type { LineItemTemplate } from "@prisma/client";
 
 interface LineItemsTableProps {
@@ -35,19 +36,42 @@ interface LineItemsTableProps {
 export function LineItemsTable({ form, lineItemAmounts, currency, templates = [] }: LineItemsTableProps) {
   const { control } = form;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
   const { t } = useTranslation();
 
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove, move, update } = useFieldArray({
     control,
     name: "lineItems",
   });
 
-  const { activeId, handleDragStart, handleDragEnd } = useLineItemDrag(fields, move);
+  const { handleDragStart, handleDragEnd } = useLineItemDrag(fields, move);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  function handleOpenAdd() {
+    setEditIndex(null);
+    setDialogOpen(true);
+  }
+
+  function handleOpenEdit(index: number) {
+    setEditIndex(index);
+    setDialogOpen(true);
+  }
+
+  function handleSave(item: Omit<LineItemFormData, "amount">) {
+    const fullItem = { ...item, amount: item.quantity * item.unitPrice };
+    if (editIndex !== null) {
+      update(editIndex, fullItem);
+    } else {
+      append(fullItem);
+    }
+  }
+
+  const editingItem = editIndex !== null ? fields[editIndex] : undefined;
 
   return (
     <div className="space-y-1">
@@ -58,7 +82,7 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
         <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("lineItems.qty")}</span>
         <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">{t("lineItems.unitPrice")}</span>
         <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide text-right">{t("lineItems.amount")}</span>
-        <div className="w-7" />
+        <div className="w-14" />
       </div>
 
       <DndContext
@@ -71,11 +95,14 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
           {fields.map((field, index) => (
             <LineItemRow
               key={field.id}
-              form={form}
-              index={index}
               fieldId={field.id}
+              description={field.description}
+              notes={field.notes}
+              quantity={field.quantity}
+              unitPrice={field.unitPrice}
               amount={lineItemAmounts[index] ?? 0}
               currency={currency}
+              onEdit={() => handleOpenEdit(index)}
               onRemove={() => remove(index)}
               isOnly={fields.length === 1}
             />
@@ -89,7 +116,7 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
           variant="ghost"
           size="sm"
           className="flex-1 border border-dashed border-surface-200 text-surface-500 hover:text-surface-700 hover:border-surface-300"
-          onClick={() => append({ description: "", quantity: 1, unitPrice: 0, amount: 0 })}
+          onClick={handleOpenAdd}
         >
           <Plus className="w-4 h-4" />
           {t("lineItems.addLineItem")}
@@ -108,16 +135,28 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
         )}
       </div>
 
+      <LineItemDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSave={handleSave}
+        initialValues={editingItem}
+      />
+
       <TemplatePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         templates={templates}
-        onSelect={(t) => append({
-          description: t.name,
-          quantity: 1,
-          unitPrice: centsToDollars(t.unitPrice),
-          amount: 0,
-        })}
+        onSelect={(tmpl) => {
+          setEditIndex(null);
+          setDialogOpen(false);
+          append({
+            description: tmpl.name,
+            notes: tmpl.description || undefined,
+            quantity: 1,
+            unitPrice: centsToDollars(tmpl.unitPrice),
+            amount: 0,
+          });
+        }}
       />
     </div>
   );

@@ -35,9 +35,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   try {
     if (channel === "email") {
+      const toEmail = recipientEmail ?? invoice.clientEmail;
+      if (!toEmail) return NextResponse.json({ error: "No recipient email address" }, { status: 422 });
       await sendInvoiceEmail({
         invoice,
-        recipientEmail: recipientEmail ?? invoice.clientEmail,
+        recipientEmail: toEmail,
         customMessage,
       });
       await updateInvoiceStatus(id, session.user.id, "SENT");

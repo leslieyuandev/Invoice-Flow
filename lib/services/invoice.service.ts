@@ -72,6 +72,7 @@ export async function createInvoice(userId: string, input: CreateInvoiceInput) {
         create: input.lineItems.map((item, idx) => ({
           sortOrder: idx,
           description: item.description,
+          notes: item.notes || null,
           quantity: item.quantity,
           unitPrice: dollarsToCents(item.unitPrice),
           amount: dollarsToCents(item.quantity * item.unitPrice),
@@ -131,6 +132,7 @@ export async function updateInvoice(invoiceId: string, userId: string, input: Cr
         create: input.lineItems.map((item, idx) => ({
           sortOrder: idx,
           description: item.description,
+          notes: item.notes || null,
           quantity: item.quantity,
           unitPrice: dollarsToCents(item.unitPrice),
           amount: dollarsToCents(item.quantity * item.unitPrice),

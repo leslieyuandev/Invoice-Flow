@@ -70,6 +70,7 @@ model User {
   defaultNotes           String? @db.Text
   defaultTerms           String? @db.Text
   invoiceNumberPrefix    String  @default("INV")
+  showDueDate            Boolean @default(true)
 
   accounts          Account[]
   sessions          Session[]
@@ -86,7 +87,7 @@ model Client {
   userId String
 
   name         String
-  email        String
+  email        String?
   phone        String?
   company      String?
   addressLine1 String?
@@ -153,7 +154,7 @@ model Invoice {
 
   // Client snapshot — denormalized for fast PDF rendering
   clientName    String
-  clientEmail   String
+  clientEmail   String?
   clientAddress String?
   clientCompany String?
 
@@ -188,6 +189,7 @@ model LineItem {
 
   sortOrder   Int     @default(0)
   description String
+  notes       String? @db.Text
   quantity    Decimal @db.Decimal(10, 3)
   unitPrice   Int
   amount      Int

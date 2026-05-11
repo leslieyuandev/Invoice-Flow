@@ -29,12 +29,14 @@ interface ProfileFormProps {
     invoiceNumberPrefix: string;
     logoUrl: string;
     hasPassword: boolean;
+    showDueDate: boolean;
   };
   templates: LineItemTemplate[];
 }
 
 export function ProfileForm({ user, templates: initialTemplates }: ProfileFormProps) {
   const [profileLoading, setProfileLoading] = useState(false);
+  const [showDueDate, setShowDueDate] = useState(user.showDueDate);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState(user.logoUrl);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -57,6 +59,7 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
       defaultNotes: fd.get("defaultNotes") || undefined,
       defaultTerms: fd.get("defaultTerms") || undefined,
       invoiceNumberPrefix: fd.get("invoiceNumberPrefix") || undefined,
+      showDueDate,
     });
     setProfileLoading(false);
     if ("error" in result && result.error) {
@@ -246,6 +249,22 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
                 />
                 <p className="text-xs text-surface-400">e.g. "INV" → INV-2025-001</p>
               </div>
+              <div className="col-span-full flex items-center justify-between rounded-lg border border-surface-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-surface-900">Show due date on invoices</p>
+                  <p className="text-xs text-surface-400 mt-0.5">Display the due date field on invoices and PDFs</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showDueDate}
+                  onClick={() => setShowDueDate((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2 ${showDueDate ? "bg-brand-600" : "bg-surface-300"}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${showDueDate ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
               <div className="col-span-full flex flex-col gap-1.5">
                 <Label htmlFor="defaultNotes">Default notes</Label>
                 <textarea
@@ -315,7 +334,13 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
               </div>
               <div className="col-span-full flex flex-col gap-1">
                 <Label htmlFor="tDescription">Description</Label>
-                <Input id="tDescription" name="tDescription" placeholder="Brief description shown on invoice (optional)" />
+                <textarea
+                  id="tDescription"
+                  name="tDescription"
+                  rows={3}
+                  placeholder="Brief description shown on invoice (optional)"
+                  className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                />
               </div>
             </div>
             <div className="flex justify-end">

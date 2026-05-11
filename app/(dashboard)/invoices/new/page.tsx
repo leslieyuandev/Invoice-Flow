@@ -32,6 +32,7 @@ export default async function NewInvoicePage() {
         defaultNotes: true,
         defaultTerms: true,
         invoiceNumberPrefix: true,
+        showDueDate: true,
       },
     }),
     db.lineItemTemplate.findMany({
@@ -51,6 +52,7 @@ export default async function NewInvoicePage() {
     defaultNotes: user?.defaultNotes ?? "",
     defaultTerms: user?.defaultTerms ?? "50% booking fees upon confirmation\n\nPlease make your payment to:\nBank: Public Bank\nAccount No.: 3823632829\nHalo Balloon Services",
     invoiceNumberPrefix: user?.invoiceNumberPrefix ?? "INV",
+    showDueDate: user?.showDueDate ?? true,
   };
 
   return (

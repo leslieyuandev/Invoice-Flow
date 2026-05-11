@@ -35,6 +35,7 @@ export interface UserDefaults {
   defaultNotes: string;
   defaultTerms: string;
   invoiceNumberPrefix: string;
+  showDueDate: boolean;
 }
 
 interface InvoiceBuilderProps {
@@ -77,6 +78,7 @@ export function InvoiceBuilder({
     defaultNotes: "",
     defaultTerms: "50% booking fees upon confirmation\n\nPlease make your payment to:\nBank: Public Bank\nAccount No.: 3823632829\nHalo Balloon Services",
     invoiceNumberPrefix: "INV",
+    showDueDate: true,
   };
 
   const issueDate = new Date();
@@ -241,7 +243,7 @@ export function InvoiceBuilder({
             <Card>
               <CardHeader><CardTitle>{t("builder.invoiceDetails")}</CardTitle></CardHeader>
               <CardContent>
-                <MetadataSection form={form} defaultPaymentTerms={defaults.defaultPaymentTerms} />
+                <MetadataSection form={form} defaultPaymentTerms={defaults.defaultPaymentTerms} showDueDate={defaults.showDueDate} />
               </CardContent>
             </Card>
 
@@ -308,6 +310,7 @@ export function InvoiceBuilder({
               financials={financials}
               client={selectedClient}
               lineItemAmounts={lineItemAmounts}
+              showDueDate={defaults.showDueDate}
             />
           </div>
         )}

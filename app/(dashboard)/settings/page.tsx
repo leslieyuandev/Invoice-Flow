@@ -25,6 +25,7 @@ export default async function SettingsPage() {
         invoiceNumberPrefix: true,
         logoUrl: true,
         passwordHash: true,
+        showDueDate: true,
       },
     }),
     db.lineItemTemplate.findMany({
@@ -54,6 +55,7 @@ export default async function SettingsPage() {
             invoiceNumberPrefix: user.invoiceNumberPrefix ?? "INV",
             logoUrl: user.logoUrl ?? "",
             hasPassword: !!user.passwordHash,
+            showDueDate: user.showDueDate ?? true,
           }}
           templates={templates}
         />

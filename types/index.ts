@@ -25,7 +25,8 @@ export type InvoiceListItem = Pick<
 // ─── Form data types (before saving to DB) ───────────────────────────────────
 export interface LineItemFormData {
   id?: string;
-  description: string;
+  description: string;  // item name (bold)
+  notes?: string;        // multiline description shown below the name
   quantity: number;
   unitPrice: number; // in major currency units (dollars), converted to cents on save
   amount: number;

@@ -17,6 +17,7 @@ const profileSchema = z.object({
   defaultNotes: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
   defaultTerms: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
   invoiceNumberPrefix: z.string().max(20).optional().transform((v) => v?.trim() || undefined),
+  showDueDate: z.boolean().optional(),
 });
 
 export async function updateProfileAction(formData: unknown) {

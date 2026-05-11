@@ -7,9 +7,10 @@ export const lineItemSchema = z.object({
   id: z.string().optional(),
   description: z
     .string()
-    .min(1, "Description is required")
-    .max(500, "Description too long")
+    .min(1, "Item name is required")
+    .max(500, "Name too long")
     .transform((v) => v.trim()),
+  notes: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
   quantity: z
     .number({ error: "Quantity must be a number" })
     .positive("Quantity must be greater than 0")

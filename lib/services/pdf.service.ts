@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   notesText: { fontSize: 9, color: "#475569", lineHeight: 1.5 },
 });
 
-function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
+function InvoiceDocument({ invoice, showDueDate }: { invoice: InvoiceWithRelations; showDueDate: boolean }) {
   const currency = invoice.currency;
   const fmt = (cents: number) => formatCurrency(cents, currency);
   const statusColor = STATUS_COLORS[invoice.status] ?? "#475569";
@@ -167,7 +167,7 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
           React.createElement(Text, { style: styles.metaLabel }, "Bill To"),
           React.createElement(Text, { style: styles.metaBold }, invoice.clientName),
           invoice.clientCompany && React.createElement(Text, { style: styles.metaValue }, invoice.clientCompany),
-          React.createElement(Text, { style: styles.metaValue }, invoice.clientEmail),
+          invoice.clientEmail && React.createElement(Text, { style: styles.metaValue }, invoice.clientEmail),
           invoice.clientAddress && React.createElement(Text, { style: styles.metaValue }, invoice.clientAddress)
         ),
         React.createElement(
@@ -185,12 +185,14 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
                 React.createElement(Text, { style: styles.metaLabel }, "Issue Date"),
                 React.createElement(Text, { style: styles.metaValue }, formatDate(invoice.issueDate))
               ),
-              React.createElement(
-                View,
-                { style: styles.dateItem },
-                React.createElement(Text, { style: styles.metaLabel }, "Due Date"),
-                React.createElement(Text, { style: { ...styles.metaValue, color: invoice.status === "OVERDUE" ? "#c2410c" : "#1e293b" } }, formatDate(invoice.dueDate))
-              )
+              showDueDate
+                ? React.createElement(
+                    View,
+                    { style: styles.dateItem },
+                    React.createElement(Text, { style: styles.metaLabel }, "Due Date"),
+                    React.createElement(Text, { style: { ...styles.metaValue, color: invoice.status === "OVERDUE" ? "#c2410c" : "#1e293b" } }, formatDate(invoice.dueDate))
+                  )
+                : null
             )
           )
         )
@@ -201,9 +203,9 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
       React.createElement(
         View,
         { style: styles.tableHeader },
-        React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colDescription } }, "DESCRIPTION"),
+        React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colDescription } }, "ITEM"),
         React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colQty } }, "QTY"),
-        React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colPrice } }, "UNIT PRICE"),
+        React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colPrice } }, "PRICE"),
         React.createElement(Text, { style: { ...styles.tableHeaderText, ...styles.colAmount } }, "AMOUNT")
       ),
       // ── Line items ───────────────────────────────────────────────
@@ -211,7 +213,14 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
         React.createElement(
           View,
           { key: item.id, style: styles.tableRow, wrap: false },
-          React.createElement(Text, { style: { ...styles.descriptionText, ...styles.colDescription } }, item.description),
+          React.createElement(
+            View,
+            { style: styles.colDescription },
+            React.createElement(Text, { style: { ...styles.descriptionText, fontFamily: "Helvetica-Bold" } }, item.description),
+            item.notes
+              ? React.createElement(Text, { style: { ...styles.descriptionText, fontSize: 8, color: "#64748b", marginTop: 2 } }, item.notes)
+              : null
+          ),
           React.createElement(Text, { style: { ...styles.tableBodyText, ...styles.colQty } }, Number(item.quantity).toFixed(item.quantity.toString().includes(".") ? 2 : 0)),
           React.createElement(Text, { style: { ...styles.tableBodyText, ...styles.colPrice } }, fmt(item.unitPrice)),
           React.createElement(Text, { style: { ...styles.tableBodyText, ...styles.colAmount } }, fmt(item.amount))
@@ -288,10 +297,10 @@ function InvoiceDocument({ invoice }: { invoice: InvoiceWithRelations }) {
   );
 }
 
-export async function generateInvoicePDF(invoice: InvoiceWithRelations): Promise<Buffer> {
+export async function generateInvoicePDF(invoice: InvoiceWithRelations, showDueDate = true): Promise<Buffer> {
   const element = React.createElement(
     InvoiceDocument,
-    { invoice }
+    { invoice, showDueDate }
   ) as unknown as React.ReactElement<DocumentProps>;
   return renderToBuffer(element);
 }

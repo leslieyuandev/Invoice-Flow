@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { getInvoiceById } from "@/lib/services/invoice.service";
 import { centsToDollars, formatCurrency } from "@/lib/utils/calculations";
 import { InvoicePreview } from "@/components/invoice/preview/InvoicePreview";
@@ -18,10 +19,17 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
-  const invoice = await getInvoiceById(id, session.user.id);
+  const [invoice, userSettings] = await Promise.all([
+    getInvoiceById(id, session.user.id),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { showDueDate: true },
+    }),
+  ]);
   if (!invoice) notFound();
 
   const t = await getServerT();
+  const showDueDate = userSettings?.showDueDate ?? true;
 
   // Convert DB cents → form-compatible dollars for InvoicePreview
   const previewData: Partial<InvoiceFormData> = {
@@ -43,6 +51,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
     lineItems: invoice.lineItems.map((item) => ({
       id: item.id,
       description: item.description,
+      notes: item.notes ?? undefined,
       quantity: Number(item.quantity),
       unitPrice: centsToDollars(item.unitPrice),
       amount: centsToDollars(item.amount),
@@ -88,7 +97,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
             invoiceId={invoice.id}
             invoiceNumber={invoice.invoiceNumber}
             status={invoice.status}
-            clientEmail={invoice.clientEmail}
+            clientEmail={invoice.clientEmail ?? ""}
             clientPhone={invoice.client?.phone ?? undefined}
           />
         </div>
@@ -100,6 +109,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
           financials={financials}
           client={invoice.client}
           lineItemAmounts={lineItemAmounts}
+          showDueDate={showDueDate}
         />
       </div>
     </div>

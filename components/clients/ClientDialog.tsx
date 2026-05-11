@@ -61,8 +61,8 @@ export function ClientDialog({ open, onClose, client, onSuccess }: ClientDialogP
               <Input id="name" name="name" required defaultValue={client?.name ?? ""} placeholder="Jane Smith" />
             </div>
             <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="email" required>{t("clientDialog.email")}</Label>
-              <Input id="email" name="email" type="email" required defaultValue={client?.email ?? ""} placeholder="jane@example.com" />
+              <Label htmlFor="email">{t("clientDialog.email")}</Label>
+              <Input id="email" name="email" type="email" defaultValue={client?.email ?? ""} placeholder="jane@example.com" />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="company">{t("clientDialog.company")}</Label>

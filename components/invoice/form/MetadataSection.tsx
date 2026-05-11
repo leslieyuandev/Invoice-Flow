@@ -10,9 +10,10 @@ import type { InvoiceFormData } from "@/types";
 interface MetadataSectionProps {
   form: UseFormReturn<InvoiceFormData>;
   defaultPaymentTerms?: number;
+  showDueDate?: boolean;
 }
 
-export function MetadataSection({ form, defaultPaymentTerms = 30 }: MetadataSectionProps) {
+export function MetadataSection({ form, defaultPaymentTerms = 30, showDueDate = true }: MetadataSectionProps) {
   const { register, formState: { errors } } = form;
   const { t } = useTranslation();
 
@@ -48,17 +49,19 @@ export function MetadataSection({ form, defaultPaymentTerms = 30 }: MetadataSect
         />
       </div>
 
-      <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
-        <Label required>{t("metadata.dueDate")}</Label>
-        <Input
-          type="date"
-          {...register("dueDate")}
-          error={errors.dueDate?.message}
-        />
-        <p className="text-xs text-surface-400">
-          {t("metadata.dueDate.hint").replace("{n}", String(defaultPaymentTerms))}
-        </p>
-      </div>
+      {showDueDate && (
+        <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
+          <Label required>{t("metadata.dueDate")}</Label>
+          <Input
+            type="date"
+            {...register("dueDate")}
+            error={errors.dueDate?.message}
+          />
+          <p className="text-xs text-surface-400">
+            {t("metadata.dueDate.hint").replace("{n}", String(defaultPaymentTerms))}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
