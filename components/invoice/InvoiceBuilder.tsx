@@ -101,14 +101,13 @@ export function InvoiceBuilder({
   const currency = watchedValues.currency ?? defaults.defaultCurrency;
   const selectedClient = clients.find((c) => c.id === watchedValues.clientId);
 
-  // Auto-update due date when issue date changes (only in create mode without initialData)
   const watchedIssueDate = form.watch("issueDate");
   useEffect(() => {
-    if (mode === "create" || !initialData) {
-      const parsed = new Date(watchedIssueDate as unknown as string);
-      if (!isNaN(parsed.getTime())) {
-        form.setValue("dueDate", addDays(parsed, defaults.defaultPaymentTerms), { shouldValidate: false });
-      }
+    const parsed = watchedIssueDate instanceof Date
+      ? watchedIssueDate
+      : new Date(watchedIssueDate as unknown as string);
+    if (!isNaN(parsed.getTime())) {
+      form.setValue("dueDate", addDays(parsed, defaults.defaultPaymentTerms), { shouldValidate: false });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedIssueDate]);
@@ -227,7 +226,7 @@ export function InvoiceBuilder({
             id="invoice-form"
             onSubmit={form.handleSubmit(onSubmit)}
             noValidate
-            className="p-4 md:p-6 space-y-6"
+            className="p-4 md:p-6 space-y-6 pb-28 md:pb-10"
           >
             <Card>
               <CardHeader><CardTitle>Invoice Details</CardTitle></CardHeader>

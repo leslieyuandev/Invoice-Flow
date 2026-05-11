@@ -37,7 +37,8 @@ const invoiceBaseSchema = z.object({
   senderPhone: z.string().max(50).optional().transform((v) => v?.trim()),
   senderLogoUrl: z.string().url().optional().or(z.literal("")),
   taxRate: z.number().min(0).max(100),
-  discountType: z.enum(["PERCENTAGE", "FIXED"]).optional(),
+  discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().or(z.literal(""))
+    .transform(v => (v === "" ? undefined : v)),
   discountValue: z.number().min(0).optional(),
   notes: z.string().max(2000).optional().transform((v) => v?.trim()),
   terms: z.string().max(2000).optional().transform((v) => v?.trim()),

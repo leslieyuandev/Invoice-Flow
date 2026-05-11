@@ -6,10 +6,16 @@ import { Sidebar } from "./Sidebar";
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-50">
-      <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        mobileOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed(c => !c)}
+      />
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
         {/* Mobile top bar */}

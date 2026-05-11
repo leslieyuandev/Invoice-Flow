@@ -37,7 +37,7 @@ export function MetadataSection({ form, defaultPaymentTerms = 30 }: MetadataSect
         </select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
         <Label required>Issue Date</Label>
         <Input
           type="date"
@@ -46,7 +46,7 @@ export function MetadataSection({ form, defaultPaymentTerms = 30 }: MetadataSect
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
         <Label required>Due Date</Label>
         <Input
           type="date"

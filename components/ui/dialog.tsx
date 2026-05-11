@@ -24,7 +24,11 @@ export function DialogContent({
       <RadixDialog.Overlay className="fixed inset-0 bg-black/40 z-40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
       <RadixDialog.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-xl p-6",
+          "fixed z-50 bg-white rounded-2xl shadow-xl p-6",
+          // Mobile: 16px margins on each side, near top, scrollable when keyboard opens
+          "left-4 right-4 top-[8%] max-h-[85dvh] overflow-y-auto",
+          // SM+: centered as usual
+          "sm:left-1/2 sm:right-auto sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-none sm:overflow-visible",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
         )}

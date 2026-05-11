@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState, useEffect } from "react";
 import { formatCurrency, centsToDollars } from "@/lib/utils/calculations";
 import { formatDate } from "@/lib/utils/date";
 import { getCurrencySymbol } from "@/lib/utils/currency";
@@ -20,13 +21,34 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts }: In
   const fmt = (cents: number) => formatCurrency(cents, currency);
   const symbol = getCurrencySymbol(currency);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const available = entry.contentRect.width - 48;
+      setScale(Math.min(1, available / 794));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     // Outer scroll wrapper — preview pane scrolls while form stays sticky
-    <div className="preview-scroll overflow-y-auto h-full bg-surface-100 p-6 flex justify-center">
+    <div ref={containerRef} className="preview-scroll overflow-y-auto h-full bg-surface-100 p-6 flex justify-center">
       {/* A4 sheet */}
       <div
         className="bg-white shadow-preview font-invoice text-surface-800 shrink-0 w-a4 min-h-a4"
-        style={{ padding: "48px" }}
+        style={{
+          padding: "48px",
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+          marginLeft: `${(scale - 1) * 397}px`,
+          marginRight: `${(scale - 1) * 397}px`,
+          marginBottom: `${(scale - 1) * 1123}px`,
+        }}
       >
         {/* ── Header ───────────────────────────────────────────────── */}
         <div className="flex justify-between items-start mb-10">

@@ -20,10 +20,10 @@ export function FinancialSummary({ form, financials, currency }: FinancialSummar
 
   return (
     <div className="flex justify-end">
-      <div className="w-72 space-y-3">
+      <div className="w-full sm:w-72 space-y-3">
         {/* Tax */}
-        <div className="flex items-center gap-3">
-          <Label className="shrink-0 w-24 text-right">Tax Rate (%)</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label className="shrink-0">Tax Rate (%)</Label>
           <Input
             type="number"
             step="0.01"
@@ -31,14 +31,14 @@ export function FinancialSummary({ form, financials, currency }: FinancialSummar
             max="100"
             {...register("taxRate", { valueAsNumber: true })}
             placeholder="0"
-            className="w-full"
+            className="w-24 text-right"
           />
         </div>
 
         {/* Discount */}
-        <div className="flex items-center gap-3">
-          <Label className="shrink-0 w-24 text-right">Discount</Label>
-          <div className="flex gap-2 flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <Label className="shrink-0">Discount</Label>
+          <div className="flex gap-2 items-center">
             <select
               {...register("discountType")}
               className="h-9 rounded-md border border-surface-200 bg-white px-2 text-sm text-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-600"
@@ -54,6 +54,7 @@ export function FinancialSummary({ form, financials, currency }: FinancialSummar
                 min="0"
                 {...register("discountValue", { valueAsNumber: true })}
                 placeholder={discountType === "PERCENTAGE" ? "10" : "50.00"}
+                className="w-24 text-right"
               />
             )}
           </div>

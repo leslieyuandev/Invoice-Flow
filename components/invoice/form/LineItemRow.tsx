@@ -5,7 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { formatCurrency, centsToDollars } from "@/lib/utils/calculations";
+import { formatCurrency } from "@/lib/utils/calculations";
 import { cn } from "@/lib/utils/cn";
 import type { InvoiceFormData } from "@/types";
 
@@ -13,7 +13,7 @@ interface LineItemRowProps {
   form: UseFormReturn<InvoiceFormData>;
   index: number;
   fieldId: string;
-  amount: number; // in cents, calculated by hook
+  amount: number;
   currency: string;
   onRemove: () => void;
   isOnly: boolean;
@@ -42,7 +42,9 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
       ref={setNodeRef}
       style={style}
       className={cn(
-        "grid grid-cols-[auto_1fr_80px_100px_80px_auto] gap-2 items-start py-2 px-1 rounded-lg transition-all",
+        // Mobile: 3-col [drag | description+subitems | delete]
+        // Desktop: 6-col flat grid (same as column headers)
+        "grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_80px_100px_80px_auto] gap-2 items-start py-2 px-1 rounded-lg transition-all",
         isDragging ? "opacity-50 bg-surface-50 shadow-card-lg z-50" : "hover:bg-surface-50"
       )}
     >
@@ -57,38 +59,53 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
         <GripVertical className="w-4 h-4" />
       </button>
 
-      {/* Description */}
-      <Input
-        {...register(`lineItems.${index}.description`)}
-        placeholder="Service or product description"
-        error={rowErrors?.description?.message}
-      />
+      {/* On mobile: flex-col block in the 1fr middle column.
+          On desktop: display:contents so children become direct grid cells. */}
+      <div className="flex flex-col gap-2 md:contents">
+        {/* Description — full width on mobile, own grid cell on desktop */}
+        <Input
+          {...register(`lineItems.${index}.description`)}
+          placeholder="Service or product description"
+          error={rowErrors?.description?.message}
+        />
 
-      {/* Qty */}
-      <Input
-        type="number"
-        step="0.001"
-        min="0"
-        {...register(`lineItems.${index}.quantity`, { valueAsNumber: true })}
-        placeholder="1"
-        error={rowErrors?.quantity?.message}
-      />
+        {/* On mobile: 3-col sub-row for qty, price, amount.
+            On desktop: display:contents exposes children as separate grid cells. */}
+        <div className="grid grid-cols-3 gap-2 md:contents">
+          {/* Qty */}
+          <div>
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Qty</p>
+            <Input
+              type="number"
+              step="0.001"
+              min="0"
+              {...register(`lineItems.${index}.quantity`, { valueAsNumber: true })}
+              placeholder="1"
+              error={rowErrors?.quantity?.message}
+            />
+          </div>
 
-      {/* Unit price */}
-      <Input
-        type="number"
-        step="0.01"
-        min="0"
-        {...register(`lineItems.${index}.unitPrice`, { valueAsNumber: true })}
-        placeholder="0.00"
-        error={rowErrors?.unitPrice?.message}
-      />
+          {/* Unit price */}
+          <div>
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Unit Price</p>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              {...register(`lineItems.${index}.unitPrice`, { valueAsNumber: true })}
+              placeholder="0.00"
+              error={rowErrors?.unitPrice?.message}
+            />
+          </div>
 
-      {/* Amount (read-only) */}
-      <div className="flex items-center justify-end mt-1">
-        <span className="text-sm font-medium tabular-nums text-surface-700">
-          {formatCurrency(amount, currency)}
-        </span>
+          {/* Amount (read-only) */}
+          <div className="flex flex-col items-end md:flex-row md:items-center md:justify-end md:mt-1">
+            <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Amt</p>
+            <span className="text-sm font-medium tabular-nums text-surface-700">
+              {formatCurrency(amount, currency)}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Remove */}

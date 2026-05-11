@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const links = [
@@ -15,9 +15,11 @@ const links = [
 interface SidebarProps {
   mobileOpen?: boolean;
   onClose?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -33,20 +35,34 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 flex flex-col w-60 shrink-0 border-r border-surface-200 bg-white h-screen transition-transform duration-200",
+          "fixed top-0 left-0 z-50 flex flex-col w-60 shrink-0 border-r border-surface-200 bg-white h-screen transition-all duration-200",
           "md:static md:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          collapsed && "md:w-14"
         )}
       >
         {/* Logo row */}
-        <div className="flex items-center justify-between px-5 h-16 border-b border-surface-200">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-600">
+        <div className="flex items-center justify-between px-3 h-16 border-b border-surface-200">
+          <div className={cn("flex items-center gap-2 min-w-0", collapsed && "md:hidden")}>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-600 shrink-0">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="text-sm font-bold text-surface-900 tracking-tight">InvoiceFlow</span>
+            <span className="text-sm font-bold text-surface-900 tracking-tight truncate">InvoiceFlow</span>
           </div>
-          {/* Close button — mobile only */}
+          {/* Icon-only logo when collapsed on desktop */}
+          <div className={cn("hidden items-center justify-center w-8 h-8 rounded-lg bg-brand-600 mx-auto", collapsed && "md:flex")}>
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          {/* Desktop collapse toggle */}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="hidden md:flex p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100 transition-colors shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+          {/* Mobile close button */}
           <button
             type="button"
             onClick={onClose}
@@ -66,15 +82,17 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
                 key={href}
                 href={href}
                 onClick={onClose}
+                title={collapsed ? label : undefined}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  collapsed && "md:justify-center md:px-0",
                   active
                     ? "bg-brand-50 text-brand-700"
                     : "text-surface-600 hover:bg-surface-100 hover:text-surface-900"
                 )}
               >
                 <Icon className={cn("w-4 h-4 shrink-0", active ? "text-brand-600" : "text-surface-400")} />
-                {label}
+                <span className={cn(collapsed && "md:hidden")}>{label}</span>
               </Link>
             );
           })}
