@@ -50,7 +50,7 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
   return (
     <div className="space-y-1">
       {/* Column headers — hidden on mobile */}
-      <div className="hidden md:grid grid-cols-[auto_1fr_80px_100px_80px_auto] gap-2 px-1">
+      <div className="hidden md:grid grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_auto] gap-2 px-1">
         <div className="w-4" />
         <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">Description</span>
         <span className="text-xs font-semibold text-surface-500 uppercase tracking-wide">Qty</span>

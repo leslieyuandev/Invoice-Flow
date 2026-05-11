@@ -54,7 +54,7 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts }: In
         <div className="flex justify-between items-start mb-10">
           <div>
             {data.senderLogoUrl ? (
-              <div className="mb-2 h-10 w-20 relative">
+              <div className="mb-3 h-[120px] w-[240px] relative">
                 <Image
                   src={data.senderLogoUrl}
                   alt="Company logo"

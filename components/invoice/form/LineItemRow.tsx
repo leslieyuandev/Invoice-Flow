@@ -44,7 +44,7 @@ export function LineItemRow({ form, index, fieldId, amount, currency, onRemove, 
       className={cn(
         // Mobile: 3-col [drag | description+subitems | delete]
         // Desktop: 6-col flat grid (same as column headers)
-        "grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_80px_100px_80px_auto] gap-2 items-start py-2 px-1 rounded-lg transition-all",
+        "grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_3fr_1fr_1.5fr_1.5fr_auto] gap-2 items-start py-2 px-1 rounded-lg transition-all",
         isDragging ? "opacity-50 bg-surface-50 shadow-card-lg z-50" : "hover:bg-surface-50"
       )}
     >

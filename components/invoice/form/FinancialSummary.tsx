@@ -19,8 +19,7 @@ export function FinancialSummary({ form, financials, currency }: FinancialSummar
   const fmt = (cents: number) => formatCurrency(cents, currency);
 
   return (
-    <div className="flex justify-end">
-      <div className="w-full sm:w-72 space-y-3">
+    <div className="space-y-3">
         {/* Tax */}
         <div className="flex items-center justify-between gap-3">
           <Label className="shrink-0">Tax Rate (%)</Label>
@@ -86,7 +85,6 @@ export function FinancialSummary({ form, financials, currency }: FinancialSummar
             <span className="tabular-nums text-brand-700">{fmt(financials.total)}</span>
           </div>
         </div>
-      </div>
     </div>
   );
 }

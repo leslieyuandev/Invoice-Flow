@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 36,
   },
-  logo: { width: 80, height: 40, objectFit: "contain" },
+  logo: { width: 240, height: 120, objectFit: "contain" },
   companyName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: "#0f172a" },
   companyMeta: { fontSize: 8, color: "#64748b", marginTop: 2 },
   invoiceLabel: { fontSize: 24, fontFamily: "Helvetica-Bold", color: "#4f46e5" },

@@ -46,6 +46,10 @@ interface InvoiceBuilderProps {
   invoiceId?: string;
 }
 
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function InvoiceBuilder({
   clients,
   existingNumbers = [],
@@ -79,8 +83,8 @@ export function InvoiceBuilder({
     resolver: standardSchemaResolver(createInvoiceSchema) as Resolver<InvoiceFormData, unknown, InvoiceFormData>,
     defaultValues: initialData ?? {
       invoiceNumber: generateInvoiceNumber(defaults.invoiceNumberPrefix, existingNumbers),
-      issueDate,
-      dueDate: addDays(issueDate, defaults.defaultPaymentTerms),
+      issueDate: toDateStr(issueDate) as unknown as Date,
+      dueDate: toDateStr(addDays(issueDate, defaults.defaultPaymentTerms)) as unknown as Date,
       currency: defaults.defaultCurrency,
       clientId: "",
       senderName: defaults.senderName,
@@ -103,11 +107,15 @@ export function InvoiceBuilder({
 
   const watchedIssueDate = form.watch("issueDate");
   useEffect(() => {
-    const parsed = watchedIssueDate instanceof Date
-      ? watchedIssueDate
-      : new Date(watchedIssueDate as unknown as string);
+    let parsed: Date;
+    if (watchedIssueDate instanceof Date) {
+      parsed = watchedIssueDate;
+    } else {
+      const parts = String(watchedIssueDate).split("-").map(Number);
+      parsed = new Date(parts[0], parts[1] - 1, parts[2]); // local timezone, avoid UTC shift
+    }
     if (!isNaN(parsed.getTime())) {
-      form.setValue("dueDate", addDays(parsed, defaults.defaultPaymentTerms), { shouldValidate: false });
+      form.setValue("dueDate", toDateStr(addDays(parsed, defaults.defaultPaymentTerms)) as unknown as Date, { shouldValidate: false });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedIssueDate]);
