@@ -61,6 +61,10 @@ export default async function EditProposalPage({ params }: PageProps) {
       quantity: ao.quantity,
       sortOrder: ao.sortOrder ?? idx,
     })),
+    pagesCount: (proposal as { pagesCount?: number }).pagesCount ?? 1,
+    addOnsEnabled: (proposal as { addOnsEnabled?: boolean }).addOnsEnabled ?? false,
+    creativity: (proposal as { creativity?: number }).creativity ?? 50,
+    elegance: (proposal as { elegance?: number }).elegance ?? 50,
   };
 
   return (

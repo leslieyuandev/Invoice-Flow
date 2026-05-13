@@ -121,6 +121,10 @@ export async function createProposal(
       eventCategoryId: input.eventCategoryId,
       coverImageUrl: input.coverImageUrl || null,
       termsText: input.termsText || null,
+      pagesCount: input.pagesCount ?? 1,
+      addOnsEnabled: input.addOnsEnabled ?? false,
+      creativity: input.creativity ?? 50,
+      elegance: input.elegance ?? 50,
       items: {
         create: input.selectedPackages.map((pkg, idx) => ({
           sortOrder: pkg.sortOrder ?? idx,
@@ -175,6 +179,10 @@ export async function updateProposal(
         eventCategoryId: input.eventCategoryId,
         coverImageUrl: input.coverImageUrl || null,
         termsText: input.termsText || null,
+        pagesCount: input.pagesCount ?? 1,
+        addOnsEnabled: input.addOnsEnabled ?? false,
+        creativity: input.creativity ?? 50,
+        elegance: input.elegance ?? 50,
         items: {
           create: input.selectedPackages.map((pkg, idx) => ({
             sortOrder: pkg.sortOrder ?? idx,

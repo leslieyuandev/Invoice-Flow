@@ -298,6 +298,11 @@ model Proposal {
   sentAt    DateTime?
   deletedAt DateTime?
 
+  pagesCount    Int     @default(1)
+  addOnsEnabled Boolean @default(false)
+  creativity    Int     @default(50)
+  elegance      Int     @default(50)
+
   items  ProposalItem[]
   addOns ProposalAddOnItem[]
 

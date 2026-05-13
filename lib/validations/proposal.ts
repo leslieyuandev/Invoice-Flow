@@ -36,7 +36,21 @@ export const createProposalSchema = z.object({
     .array(proposalPackageSchema)
     .min(1, "Select at least one package"),
   selectedAddOns: z.array(proposalAddOnSchema),
-});
+  pagesCount: z.number().int().min(1).max(10).default(1),
+  addOnsEnabled: z.boolean().default(false),
+  creativity: z.number().int().min(0).max(100).default(50),
+  elegance: z.number().int().min(0).max(100).default(50),
+}).refine(
+  (data) => {
+    const pkgCount = data.selectedPackages?.length ?? 0;
+    if (pkgCount === 0) return true;
+    return data.pagesCount * 6 >= pkgCount;
+  },
+  {
+    message: "Too many packages for the selected page count (max 6 per page). Increase pages or remove packages.",
+    path: ["pagesCount"],
+  }
+);
 
 export const updateProposalSchema = createProposalSchema;
 

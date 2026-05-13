@@ -73,4 +73,8 @@ export interface ProposalFormData {
   termsText: string;
   selectedPackages: ProposalPackageFormItem[];
   selectedAddOns: ProposalAddOnFormItem[];
+  pagesCount: number;
+  addOnsEnabled: boolean;
+  creativity: number;
+  elegance: number;
 }
