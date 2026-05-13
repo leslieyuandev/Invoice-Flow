@@ -1,8 +1,10 @@
 import { Resend } from "resend";
 import type { InvoiceWithRelations } from "@/types";
+import type { ProposalWithItems } from "@/types/proposal";
 import { formatCurrency } from "@/lib/utils/calculations";
 import { formatDate } from "@/lib/utils/date";
 import { generateInvoicePDF } from "./pdf.service";
+import { generateProposalPDF } from "./proposal-pdf.service";
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
@@ -121,4 +123,81 @@ function buildEmailHtml({
   </div>
 </body>
 </html>`;
+}
+
+interface SendProposalEmailOptions {
+  proposal: ProposalWithItems;
+  recipientEmail: string;
+  customMessage?: string;
+}
+
+export async function sendProposalEmail(options: SendProposalEmailOptions): Promise<void> {
+  const { proposal, recipientEmail, customMessage } = options;
+
+  const pdfBuffer = await generateProposalPDF(proposal);
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proposal — ${proposal.eventTitle}</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .header { background: #4f46e5; padding: 32px 40px; }
+    .header-title { color: #fff; font-size: 22px; font-weight: 700; margin: 0; }
+    .header-sub { color: #c7d2fe; font-size: 14px; margin: 4px 0 0; }
+    .body { padding: 36px 40px; }
+    .greeting { font-size: 15px; margin-bottom: 20px; }
+    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; }
+    .footer { background: #f8fafc; padding: 20px 40px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">${proposal.eventTitle}</p>
+      <p class="header-sub">Proposal from ${proposal.senderName}</p>
+    </div>
+    <div class="body">
+      <p class="greeting">Hi ${proposal.leadName},</p>
+      ${customMessage ? `<div class="message-box">${customMessage}</div>` : `<p style="font-size:14px;color:#475569;margin-bottom:28px;">Please find your event proposal attached to this email. We look forward to making your event special!</p>`}
+    </div>
+    <div class="footer">
+      <p>${proposal.senderName}${proposal.senderEmail ? ` · ${proposal.senderEmail}` : ""}${proposal.senderPhone ? ` · ${proposal.senderPhone}` : ""}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await getResend().emails.send({
+        from: `${proposal.senderName} <${FROM_EMAIL}>`,
+        to: [recipientEmail],
+        subject: `Proposal from ${proposal.senderName} — ${proposal.eventTitle}`,
+        html,
+        attachments: [
+          {
+            filename: `Proposal-${proposal.id}.pdf`,
+            content: pdfBuffer.toString("base64"),
+          },
+        ],
+      });
+
+      if (error) throw new Error(error.message);
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+
+  throw new Error(`Failed to send proposal email after ${MAX_RETRIES} attempts: ${lastError?.message}`);
 }

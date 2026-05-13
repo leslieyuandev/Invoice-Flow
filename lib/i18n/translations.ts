@@ -138,6 +138,49 @@ const en = {
   "clientDialog.cancel": "Cancel",
   "clientDialog.saveChanges": "Save changes",
   "clientDialog.addClientBtn": "Add client",
+  // Proposals nav
+  "nav.proposals": "Proposals",
+  // Proposals listing
+  "proposals.title": "Proposals",
+  "proposals.tab.all": "All",
+  "proposals.tab.draft": "Draft",
+  "proposals.tab.sent": "Sent",
+  "proposals.tab.accepted": "Accepted",
+  "proposals.tab.rejected": "Rejected",
+  "proposals.empty": "No proposals yet. Create your first proposal.",
+  // Proposal status
+  "proposalStatus.DRAFT": "Draft",
+  "proposalStatus.SENT": "Sent",
+  "proposalStatus.ACCEPTED": "Accepted",
+  "proposalStatus.REJECTED": "Rejected",
+  // Proposal builder
+  "proposalBuilder.newProposal": "New Proposal",
+  "proposalBuilder.editProposal": "Edit Proposal",
+  "proposalBuilder.leadInfo": "Lead Information",
+  "proposalBuilder.leadName": "Name",
+  "proposalBuilder.leadEmail": "Email",
+  "proposalBuilder.leadPhone": "Phone / WhatsApp",
+  "proposalBuilder.eventDetails": "Event Details",
+  "proposalBuilder.eventTitle": "Event Title",
+  "proposalBuilder.eventTitle.placeholder": "e.g. Lee & Chan — Wedding Dinner",
+  "proposalBuilder.eventCategory": "Event Category",
+  "proposalBuilder.packages": "Packages",
+  "proposalBuilder.addOns": "Optional Add-Ons",
+  "proposalBuilder.coverImage": "Cover Image URL",
+  "proposalBuilder.terms": "Terms & Contact",
+  "proposalBuilder.noPackages": "No packages available for this category yet.",
+  "proposalBuilder.replacePhoto": "Replace Photo",
+  "proposalBuilder.bestSeller": "Best Seller",
+  "proposalBuilder.save": "Save",
+  "proposalBuilder.downloadPdf": "Download PDF",
+  "proposalBuilder.send": "Send",
+  "proposalBuilder.preview.subtitle": "Live preview updates as you fill the form",
+  // Proposal actions
+  "proposalActions.markAccepted": "Mark Accepted",
+  "proposalActions.markRejected": "Mark Rejected",
+  "proposalActions.delete": "Delete",
+  // Proposal send dialog
+  "proposalSendDialog.title": "Send Proposal",
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
@@ -278,6 +321,49 @@ const zh: Record<keyof typeof en, string> = {
   "clientDialog.cancel": "取消",
   "clientDialog.saveChanges": "保存更改",
   "clientDialog.addClientBtn": "添加客户",
+  // Proposals nav
+  "nav.proposals": "建议书",
+  // Proposals listing
+  "proposals.title": "建议书",
+  "proposals.tab.all": "全部",
+  "proposals.tab.draft": "草稿",
+  "proposals.tab.sent": "已发送",
+  "proposals.tab.accepted": "已接受",
+  "proposals.tab.rejected": "已拒绝",
+  "proposals.empty": "暂无建议书，创建您的第一份建议书。",
+  // Proposal status
+  "proposalStatus.DRAFT": "草稿",
+  "proposalStatus.SENT": "已发送",
+  "proposalStatus.ACCEPTED": "已接受",
+  "proposalStatus.REJECTED": "已拒绝",
+  // Proposal builder
+  "proposalBuilder.newProposal": "新建建议书",
+  "proposalBuilder.editProposal": "编辑建议书",
+  "proposalBuilder.leadInfo": "客户信息",
+  "proposalBuilder.leadName": "姓名",
+  "proposalBuilder.leadEmail": "电子邮件",
+  "proposalBuilder.leadPhone": "电话 / WhatsApp",
+  "proposalBuilder.eventDetails": "活动详情",
+  "proposalBuilder.eventTitle": "活动标题",
+  "proposalBuilder.eventTitle.placeholder": "例如：李先生与陈小姐 — 婚宴",
+  "proposalBuilder.eventCategory": "活动类别",
+  "proposalBuilder.packages": "套餐",
+  "proposalBuilder.addOns": "可选附加项",
+  "proposalBuilder.coverImage": "封面图片网址",
+  "proposalBuilder.terms": "条款与联系方式",
+  "proposalBuilder.noPackages": "此类别暂无套餐。",
+  "proposalBuilder.replacePhoto": "替换图片",
+  "proposalBuilder.bestSeller": "热销",
+  "proposalBuilder.save": "保存",
+  "proposalBuilder.downloadPdf": "下载 PDF",
+  "proposalBuilder.send": "发送",
+  "proposalBuilder.preview.subtitle": "填写表单时预览实时更新",
+  // Proposal actions
+  "proposalActions.markAccepted": "标记为已接受",
+  "proposalActions.markRejected": "标记为已拒绝",
+  "proposalActions.delete": "删除",
+  // Proposal send dialog
+  "proposalSendDialog.title": "发送建议书",
 };
 
 export type TranslationKey = keyof typeof en;

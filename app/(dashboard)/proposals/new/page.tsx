@@ -1,0 +1,32 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { getCatalogCategoryTree, getAllPackages, getAddOns } from "@/lib/services/proposal.service";
+import { ProposalBuilder } from "@/components/proposal/ProposalBuilder";
+
+export default async function NewProposalPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const [categoryTree, packages, addOns, user] = await Promise.all([
+    getCatalogCategoryTree(),
+    getAllPackages(),
+    getAddOns(),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { name: true },
+    }),
+  ]);
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <ProposalBuilder
+        categoryTree={categoryTree}
+        packages={packages}
+        addOns={addOns}
+        senderName={user?.name ?? ""}
+        mode="create"
+      />
+    </div>
+  );
+}

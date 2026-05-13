@@ -77,6 +77,7 @@ model User {
   clients           Client[]
   invoices          Invoice[]
   lineItemTemplates LineItemTemplate[]
+  proposals         Proposal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -99,8 +100,9 @@ model Client {
 
   deletedAt DateTime?
 
-  invoices Invoice[]
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices  Invoice[]
+  proposals Proposal[]
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -201,6 +203,150 @@ model LineItem {
 
   @@index([invoiceId, sortOrder])
 }
+
+// ─── Proposal Catalog ─────────────────────────────────────────────────────────
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model EventCategory {
+  id        String  @id @default(cuid())
+  name      String
+  slug      String  @unique
+  parentId  String?
+  sortOrder Int     @default(0)
+
+  parent   EventCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children EventCategory[] @relation("CategoryTree")
+  packages CatalogPackage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+}
+
+model CatalogPackage {
+  id            String  @id @default(cuid())
+  categoryId    String
+  name          String
+  tagline       String?
+  price         Int
+  originalPrice Int?
+  imageUrl      String?
+  isBestSeller  Boolean @default(false)
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  features CatalogPackageFeature[]
+  category EventCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+}
+
+model CatalogPackageFeature {
+  id        String @id @default(cuid())
+  packageId String
+  text      String
+  sortOrder Int    @default(0)
+
+  package CatalogPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+}
+
+model CatalogAddOn {
+  id         String  @id @default(cuid())
+  name       String
+  price      Int?
+  priceLabel String?
+  imageUrl   String?
+  isActive   Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Proposal {
+  id     String @id @default(cuid())
+  userId String
+
+  leadName    String
+  leadEmail   String?
+  leadPhone   String?
+  clientId    String?
+
+  senderName    String
+  senderEmail   String?
+  senderLogoUrl String?
+  senderPhone   String?
+
+  eventTitle      String
+  eventCategoryId String
+  coverImageUrl   String?
+  termsText       String? @db.Text
+
+  status    ProposalStatus @default(DRAFT)
+  sentAt    DateTime?
+  deletedAt DateTime?
+
+  items  ProposalItem[]
+  addOns ProposalAddOnItem[]
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, deletedAt])
+}
+
+model ProposalItem {
+  id         String @id @default(cuid())
+  proposalId String
+  sortOrder  Int    @default(0)
+
+  packageName   String
+  tagline       String?
+  price         Int
+  originalPrice Int?
+  imageUrl      String?
+  isBestSeller  Boolean @default(false)
+  features      String  @db.Text
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, sortOrder])
+}
+
+model ProposalAddOnItem {
+  id         String @id @default(cuid())
+  proposalId String
+  sortOrder  Int    @default(0)
+
+  addOnName  String
+  price      Int?
+  priceLabel String?
+  imageUrl   String?
+  quantity   Int    @default(1)
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, sortOrder])
+}
+
+// ─── Invoice Templates ────────────────────────────────────────────────────────
 
 model LineItemTemplate {
   id          String  @id @default(cuid())

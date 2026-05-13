@@ -13,6 +13,8 @@ const badgeVariants = cva(
         paid:      "bg-green-50 text-green-700",
         overdue:   "bg-orange-50 text-orange-700",
         cancelled: "bg-red-50 text-red-700",
+        accepted:  "bg-green-50 text-green-700",
+        rejected:  "bg-red-50 text-red-700",
       },
     },
     defaultVariants: { variant: "draft" },
