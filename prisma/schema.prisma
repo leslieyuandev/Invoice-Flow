@@ -62,13 +62,15 @@ model User {
   companyEmail    String?
   companyPhone    String?
   companyWebsite  String?
-  logoUrl         String?
+  logoUrl            String?
+  proposalLogoUrl    String?
 
   defaultCurrency        String  @default("MYR")
   defaultTaxRate         Decimal @default(0) @db.Decimal(5, 2)
   defaultPaymentTerms    Int?    @default(30)
   defaultNotes           String? @db.Text
   defaultTerms           String? @db.Text
+  proposalDefaultTerms   String? @db.Text
   invoiceNumberPrefix    String  @default("INV")
   showDueDate            Boolean @default(true)
 
@@ -301,10 +303,8 @@ model Proposal {
 
   bgColor       String?
   coverTitle    String?
-  pagesCount    Int     @default(1)
   addOnsEnabled Boolean @default(false)
-  creativity    Int     @default(50)
-  elegance      Int     @default(50)
+  compact       Boolean @default(false)
 
   items  ProposalItem[]
   addOns ProposalAddOnItem[]

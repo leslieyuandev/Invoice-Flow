@@ -24,6 +24,8 @@ export default async function SettingsPage() {
         defaultTerms: true,
         invoiceNumberPrefix: true,
         logoUrl: true,
+        proposalLogoUrl: true,
+        proposalDefaultTerms: true,
         passwordHash: true,
         showDueDate: true,
       },
@@ -54,6 +56,8 @@ export default async function SettingsPage() {
             defaultTerms: user.defaultTerms ?? "50% booking fees upon confirmation\n\nPlease make your payment to:\nBank: Public Bank\nAccount No.: 3823632829\nHalo Balloon Services",
             invoiceNumberPrefix: user.invoiceNumberPrefix ?? "INV",
             logoUrl: user.logoUrl ?? "",
+            proposalLogoUrl: user.proposalLogoUrl ?? "",
+            proposalDefaultTerms: user.proposalDefaultTerms ?? "",
             hasPassword: !!user.passwordHash,
             showDueDate: user.showDueDate ?? true,
           }}

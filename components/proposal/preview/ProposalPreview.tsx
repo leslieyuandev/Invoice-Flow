@@ -295,74 +295,84 @@ function AddOnsSlide({
         backgroundColor: bg,
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
         overflow: "hidden",
       }}
     >
       <CurlTopLeft />
       <CurlTopRight />
-      {/* Title */}
-      <h2
-        style={{
-          color: GOLD,
-          fontSize: 26,
-          fontWeight: "bold",
-          letterSpacing: 8,
-          marginTop: 44,
-          marginBottom: 28,
-        }}
-      >
-        ADD ONS
-      </h2>
-      {/* Grid 4 cols */}
+      {/* Center content vertically */}
       <div
         style={{
+          flex: 1,
           display: "flex",
-          flexWrap: "wrap",
+          flexDirection: "column",
+          alignItems: "center",
           justifyContent: "center",
-          gap: "16px 32px",
           padding: "0 40px",
-          width: "100%",
+          gap: 0,
         }}
       >
-        {addOns.map((ao, i) => {
-          const price = displayAddOnPrice(ao);
-          return (
-            <div
-              key={i}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 120 }}
-            >
-              {ao.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={ao.imageUrl}
-                  alt={ao.addOnName}
-                  style={{ width: 70, height: 70, objectFit: "contain", borderRadius: 4 }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 70,
-                    height: 70,
-                    borderRadius: 4,
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <span style={{ color: GOLD, fontSize: 18 }}>✦</span>
-                </div>
-              )}
-              <p style={{ color: "white", fontWeight: "bold", fontSize: 10, textAlign: "center", marginTop: 8 }}>
-                {ao.addOnName}
-              </p>
-              {price && (
-                <p style={{ color: GOLD, fontSize: 10, textAlign: "center" }}>{price}</p>
-              )}
-            </div>
-          );
-        })}
+        {/* Title */}
+        <h2
+          style={{
+            color: GOLD,
+            fontSize: 26,
+            fontWeight: "bold",
+            letterSpacing: 8,
+            margin: "0 0 24px 0",
+          }}
+        >
+          ADD ONS
+        </h2>
+        {/* Grid */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "16px 28px",
+            width: "100%",
+          }}
+        >
+          {addOns.map((ao, i) => {
+            const price = displayAddOnPrice(ao);
+            return (
+              <div
+                key={i}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 110 }}
+              >
+                {ao.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ao.imageUrl}
+                    alt={ao.addOnName}
+                    style={{ width: 65, height: 65, objectFit: "contain", borderRadius: 4 }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 65,
+                      height: 65,
+                      borderRadius: 4,
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span style={{ color: GOLD, fontSize: 18 }}>✦</span>
+                  </div>
+                )}
+                <p style={{ color: "white", fontWeight: "bold", fontSize: 10, textAlign: "center", marginTop: 6 }}>
+                  {ao.addOnName}
+                </p>
+                {price && (
+                  <p style={{ color: GOLD, fontSize: 10, textAlign: "center", margin: 0 }}>{price}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
       {/* Logo bottom-right */}
       <div style={{ position: "absolute", bottom: 20, right: 28, textAlign: "right" }}>
@@ -370,6 +380,103 @@ function AddOnsSlide({
         <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 7, fontStyle: "italic", marginTop: 2 }}>
           Your Vision. Our Craft.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function CompactPackagesSlide({
+  packages,
+  pageIndex,
+  bg,
+  senderName,
+  senderLogoUrl,
+}: {
+  packages: ProposalFormData["selectedPackages"];
+  pageIndex: number;
+  bg: string;
+  senderName: string;
+  senderLogoUrl?: string | null;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        backgroundColor: bg,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        padding: "20px 28px 16px",
+      }}
+    >
+      <CurlTopLeft />
+      <CurlTopRight />
+      {/* Header */}
+      <p
+        style={{
+          color: GOLD,
+          fontSize: 9,
+          fontWeight: "bold",
+          letterSpacing: 4,
+          textAlign: "center",
+          marginBottom: 12,
+        }}
+      >
+        PACKAGES{pageIndex > 0 ? ` (CONT.)` : ""}
+      </p>
+      {/* 3-column grid */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+        {[0, 1].map((row) => (
+          <div key={row} style={{ flex: 1, display: "flex", gap: 10 }}>
+            {[0, 1, 2].map((col) => {
+              const pkg = packages[row * 3 + col];
+              if (!pkg) return <div key={col} style={{ flex: 1 }} />;
+              const photoUrl = pkg.imageOverride || pkg.imageUrl;
+              return (
+                <div
+                  key={col}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "row",
+                    backgroundColor: "rgba(0,0,0,0.18)",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <div style={{ width: 56, flexShrink: 0, backgroundColor: "#555", position: "relative" }}>
+                    {photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoUrl} alt={pkg.packageName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", backgroundColor: "rgba(255,255,255,0.1)" }} />
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div style={{ flex: 1, padding: "8px 10px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <p style={{ color: GOLD, fontSize: 13, fontWeight: "bold", lineHeight: 1, margin: 0 }}>
+                      {fmtPriceRm(pkg.price)}
+                    </p>
+                    <p style={{ color: "white", fontSize: 9, fontWeight: "bold", margin: "3px 0 2px", lineHeight: 1.2 }}>
+                      {pkg.packageName}
+                    </p>
+                    {pkg.features.slice(0, 2).map((f, fi) => (
+                      <p key={fi} style={{ color: "rgba(255,255,255,0.75)", fontSize: 7.5, margin: 0, lineHeight: 1.3 }}>
+                        • {f}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {/* Logo */}
+      <div style={{ position: "absolute", bottom: 14, right: 24, textAlign: "right" }}>
+        <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
       </div>
     </div>
   );
@@ -484,6 +591,7 @@ interface ProposalPreviewProps {
   senderLogoUrl?: string | null;
   senderPhone?: string | null;
   senderEmail?: string | null;
+  compact?: boolean;
 }
 
 export function ProposalPreview({
@@ -492,6 +600,7 @@ export function ProposalPreview({
   senderLogoUrl,
   senderPhone,
   senderEmail,
+  compact = false,
 }: ProposalPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -512,15 +621,21 @@ export function ProposalPreview({
   const selectedAddOns = data.selectedAddOns ?? [];
   const addOnsEnabled = data.addOnsEnabled ?? false;
 
+  // Build slides based on compact mode
+  const compactPages = compact
+    ? Array.from({ length: Math.ceil(selectedPackages.length / 6) }, (_, i) => i)
+    : [];
+
   const slides: { id: string; label: string }[] = [
     { id: "cover", label: "Cover" },
-    ...selectedPackages.map((_, i) => ({ id: `pkg-${i}`, label: `Pkg ${i + 1}` })),
+    ...(compact
+      ? compactPages.map((pi) => ({ id: `compact-${pi}`, label: `Pkgs${pi > 0 ? ` ${pi + 1}` : ""}` }))
+      : selectedPackages.map((_, i) => ({ id: `pkg-${i}`, label: `Pkg ${i + 1}` }))),
     ...(addOnsEnabled && selectedAddOns.length > 0 ? [{ id: "addons", label: "Add-Ons" }] : []),
     { id: "terms", label: "Terms" },
   ];
 
   const [activeSlide, setActiveSlide] = useState("cover");
-
   const effectiveSlide = slides.find((s) => s.id === activeSlide) ? activeSlide : slides[0]?.id ?? "cover";
 
   return (
@@ -559,18 +674,31 @@ export function ProposalPreview({
           {effectiveSlide === "cover" && (
             <CoverSlide data={data} senderName={senderName} senderLogoUrl={senderLogoUrl} />
           )}
-          {selectedPackages.map((pkg, i) =>
-            effectiveSlide === `pkg-${i}` ? (
-              <PackageSlide
-                key={i}
-                item={pkg}
-                index={i}
-                bg={bg}
-                senderName={senderName}
-                senderLogoUrl={senderLogoUrl}
-              />
-            ) : null
-          )}
+          {compact
+            ? compactPages.map((pi) =>
+                effectiveSlide === `compact-${pi}` ? (
+                  <CompactPackagesSlide
+                    key={pi}
+                    packages={selectedPackages.slice(pi * 6, pi * 6 + 6)}
+                    pageIndex={pi}
+                    bg={bg}
+                    senderName={senderName}
+                    senderLogoUrl={senderLogoUrl}
+                  />
+                ) : null
+              )
+            : selectedPackages.map((pkg, i) =>
+                effectiveSlide === `pkg-${i}` ? (
+                  <PackageSlide
+                    key={i}
+                    item={pkg}
+                    index={i}
+                    bg={bg}
+                    senderName={senderName}
+                    senderLogoUrl={senderLogoUrl}
+                  />
+                ) : null
+              )}
           {effectiveSlide === "addons" && addOnsEnabled && selectedAddOns.length > 0 && (
             <AddOnsSlide
               addOns={selectedAddOns}

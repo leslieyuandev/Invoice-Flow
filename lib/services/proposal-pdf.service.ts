@@ -15,6 +15,26 @@ import type { ProposalWithItems } from "@/types/proposal";
 
 Font.registerHyphenationCallback((word) => [word]);
 
+// Register Tenor Sans for headings (Google Fonts CDN)
+try {
+  Font.register({
+    family: "Tenor Sans",
+    src: "https://fonts.gstatic.com/s/tenorsans/v19/bx6ANxqUneKx06UkIXISr3JyC22IyqI.woff2",
+  });
+  Font.register({
+    family: "Clear Sans",
+    fonts: [
+      { src: "https://fonts.gstatic.com/s/clearsans/v2/q2sTCqbg-6-m1Hm2Y3LMRQ.ttf", fontWeight: "normal" },
+      { src: "https://fonts.gstatic.com/s/clearsans/v2/q2sUCqbg-6-m1Hm2Y3LMRQ.ttf", fontWeight: "bold" },
+    ],
+  });
+} catch {
+  // Font registration failure is non-fatal; PDF falls back to Helvetica
+}
+
+const HEADING_FONT = "Tenor Sans";
+const BODY_FONT = "Clear Sans";
+
 const PAGE_SIZE: [number, number] = [841.89, 595.28];
 const GOLD = "#D4A843";
 const DEFAULT_BG = "#C8151B";
@@ -252,6 +272,7 @@ function PackagePage({
             fontWeight: "bold",
             letterSpacing: 3,
             marginBottom: 8,
+            fontFamily: BODY_FONT,
           },
         },
         `PACKAGE ${index + 1}`
@@ -262,7 +283,7 @@ function PackagePage({
         { style: { flexDirection: "row", alignItems: "flex-end", marginBottom: 14 } },
         React.createElement(
           Text,
-          { style: { color: GOLD, fontSize: 44, fontWeight: "bold", lineHeight: 1 } },
+          { style: { color: GOLD, fontSize: 44, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT } },
           fmtRm(item.price)
         ),
         item.originalPrice != null
@@ -346,13 +367,21 @@ function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
 
   return React.createElement(
     Page,
-    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative", overflow: "hidden" } },
+    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative" } },
     CurlTopLeftSvg(),
     CurlTopRightSvg(),
-    // ADD ONS title
+    // Centered content wrapper
     React.createElement(
       View,
-      { style: { alignItems: "center", marginTop: 42 } },
+      {
+        style: {
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 40,
+        },
+      },
+      // ADD ONS title
       React.createElement(
         Text,
         {
@@ -361,64 +390,65 @@ function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
             fontSize: 24,
             fontWeight: "bold",
             letterSpacing: 8,
+            marginBottom: 22,
+            fontFamily: HEADING_FONT,
           },
         },
         "ADD ONS"
       ),
-    ),
-    // Grid: up to 4 columns, wrap
-    React.createElement(
-      View,
-      {
-        style: {
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          gap: 20,
-          marginTop: 24,
-          paddingHorizontal: 40,
+      // Grid
+      React.createElement(
+        View,
+        {
+          style: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 18,
+            width: "100%",
+          },
         },
-      },
-      ...addOns.map((ao, i) => {
-        const price = fmtAoPrice(ao);
-        return React.createElement(
-          View,
-          { key: i, style: { alignItems: "center", width: 110 } },
-          ao.imageUrl
-            ? React.createElement(Image, {
-                src: ao.imageUrl,
-                style: { width: 65, height: 65, objectFit: "contain" },
-              })
-            : React.createElement(View, {
+        ...addOns.map((ao, i) => {
+          const price = fmtAoPrice(ao);
+          return React.createElement(
+            View,
+            { key: i, style: { alignItems: "center", width: 110 } },
+            ao.imageUrl
+              ? React.createElement(Image, {
+                  src: ao.imageUrl,
+                  style: { width: 65, height: 65, objectFit: "contain" },
+                })
+              : React.createElement(View, {
+                  style: {
+                    width: 65,
+                    height: 65,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 4,
+                  },
+                }),
+            React.createElement(
+              Text,
+              {
                 style: {
-                  width: 65,
-                  height: 65,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderRadius: 4,
+                  color: "white",
+                  fontWeight: "bold",
+                  fontSize: 9,
+                  marginTop: 6,
+                  textAlign: "center",
                 },
-              }),
-          React.createElement(
-            Text,
-            {
-              style: {
-                color: "white",
-                fontWeight: "bold",
-                fontSize: 9,
-                marginTop: 6,
-                textAlign: "center",
               },
-            },
-            ao.addOnName
-          ),
-          price
-            ? React.createElement(
-                Text,
-                { style: { color: GOLD, fontSize: 9, textAlign: "center" } },
-                price
-              )
-            : null,
-        );
-      }),
+              ao.addOnName
+            ),
+            price
+              ? React.createElement(
+                  Text,
+                  { style: { color: GOLD, fontSize: 9, textAlign: "center" } },
+                  price
+                )
+              : null,
+          );
+        }),
+      ),
     ),
     // Logo bottom-right
     React.createElement(
@@ -431,6 +461,113 @@ function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
         "Your Vision. Our Craft."
       ),
     ),
+  );
+}
+
+// ── Compact Package Page (multiple packages per page) ─────────────────────────
+
+function CompactPackagePage({
+  items,
+  pageIndex,
+  proposal,
+}: {
+  items: ProposalWithItems["items"];
+  pageIndex: number;
+  proposal: ProposalWithItems;
+}) {
+  const bg = getBg(proposal);
+
+  return React.createElement(
+    Page,
+    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative", padding: 24 } },
+    CurlTopLeftSvg(),
+    CurlTopRightSvg(),
+    React.createElement(
+      Text,
+      {
+        style: {
+          color: GOLD,
+          fontSize: 9,
+          fontWeight: "bold",
+          letterSpacing: 4,
+          textAlign: "center",
+          marginBottom: 10,
+          fontFamily: HEADING_FONT,
+        },
+      },
+      pageIndex > 0 ? "PACKAGES (CONT.)" : "PACKAGES"
+    ),
+    // 2-row × 3-col grid
+    React.createElement(
+      View,
+      { style: { flex: 1, flexDirection: "column", gap: 8 } },
+      ...[0, 1].map((row) =>
+        React.createElement(
+          View,
+          { key: row, style: { flex: 1, flexDirection: "row", gap: 8 } },
+          ...[0, 1, 2].map((col) => {
+            const item = items[row * 3 + col];
+            if (!item) return React.createElement(View, { key: col, style: { flex: 1 } });
+            let features: string[] = [];
+            try { features = JSON.parse(item.features) as string[]; } catch { features = []; }
+            return React.createElement(
+              View,
+              {
+                key: col,
+                style: {
+                  flex: 1,
+                  flexDirection: "row",
+                  backgroundColor: "rgba(0,0,0,0.18)",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                },
+              },
+              // Thumbnail
+              React.createElement(
+                View,
+                { style: { width: 60, backgroundColor: "#555" } },
+                item.imageUrl
+                  ? React.createElement(Image, {
+                      src: item.imageUrl,
+                      style: { width: 60, height: "100%", objectFit: "cover" },
+                    })
+                  : React.createElement(View, {
+                      style: { width: 60, height: "100%", backgroundColor: "rgba(255,255,255,0.1)" },
+                    })
+              ),
+              // Info
+              React.createElement(
+                View,
+                { style: { flex: 1, padding: 8, justifyContent: "center" } },
+                React.createElement(
+                  Text,
+                  { style: { color: GOLD, fontSize: 14, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT } },
+                  fmtRm(item.price)
+                ),
+                React.createElement(
+                  Text,
+                  { style: { color: "white", fontSize: 8, fontWeight: "bold", marginTop: 2, marginBottom: 2, lineHeight: 1.2 } },
+                  item.packageName
+                ),
+                ...features.slice(0, 2).map((f, fi) =>
+                  React.createElement(
+                    Text,
+                    { key: fi, style: { color: "rgba(255,255,255,0.75)", fontSize: 7, lineHeight: 1.3 } },
+                    `• ${f}`
+                  )
+                )
+              )
+            );
+          })
+        )
+      )
+    ),
+    // Logo
+    React.createElement(
+      View,
+      { style: { position: "absolute", bottom: 14, right: 20 } },
+      logoEl(proposal.senderLogoUrl, proposal.senderName, true)
+    )
   );
 }
 
@@ -526,16 +663,29 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function generateProposalPDF(proposal: ProposalWithItems): Promise<Buffer> {
-  const showAddOns = proposal.addOns.length > 0 &&
-    ((proposal as unknown as { addOnsEnabled?: boolean }).addOnsEnabled ?? false);
+  const p = proposal as unknown as { addOnsEnabled?: boolean; compact?: boolean };
+  const showAddOns = proposal.addOns.length > 0 && (p.addOnsEnabled ?? false);
+  const compact = p.compact ?? false;
+
+  // Compact: chunk items into pages of 6
+  const packagePages = compact
+    ? Array.from({ length: Math.ceil(proposal.items.length / 6) }, (_, pi) =>
+        React.createElement(CompactPackagePage, {
+          key: `compact-${pi}`,
+          items: proposal.items.slice(pi * 6, pi * 6 + 6),
+          pageIndex: pi,
+          proposal,
+        })
+      )
+    : proposal.items.map((item, i) =>
+        React.createElement(PackagePage, { key: item.id, item, index: i, proposal })
+      );
 
   const doc = React.createElement(
     Document,
     {},
     React.createElement(CoverPage, { proposal }),
-    ...proposal.items.map((item, i) =>
-      React.createElement(PackagePage, { key: item.id, item, index: i, proposal })
-    ),
+    ...packagePages,
     ...(showAddOns ? [React.createElement(AddOnsPage, { proposal })] : []),
     React.createElement(TermsPage, { proposal }),
   );

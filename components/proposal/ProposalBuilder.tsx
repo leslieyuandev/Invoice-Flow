@@ -77,12 +77,14 @@ export function ProposalBuilder({
       selectedPackages: [],
       selectedAddOns: [],
       addOnsEnabled: false,
+      compact: false,
     },
   });
 
   const watchedValues = useWatch({ control: form.control });
   const selectedPkgs = watchedValues.selectedPackages ?? [];
   const addOnsEnabled = watchedValues.addOnsEnabled ?? false;
+  const compact = watchedValues.compact ?? false;
 
   const canSend = Boolean(
     watchedValues.leadName &&
@@ -227,7 +229,38 @@ export function ProposalBuilder({
             {/* Packages */}
             <Card>
               <CardHeader>
-                <CardTitle>{t("proposalBuilder.packages")}</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>{t("proposalBuilder.packages")}</CardTitle>
+                    {compact && (
+                      <p className="text-xs text-surface-400 mt-0.5">Compact: up to 6 packages per page</p>
+                    )}
+                  </div>
+                  <Controller
+                    control={form.control}
+                    name="compact"
+                    render={({ field }) => (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-surface-500">Compact</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={field.value}
+                          onClick={() => field.onChange(!field.value)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                            field.value ? "bg-brand-600" : "bg-surface-300"
+                          )}
+                        >
+                          <span className={cn(
+                            "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                            field.value ? "translate-x-6" : "translate-x-1"
+                          )} />
+                        </button>
+                      </div>
+                    )}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <PackageSelectionSection form={form} packages={packages} categoryTree={categoryTree} />
@@ -324,6 +357,7 @@ export function ProposalBuilder({
               senderLogoUrl={senderLogoUrl}
               senderPhone={senderPhone}
               senderEmail={senderEmail}
+              compact={compact}
             />
           </div>
         )}

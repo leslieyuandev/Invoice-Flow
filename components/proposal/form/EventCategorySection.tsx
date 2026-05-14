@@ -30,12 +30,13 @@ export function EventCategorySection({ form, categoryTree }: EventCategorySectio
 
   function selectCategory(node: CatalogCategoryTree) {
     if (!hasAnyPackages(node)) return;
-    if (node.children.length > 0) {
-      const firstWithPkgs = node.children.find(hasAnyPackages);
-      if (firstWithPkgs) setValue("eventCategoryId", firstWithPkgs.id, { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("eventCategoryId", node.id, { shouldValidate: true, shouldDirty: true });
+    const newId = node.children.length > 0
+      ? (node.children.find(hasAnyPackages)?.id ?? node.id)
+      : node.id;
+    if (newId !== selectedCategoryId) {
+      setValue("selectedPackages", [], { shouldDirty: true });
     }
+    setValue("eventCategoryId", newId, { shouldValidate: true, shouldDirty: true });
   }
 
   return (

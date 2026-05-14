@@ -77,4 +77,5 @@ export interface ProposalFormData {
   selectedPackages: ProposalPackageFormItem[];
   selectedAddOns: ProposalAddOnFormItem[];
   addOnsEnabled: boolean;
+  compact: boolean;
 }

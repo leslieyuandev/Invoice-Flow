@@ -17,22 +17,13 @@ export default async function NewProposalPage() {
       select: {
         name: true,
         logoUrl: true,
+        proposalLogoUrl: true,
         companyPhone: true,
         companyEmail: true,
-        defaultTerms: true,
+        proposalDefaultTerms: true,
       },
     }),
   ]);
-
-  const contactLines = [
-    user?.companyPhone && `T: ${user.companyPhone}`,
-    user?.companyEmail && `E: ${user.companyEmail}`,
-  ].filter(Boolean).join("\n");
-
-  const initialTermsText = [
-    user?.defaultTerms ?? "",
-    contactLines,
-  ].filter(Boolean).join("\n\n");
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -41,7 +32,7 @@ export default async function NewProposalPage() {
         packages={packages}
         addOns={addOns}
         senderName={user?.name ?? ""}
-        senderLogoUrl={user?.logoUrl ?? null}
+        senderLogoUrl={user?.proposalLogoUrl ?? user?.logoUrl ?? null}
         senderPhone={user?.companyPhone ?? null}
         senderEmail={user?.companyEmail ?? null}
         mode="create"
@@ -55,10 +46,11 @@ export default async function NewProposalPage() {
           bgColor: "#C8151B",
           coverTitle: "",
           coverImageUrl: "",
-          termsText: initialTermsText,
+          termsText: user?.proposalDefaultTerms ?? "",
           selectedPackages: [],
           selectedAddOns: [],
           addOnsEnabled: false,
+          compact: false,
         }}
       />
     </div>

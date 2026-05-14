@@ -38,6 +38,7 @@ export const createProposalSchema = z.object({
     .min(1, "Select at least one package"),
   selectedAddOns: z.array(proposalAddOnSchema),
   addOnsEnabled: z.boolean().default(false),
+  compact: z.boolean().default(false),
 });
 
 export const updateProposalSchema = createProposalSchema;

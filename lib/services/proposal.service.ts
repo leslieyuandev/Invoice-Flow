@@ -138,6 +138,7 @@ export async function createProposal(
       coverImageUrl: input.coverImageUrl || null,
       termsText: input.termsText || null,
       addOnsEnabled: input.addOnsEnabled ?? false,
+      compact: input.compact ?? false,
       items: {
         create: input.selectedPackages.map((pkg, idx) => ({
           sortOrder: pkg.sortOrder ?? idx,
@@ -194,6 +195,7 @@ export async function updateProposal(
         coverImageUrl: input.coverImageUrl || null,
         termsText: input.termsText || null,
         addOnsEnabled: input.addOnsEnabled ?? false,
+        compact: input.compact ?? false,
         items: {
           create: input.selectedPackages.map((pkg, idx) => ({
             sortOrder: pkg.sortOrder ?? idx,

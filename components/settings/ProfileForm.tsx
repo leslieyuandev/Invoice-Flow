@@ -26,8 +26,10 @@ interface ProfileFormProps {
     defaultPaymentTerms: number;
     defaultNotes: string;
     defaultTerms: string;
+    proposalDefaultTerms: string;
     invoiceNumberPrefix: string;
     logoUrl: string;
+    proposalLogoUrl: string;
     hasPassword: boolean;
     showDueDate: boolean;
   };
@@ -40,9 +42,12 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState(user.logoUrl);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [proposalLogoUrl, setProposalLogoUrl] = useState(user.proposalLogoUrl);
+  const [proposalLogoUploading, setProposalLogoUploading] = useState(false);
   const [templates, setTemplates] = useState(initialTemplates);
   const [addingTemplate, setAddingTemplate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const proposalLogoInputRef = useRef<HTMLInputElement>(null);
 
   async function handleProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,6 +111,26 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
     }
   }
 
+  async function handleProposalLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProposalLogoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const res = await fetch("/api/upload/proposal-logo", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      setProposalLogoUrl(json.url);
+      toast.success("Proposal logo uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setProposalLogoUploading(false);
+      if (proposalLogoInputRef.current) proposalLogoInputRef.current.value = "";
+    }
+  }
+
   async function handleAddTemplate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setAddingTemplate(true);
@@ -137,43 +162,52 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
 
   return (
     <div className="space-y-6">
-      {/* Logo */}
+      {/* Logos */}
       <Card>
-        <CardHeader><CardTitle>Company Logo</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Company logo"
-                className="h-16 w-auto max-w-[160px] object-contain rounded border border-surface-200 p-1.5 bg-white"
-              />
-            ) : (
-              <div className="flex items-center justify-center w-16 h-16 rounded border border-dashed border-surface-300 bg-surface-50">
-                <ImageIcon className="w-6 h-6 text-surface-400" />
+        <CardHeader><CardTitle>Logos</CardTitle></CardHeader>
+        <CardContent className="space-y-6">
+          {/* Invoice logo */}
+          <div>
+            <p className="text-sm font-medium text-surface-800 mb-2">Invoice Logo</p>
+            <div className="flex items-center gap-4">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Invoice logo" className="h-16 w-auto max-w-[160px] object-contain rounded border border-surface-200 p-1.5 bg-white" />
+              ) : (
+                <div className="flex items-center justify-center w-16 h-16 rounded border border-dashed border-surface-300 bg-surface-50">
+                  <ImageIcon className="w-6 h-6 text-surface-400" />
+                </div>
+              )}
+              <div>
+                <Button type="button" variant="outline" size="sm" disabled={logoUploading} onClick={() => fileInputRef.current?.click()}>
+                  {logoUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {logoUrl ? "Replace" : "Upload"}
+                </Button>
+                <p className="text-xs text-surface-400 mt-1">Used on invoices · PNG, JPG or WebP · max 2 MB</p>
               </div>
-            )}
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={logoUploading}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {logoUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {logoUrl ? "Replace logo" : "Upload logo"}
-              </Button>
-              <p className="text-xs text-surface-400 mt-1">PNG, JPG or WebP · max 2 MB</p>
             </div>
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleLogoChange} />
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            className="hidden"
-            onChange={handleLogoChange}
-          />
+          {/* Proposal logo */}
+          <div>
+            <p className="text-sm font-medium text-surface-800 mb-2">Proposal Logo</p>
+            <div className="flex items-center gap-4">
+              {proposalLogoUrl ? (
+                <img src={proposalLogoUrl} alt="Proposal logo" className="h-16 w-auto max-w-[160px] object-contain rounded border border-surface-200 p-1.5 bg-white" />
+              ) : (
+                <div className="flex items-center justify-center w-16 h-16 rounded border border-dashed border-surface-300 bg-surface-50">
+                  <ImageIcon className="w-6 h-6 text-surface-400" />
+                </div>
+              )}
+              <div>
+                <Button type="button" variant="outline" size="sm" disabled={proposalLogoUploading} onClick={() => proposalLogoInputRef.current?.click()}>
+                  {proposalLogoUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {proposalLogoUrl ? "Replace" : "Upload"}
+                </Button>
+                <p className="text-xs text-surface-400 mt-1">Used on proposals · PNG, JPG or WebP · max 2 MB</p>
+              </div>
+            </div>
+            <input ref={proposalLogoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleProposalLogoChange} />
+          </div>
         </CardContent>
       </Card>
 
@@ -277,13 +311,25 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
                 />
               </div>
               <div className="col-span-full flex flex-col gap-1.5">
-                <Label htmlFor="defaultTerms">Default payment terms text</Label>
+                <Label htmlFor="defaultTerms">Default invoice payment terms</Label>
                 <textarea
                   id="defaultTerms"
                   name="defaultTerms"
                   rows={5}
                   defaultValue={user.defaultTerms}
-                  placeholder="Payment instructions…"
+                  placeholder="Payment instructions for invoices…"
+                  className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
+                />
+              </div>
+              <div className="col-span-full flex flex-col gap-1.5">
+                <Label htmlFor="proposalDefaultTerms">Default proposal terms &amp; remarks</Label>
+                <p className="text-xs text-surface-400 -mt-1">Pre-filled on every new proposal's last page. Include booking fees, remarks, etc.</p>
+                <textarea
+                  id="proposalDefaultTerms"
+                  name="proposalDefaultTerms"
+                  rows={5}
+                  defaultValue={user.proposalDefaultTerms}
+                  placeholder={"50% booking fees upon confirmation\n\nRemarks: Balloons are yours to take home!"}
                   className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
                 />
               </div>

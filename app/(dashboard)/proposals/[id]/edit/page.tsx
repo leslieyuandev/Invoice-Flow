@@ -23,11 +23,11 @@ export default async function EditProposalPage({ params }: PageProps) {
     getAddOns(),
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, logoUrl: true, companyPhone: true, companyEmail: true },
+      select: { name: true, logoUrl: true, proposalLogoUrl: true, companyPhone: true, companyEmail: true },
     }),
   ]);
 
-  const p = proposal as typeof proposal & { bgColor?: string; coverTitle?: string };
+  const p = proposal as typeof proposal & { bgColor?: string; coverTitle?: string; compact?: boolean };
 
   const initialData: ProposalFormData = {
     leadName: proposal.leadName,
@@ -65,6 +65,7 @@ export default async function EditProposalPage({ params }: PageProps) {
       sortOrder: ao.sortOrder ?? idx,
     })),
     addOnsEnabled: (proposal as typeof proposal & { addOnsEnabled?: boolean }).addOnsEnabled ?? false,
+    compact: p.compact ?? false,
   };
 
   return (
@@ -74,7 +75,7 @@ export default async function EditProposalPage({ params }: PageProps) {
         packages={packages}
         addOns={addOns}
         senderName={user?.name ?? proposal.senderName}
-        senderLogoUrl={user?.logoUrl ?? proposal.senderLogoUrl}
+        senderLogoUrl={user?.proposalLogoUrl ?? user?.logoUrl ?? proposal.senderLogoUrl}
         senderPhone={user?.companyPhone ?? proposal.senderPhone}
         senderEmail={user?.companyEmail ?? proposal.senderEmail}
         mode="edit"

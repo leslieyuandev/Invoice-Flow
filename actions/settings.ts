@@ -16,6 +16,7 @@ const profileSchema = z.object({
   defaultPaymentTerms: z.coerce.number().int().min(1).max(365).optional(),
   defaultNotes: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
   defaultTerms: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),
+  proposalDefaultTerms: z.string().max(5000).optional().transform((v) => v?.trim() || undefined),
   invoiceNumberPrefix: z.string().max(20).optional().transform((v) => v?.trim() || undefined),
   showDueDate: z.boolean().optional(),
 });
