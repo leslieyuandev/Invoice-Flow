@@ -138,8 +138,11 @@ const en = {
   "clientDialog.cancel": "Cancel",
   "clientDialog.saveChanges": "Save changes",
   "clientDialog.addClientBtn": "Add client",
-  // Proposals nav
+  // Proposals + catalog nav
   "nav.proposals": "Proposals",
+  "nav.events": "Events",
+  "nav.packages": "Packages",
+  "nav.addons": "Add-Ons",
   // Proposals listing
   "proposals.title": "Proposals",
   "proposals.tab.all": "All",
@@ -321,8 +324,11 @@ const zh: Record<keyof typeof en, string> = {
   "clientDialog.cancel": "取消",
   "clientDialog.saveChanges": "保存更改",
   "clientDialog.addClientBtn": "添加客户",
-  // Proposals nav
+  // Proposals + catalog nav
   "nav.proposals": "建议书",
+  "nav.events": "活动类型",
+  "nav.packages": "套餐",
+  "nav.addons": "附加项目",
   // Proposals listing
   "proposals.title": "建议书",
   "proposals.tab.all": "全部",

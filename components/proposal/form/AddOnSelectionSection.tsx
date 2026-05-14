@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import type { UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -61,12 +61,10 @@ function CreateAddOnDialog({
         </div>
         <div className="p-5 space-y-4">
           <ImageUploadField label="Photo" value={imageUrl} onChange={setImageUrl} previewHeight="h-32" />
-
           <div className="space-y-1.5">
             <Label htmlFor="ao-name" required>Name</Label>
             <Input id="ao-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Flower Bouquet" />
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="ao-price">Price (RM) <span className="text-surface-400 font-normal">optional</span></Label>
@@ -77,7 +75,7 @@ function CreateAddOnDialog({
               <Input id="ao-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. pcs, set" />
             </div>
           </div>
-          <p className="text-xs text-surface-400 -mt-2">Price label will be shown as RM{priceRm || "X"}{unit ? `/${unit}` : ""}</p>
+          <p className="text-xs text-surface-400 -mt-2">Label: RM{priceRm || "X"}{unit ? `/${unit}` : ""}</p>
         </div>
         <div className="flex gap-2 px-5 py-4 border-t border-surface-100">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
@@ -111,21 +109,10 @@ export function AddOnSelectionSection({ form, addOns: initialAddOns }: AddOnSele
         price: ao.price,
         priceLabel: ao.priceLabel,
         imageUrl: ao.imageUrl,
-        quantity: 1,
         sortOrder: selectedAddOns.length,
       };
       setValue("selectedAddOns", [...selectedAddOns, newItem], { shouldDirty: true });
     }
-  }
-
-  function updateQuantity(id: string, delta: number) {
-    setValue(
-      "selectedAddOns",
-      selectedAddOns.map((a) =>
-        a.catalogAddOnId !== id ? a : { ...a, quantity: Math.max(1, a.quantity + delta) }
-      ),
-      { shouldDirty: true }
-    );
   }
 
   function handleCreated(ao: CatalogAddOnData) {
@@ -147,65 +134,40 @@ export function AddOnSelectionSection({ form, addOns: initialAddOns }: AddOnSele
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {localAddOns.map((ao) => {
           const selected = isSelected(ao.id);
-          const item = selectedAddOns.find((a) => a.catalogAddOnId === ao.id);
           const price = displayPrice(ao);
-
           return (
             <div
               key={ao.id}
+              onClick={() => toggleAddOn(ao)}
               className={cn(
-                "border rounded-xl overflow-hidden transition-all",
-                selected ? "border-brand-400 bg-brand-50/30 shadow-sm" : "border-surface-200 bg-white hover:border-surface-300"
+                "flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                selected
+                  ? "border-brand-400 bg-brand-50/30 shadow-sm"
+                  : "border-surface-200 bg-white hover:border-surface-300"
               )}
             >
-              <div className="flex items-start gap-3 p-3 cursor-pointer" onClick={() => toggleAddOn(ao)}>
-                <div className={cn(
-                  "mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center",
-                  selected ? "border-brand-600 bg-brand-600" : "border-surface-300"
-                )}>
-                  {selected && (
-                    <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none">
-                      <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </div>
-
-                {ao.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ao.imageUrl} alt={ao.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-                    <span className="text-lg text-brand-200">✦</span>
-                  </div>
+              <div className={cn(
+                "mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center",
+                selected ? "border-brand-600 bg-brand-600" : "border-surface-300"
+              )}>
+                {selected && (
+                  <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 )}
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-surface-900 truncate">{ao.name}</p>
-                  {price && <p className="text-xs text-brand-600 font-medium mt-0.5">{price}</p>}
-                </div>
               </div>
-
-              {selected && item && (
-                <div className="flex items-center gap-2 px-3 pb-3" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-xs text-surface-500">Qty:</span>
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(ao.id, -1)}
-                    disabled={item.quantity <= 1}
-                    className="w-6 h-6 rounded-full border border-surface-200 flex items-center justify-center text-surface-600 hover:bg-surface-100 disabled:opacity-40"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="text-sm font-medium w-5 text-center">{item.quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(ao.id, 1)}
-                    className="w-6 h-6 rounded-full border border-surface-200 flex items-center justify-center text-surface-600 hover:bg-surface-100"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+              {ao.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ao.imageUrl} alt={ao.name} className="w-12 h-12 rounded-lg object-contain flex-shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg text-brand-200">✦</span>
                 </div>
               )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-surface-900 truncate">{ao.name}</p>
+                {price && <p className="text-xs text-brand-600 font-medium mt-0.5">{price}</p>}
+              </div>
             </div>
           );
         })}

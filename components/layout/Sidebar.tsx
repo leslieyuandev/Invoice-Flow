@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale } from "@/lib/i18n/translations";
@@ -24,6 +24,9 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
     { href: "/invoices",   label: t("nav.invoices"),  icon: FileText },
     { href: "/proposals",  label: t("nav.proposals"), icon: ScrollText },
     { href: "/clients",    label: t("nav.clients"),   icon: Users },
+    { href: "/events",     label: t("nav.events"),    icon: Calendar },
+    { href: "/packages",   label: t("nav.packages"),  icon: Package },
+    { href: "/addons",     label: t("nav.addons"),    icon: Sparkles },
     { href: "/settings",   label: t("nav.settings"),  icon: Settings },
   ];
 

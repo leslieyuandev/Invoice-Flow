@@ -77,31 +77,27 @@ function CreatePackageDialog({
         </div>
         <div className="p-5 space-y-4">
           <ImageUploadField label="Package Photo" value={imageUrl} onChange={setImageUrl} previewHeight="h-40" />
-
           <div className="space-y-1.5">
             <Label htmlFor="pkg-name" required>Package Name</Label>
             <Input id="pkg-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Premium Package" />
           </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="pkg-tagline">Tagline <span className="text-surface-400 font-normal">(optional)</span></Label>
-            <Input id="pkg-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="e.g. For the grand celebration" />
+            <Input id="pkg-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="e.g. 锦上添花" />
           </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="pkg-price" required>Price (RM)</Label>
             <Input id="pkg-price" type="number" min="0" step="1" value={priceRm} onChange={(e) => setPriceRm(e.target.value)} placeholder="e.g. 488" />
           </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="pkg-features">Description / Features</Label>
-            <p className="text-xs text-surface-400">One item per line. Start with - or • for bullet points.</p>
+            <p className="text-xs text-surface-400">One item per line.</p>
             <textarea
               id="pkg-features"
               value={featuresText}
               onChange={(e) => setFeaturesText(e.target.value)}
               rows={5}
-              placeholder={"- 12x Helium Balloons\n- 1x Balloon Arch\n- Setup & teardown included"}
+              placeholder={"12x Helium Balloons\n1x Balloon Arch\nSetup & teardown included"}
               className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
             />
           </div>
@@ -145,6 +141,7 @@ export function PackageSelectionSection({
         selectedPackages.filter((p) => p.catalogPackageId !== pkg.id),
         { shouldDirty: true }
       );
+      if (expandedId === pkg.id) setExpandedId(null);
     } else {
       setValue(
         "selectedPackages",
@@ -165,14 +162,19 @@ export function PackageSelectionSection({
         ],
         { shouldDirty: true }
       );
+      setExpandedId(pkg.id);
     }
   }
 
-  function updateImage(catalogPackageId: string, url: string | null) {
+  function updateFormItem<K extends keyof typeof selectedPackages[0]>(
+    catalogPackageId: string,
+    key: K,
+    value: typeof selectedPackages[0][K]
+  ) {
     setValue(
       "selectedPackages",
       selectedPackages.map((p) =>
-        p.catalogPackageId === catalogPackageId ? { ...p, imageOverride: url ?? "" } : p
+        p.catalogPackageId === catalogPackageId ? { ...p, [key]: value } : p
       ),
       { shouldDirty: true }
     );
@@ -192,7 +194,7 @@ export function PackageSelectionSection({
       {filteredPackages.length === 0 ? (
         <p className="text-sm text-surface-400 italic">{t("proposalBuilder.noPackages")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-3">
           {filteredPackages.map((pkg) => {
             const checked = selectedIds.has(pkg.id);
             const formItem = selectedPackages.find((p) => p.catalogPackageId === pkg.id);
@@ -205,11 +207,11 @@ export function PackageSelectionSection({
                 className={cn(
                   "rounded-xl border transition-all overflow-hidden",
                   checked
-                    ? "border-brand-400 shadow-sm bg-brand-50/30"
+                    ? "border-brand-400 shadow-sm bg-brand-50/20"
                     : "border-surface-200 bg-white hover:border-surface-300"
                 )}
               >
-                {/* Card header */}
+                {/* Card header — click to select/deselect */}
                 <div
                   className="flex items-start gap-3 p-3 cursor-pointer"
                   onClick={() => togglePackage(pkg)}
@@ -235,52 +237,99 @@ export function PackageSelectionSection({
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm font-semibold text-surface-900 truncate">{pkg.name}</p>
-                      {pkg.isBestSeller && (
-                        <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">⭐ BEST</span>
-                      )}
-                    </div>
-                    {pkg.tagline && <p className="text-xs text-surface-500 truncate">{pkg.tagline}</p>}
+                    <p className="text-sm font-semibold text-surface-900 truncate">{formItem?.packageName ?? pkg.name}</p>
+                    {(formItem?.tagline ?? pkg.tagline) && (
+                      <p className="text-xs text-surface-500 truncate">{formItem?.tagline ?? pkg.tagline}</p>
+                    )}
                     <div className="flex items-baseline gap-1.5 mt-0.5">
-                      <span className="text-sm font-bold text-brand-600">{fmtPrice(pkg.price)}</span>
-                      {pkg.originalPrice && (
-                        <span className="text-xs text-surface-400 line-through">{fmtPrice(pkg.originalPrice)}</span>
+                      <span className="text-sm font-bold text-brand-600">{fmtPrice(formItem?.price ?? pkg.price)}</span>
+                      {(formItem?.originalPrice ?? pkg.originalPrice) != null && (
+                        <span className="text-xs text-surface-400 line-through">{fmtPrice(formItem?.originalPrice ?? pkg.originalPrice ?? 0)}</span>
                       )}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : pkg.id); }}
-                    className="text-surface-400 hover:text-surface-600 flex-shrink-0"
-                  >
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
+                  {checked && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : pkg.id); }}
+                      className="text-surface-400 hover:text-surface-600 flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
 
-                {/* Expanded section */}
-                {isExpanded && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-surface-100 pt-2">
-                    {pkg.features.length > 0 && (
-                      <ul className="space-y-1">
-                        {pkg.features.map((f, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-surface-600">
-                            <span className="text-brand-400 mt-0.5 flex-shrink-0">•</span>
-                            <span>{f}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {checked && (
-                      <ImageUploadField
-                        label="Replace Photo"
-                        value={formItem?.imageOverride || null}
-                        onChange={(url) => updateImage(pkg.id, url)}
-                        previewHeight="h-28"
-                        className="mt-2"
+                {/* Editable fields when selected + expanded */}
+                {checked && isExpanded && formItem && (
+                  <div className="px-3 pb-4 space-y-3 border-t border-surface-100 pt-3" onClick={(e) => e.stopPropagation()}>
+                    <ImageUploadField
+                      label="Package Photo"
+                      value={formItem.imageOverride || null}
+                      onChange={(url) => updateFormItem(pkg.id, "imageOverride", url ?? "")}
+                      previewHeight="h-32"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Package Title</Label>
+                        <Input
+                          value={formItem.packageName}
+                          onChange={(e) => updateFormItem(pkg.id, "packageName", e.target.value)}
+                          placeholder="Package name"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tagline <span className="text-surface-400">(optional)</span></Label>
+                        <Input
+                          value={formItem.tagline ?? ""}
+                          onChange={(e) => updateFormItem(pkg.id, "tagline", e.target.value || null)}
+                          placeholder="e.g. 锦上添花"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Price (RM)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={(formItem.price / 100).toFixed(0)}
+                          onChange={(e) => updateFormItem(pkg.id, "price", Math.round(Number(e.target.value) * 100))}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Original / Discount Price (RM) <span className="text-surface-400">optional</span></Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={formItem.originalPrice != null ? (formItem.originalPrice / 100).toFixed(0) : ""}
+                          onChange={(e) => updateFormItem(pkg.id, "originalPrice", e.target.value ? Math.round(Number(e.target.value) * 100) : null)}
+                          placeholder="e.g. 1288"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Description / Features <span className="text-surface-400">(one per line)</span></Label>
+                      <textarea
+                        value={formItem.features.join("\n")}
+                        onChange={(e) =>
+                          updateFormItem(
+                            pkg.id,
+                            "features",
+                            e.target.value.split("\n").map((l) => l.trim()).filter(Boolean)
+                          )
+                        }
+                        rows={4}
+                        className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                        placeholder={"12x Helium Balloons\n1x Balloon Arch\nSetup & teardown included"}
                       />
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

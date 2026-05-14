@@ -23,9 +23,11 @@ export default async function EditProposalPage({ params }: PageProps) {
     getAddOns(),
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, logoUrl: true },
+      select: { name: true, logoUrl: true, companyPhone: true, companyEmail: true },
     }),
   ]);
+
+  const p = proposal as typeof proposal & { bgColor?: string; coverTitle?: string };
 
   const initialData: ProposalFormData = {
     leadName: proposal.leadName,
@@ -34,6 +36,8 @@ export default async function EditProposalPage({ params }: PageProps) {
     clientId: proposal.clientId ?? "",
     eventTitle: proposal.eventTitle,
     eventCategoryId: proposal.eventCategoryId,
+    bgColor: p.bgColor ?? "#C8151B",
+    coverTitle: p.coverTitle ?? "",
     coverImageUrl: proposal.coverImageUrl ?? "",
     termsText: proposal.termsText ?? "",
     selectedPackages: proposal.items.map((item, idx) => {
@@ -58,13 +62,9 @@ export default async function EditProposalPage({ params }: PageProps) {
       price: ao.price,
       priceLabel: ao.priceLabel,
       imageUrl: ao.imageUrl,
-      quantity: ao.quantity,
       sortOrder: ao.sortOrder ?? idx,
     })),
-    pagesCount: (proposal as { pagesCount?: number }).pagesCount ?? 1,
-    addOnsEnabled: (proposal as { addOnsEnabled?: boolean }).addOnsEnabled ?? false,
-    creativity: (proposal as { creativity?: number }).creativity ?? 50,
-    elegance: (proposal as { elegance?: number }).elegance ?? 50,
+    addOnsEnabled: (proposal as typeof proposal & { addOnsEnabled?: boolean }).addOnsEnabled ?? false,
   };
 
   return (
@@ -73,8 +73,10 @@ export default async function EditProposalPage({ params }: PageProps) {
         categoryTree={categoryTree}
         packages={packages}
         addOns={addOns}
-        senderName={user?.name ?? ""}
-        senderLogoUrl={user?.logoUrl ?? null}
+        senderName={user?.name ?? proposal.senderName}
+        senderLogoUrl={user?.logoUrl ?? proposal.senderLogoUrl}
+        senderPhone={user?.companyPhone ?? proposal.senderPhone}
+        senderEmail={user?.companyEmail ?? proposal.senderEmail}
         mode="edit"
         initialData={initialData}
         proposalId={id}

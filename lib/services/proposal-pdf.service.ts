@@ -3,907 +3,540 @@ import {
   Page,
   Text,
   View,
-  StyleSheet,
   Image,
+  Svg,
+  Path,
   renderToBuffer,
   Font,
 } from "@react-pdf/renderer";
-import type { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
 import type { ProposalWithItems } from "@/types/proposal";
 
 Font.registerHyphenationCallback((word) => [word]);
 
-const PAGE_SIZE: [number, number] = [841.89, 595.28]; // A4 landscape
+const PAGE_SIZE: [number, number] = [841.89, 595.28];
+const GOLD = "#D4A843";
+const DEFAULT_BG = "#C8151B";
 
-// ── Style helpers ─────────────────────────────────────────────────────────────
-
-function getAccentColor(creativity: number): string {
-  if (creativity < 30) return "#64748b";
-  if (creativity < 65) return "#4f46e5";
-  return "#7c3aed";
+function fmtRm(cents: number) {
+  return `RM${Math.round(cents / 100)}`;
 }
 
-function getAccentLight(creativity: number): string {
-  if (creativity < 30) return "#f1f5f9";
-  if (creativity < 65) return "#eef2ff";
-  return "#f5f3ff";
+function getBg(proposal: ProposalWithItems) {
+  return (proposal as unknown as { bgColor?: string }).bgColor || DEFAULT_BG;
+}
+function getCoverTitle(proposal: ProposalWithItems) {
+  return (proposal as unknown as { coverTitle?: string }).coverTitle || proposal.eventTitle || "Balloon Packages";
 }
 
-function getPad(elegance: number): number {
-  return 28 + Math.round((elegance / 100) * 24); // 28–52 pt
+// ── Decorative SVG curls ──────────────────────────────────────────────────────
+
+function CurlTopLeftSvg() {
+  return React.createElement(
+    Svg,
+    { width: 90, height: 90, style: { position: "absolute", top: 0, left: 0 } },
+    React.createElement(Path, {
+      d: "M5 85 C20 60 35 35 70 12 C78 7 84 3 90 0",
+      stroke: GOLD, strokeWidth: 1.2, fill: "none",
+    }),
+    React.createElement(Path, {
+      d: "M0 55 C12 42 25 28 50 16",
+      stroke: GOLD, strokeWidth: 0.8, fill: "none",
+    }),
+    React.createElement(Path, {
+      d: "M0 25 C8 20 16 14 28 8",
+      stroke: GOLD, strokeWidth: 0.6, fill: "none",
+    }),
+  );
 }
 
-function getLineH(elegance: number): number {
-  return 1.25 + (elegance / 100) * 0.5; // 1.25–1.75
+function CurlTopRightSvg() {
+  return React.createElement(
+    Svg,
+    { width: 90, height: 90, style: { position: "absolute", top: 0, right: 0 } },
+    React.createElement(Path, {
+      d: "M85 85 C70 60 55 35 20 12 C12 7 6 3 0 0",
+      stroke: GOLD, strokeWidth: 1.2, fill: "none",
+    }),
+    React.createElement(Path, {
+      d: "M90 55 C78 42 65 28 40 16",
+      stroke: GOLD, strokeWidth: 0.8, fill: "none",
+    }),
+    React.createElement(Path, {
+      d: "M90 25 C82 20 74 14 62 8",
+      stroke: GOLD, strokeWidth: 0.6, fill: "none",
+    }),
+  );
 }
 
-function fmtPrice(cents: number) {
-  return `RM ${(cents / 100).toFixed(0)}`;
+function CurlPkgRightSvg() {
+  return React.createElement(
+    Svg,
+    { width: 80, height: 80, style: { position: "absolute", top: 0, right: 0 } },
+    React.createElement(Path, {
+      d: "M80 0 C65 8 52 20 48 38 C44 50 46 62 40 72",
+      stroke: GOLD, strokeWidth: 1.5, fill: "none",
+    }),
+    React.createElement(Path, {
+      d: "M80 20 C70 26 62 34 58 46",
+      stroke: GOLD, strokeWidth: 1, fill: "none",
+    }),
+  );
 }
 
-// ── Cover Page ─────────────────────────────────────────────────────────────────
-// Left 55%: hero image (or gradient); right 45%: white panel with details
+// ── Logo box ──────────────────────────────────────────────────────────────────
 
-function CoverPage({
-  proposal,
-  creativity,
-  elegance,
-}: {
-  proposal: ProposalWithItems;
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const accentLight = getAccentLight(creativity);
-  const pad = getPad(elegance);
-  const lh = getLineH(elegance);
+function logoEl(logoUrl: string | null | undefined, name: string, small = false) {
+  if (logoUrl) {
+    return React.createElement(Image, {
+      src: logoUrl,
+      style: { height: small ? 20 : 28, objectFit: "contain" },
+    });
+  }
+  return React.createElement(
+    Text,
+    { style: { color: "white", fontWeight: "bold", fontSize: small ? 8 : 11 } },
+    name || "HALO BALLOON"
+  );
+}
 
-  const LEFT_W = 506; // ~60% of 842
-  const RIGHT_W = PAGE_SIZE[0] - LEFT_W;
+// ── Cover Page ────────────────────────────────────────────────────────────────
+
+function CoverPage({ proposal }: { proposal: ProposalWithItems }) {
+  const bg = getBg(proposal);
+  const title = getCoverTitle(proposal);
 
   return React.createElement(
     Page,
     { size: PAGE_SIZE, style: { flexDirection: "row" } },
-
-    // ── LEFT: hero image panel ────────────────────────────────────────────────
+    // Left colored panel 58%
     React.createElement(
       View,
-      { style: { width: LEFT_W, height: PAGE_SIZE[1], position: "relative", backgroundColor: accent } },
-      // Cover image
+      {
+        style: {
+          width: "58%",
+          height: "100%",
+          backgroundColor: bg,
+          position: "relative",
+          overflow: "hidden",
+        },
+      },
+      CurlTopLeftSvg(),
+      // Logo top-left
+      React.createElement(
+        View,
+        { style: { position: "absolute", top: 30, left: 30 } },
+        logoEl(proposal.senderLogoUrl, proposal.senderName),
+        React.createElement(
+          Text,
+          { style: { color: "rgba(255,255,255,0.75)", fontSize: 7, marginTop: 4 } },
+          "Your Vision. Our Craft."
+        ),
+      ),
+      // Title bottom-left
+      React.createElement(
+        View,
+        { style: { position: "absolute", bottom: 34, left: 30, right: 20 } },
+        React.createElement(
+          Text,
+          {
+            style: {
+              color: "white",
+              fontSize: 34,
+              fontWeight: "bold",
+              lineHeight: 1.2,
+            },
+          },
+          title
+        ),
+      ),
+    ),
+    // Right photo 42%
+    React.createElement(
+      View,
+      {
+        style: {
+          flex: 1,
+          height: "100%",
+          backgroundColor: "#888",
+          overflow: "hidden",
+        },
+      },
       proposal.coverImageUrl
         ? React.createElement(Image, {
             src: proposal.coverImageUrl,
-            style: { position: "absolute", top: 0, left: 0, width: LEFT_W, height: PAGE_SIZE[1], objectFit: "cover" },
+            style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              objectFit: "cover",
+            },
           })
-        : null,
-      // Dark overlay for text legibility
-      React.createElement(View, {
-        style: {
-          position: "absolute", top: 0, left: 0, width: LEFT_W, height: PAGE_SIZE[1],
-          backgroundColor: "rgba(0,0,0,0.35)",
-        },
-      }),
-      // Diagonal accent strip at right edge
-      React.createElement(View, {
-        style: {
-          position: "absolute", top: 0, right: 0, width: 8, height: PAGE_SIZE[1],
-          backgroundColor: accent,
-        },
-      }),
-      // Logo — top-left
-      React.createElement(
-        View,
-        { style: { position: "absolute", top: pad, left: pad } },
-        proposal.senderLogoUrl
-          ? React.createElement(Image, {
-              src: proposal.senderLogoUrl,
-              style: { width: 130, height: 65, objectFit: "contain" },
-            })
-          : React.createElement(
-              View,
-              {
-                style: {
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  borderRadius: 6,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                },
-              },
-              React.createElement(Text, {
-                style: { fontSize: 14, fontFamily: "Helvetica-Bold", color: "#ffffff", letterSpacing: 1 },
-              }, proposal.senderName || "HALO BALLOON")
-            )
-      ),
-      // Bottom-left: event title + lead name
-      React.createElement(
-        View,
-        { style: { position: "absolute", bottom: pad + 8, left: pad, right: pad } },
-        // Accent line above title
-        React.createElement(View, { style: { width: 40, height: 3, backgroundColor: accent, marginBottom: 12 } }),
-        React.createElement(Text, {
-          style: {
-            fontSize: 34, fontFamily: "Helvetica-Bold", color: "#ffffff",
-            lineHeight: lh, marginBottom: 10,
-          },
-        }, proposal.eventTitle || "Event Proposal"),
-        React.createElement(Text, {
-          style: { fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: lh },
-        }, `Prepared for ${proposal.leadName}`),
-      )
+        : React.createElement(View, {
+            style: { position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.3 },
+          }),
     ),
-
-    // ── RIGHT: white info panel ───────────────────────────────────────────────
-    React.createElement(
-      View,
-      {
-        style: {
-          width: RIGHT_W, height: PAGE_SIZE[1],
-          backgroundColor: "#ffffff",
-          paddingHorizontal: pad,
-          paddingVertical: pad,
-          justifyContent: "space-between",
-        },
-      },
-      // Top section — "Proposal" label
-      React.createElement(
-        View,
-        null,
-        React.createElement(Text, {
-          style: {
-            fontSize: 9, fontFamily: "Helvetica-Bold", color: accent,
-            letterSpacing: 3, marginBottom: 14,
-          },
-        }, "PROPOSAL"),
-        React.createElement(View, { style: { width: 30, height: 2, backgroundColor: accent, marginBottom: 20 } }),
-        React.createElement(Text, {
-          style: { fontSize: 13, fontFamily: "Helvetica-Bold", color: "#0f172a", lineHeight: lh, marginBottom: 6 },
-        }, proposal.eventTitle || "Event Proposal"),
-        React.createElement(Text, {
-          style: { fontSize: 10, color: "#64748b", lineHeight: lh },
-        }, `Prepared for: ${proposal.leadName}`),
-        proposal.leadPhone
-          ? React.createElement(Text, {
-              style: { fontSize: 10, color: "#64748b", marginTop: 4 },
-            }, `📞 ${proposal.leadPhone}`)
-          : null,
-      ),
-      // Middle — package count summary
-      React.createElement(
-        View,
-        {
-          style: {
-            backgroundColor: accentLight,
-            borderRadius: 8,
-            padding: 14,
-          },
-        },
-        React.createElement(Text, {
-          style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: accent, letterSpacing: 1.5, marginBottom: 8 },
-        }, "PACKAGES INCLUDED"),
-        ...proposal.items.slice(0, 6).map((item, i) =>
-          React.createElement(
-            View,
-            { key: i, style: { flexDirection: "row", alignItems: "center", marginBottom: 5 } },
-            React.createElement(View, {
-              style: {
-                width: 16, height: 16, borderRadius: 8,
-                backgroundColor: accent,
-                marginRight: 8,
-                justifyContent: "center", alignItems: "center",
-              },
-            }, React.createElement(Text, { style: { fontSize: 7, color: "#ffffff", fontFamily: "Helvetica-Bold" } }, `${i + 1}`)),
-            React.createElement(Text, {
-              style: { fontSize: 9, color: "#374151", flex: 1, lineHeight: 1.3 },
-            }, item.packageName),
-            React.createElement(Text, {
-              style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: accent },
-            }, fmtPrice(item.price))
-          )
-        ),
-        proposal.items.length > 6
-          ? React.createElement(Text, {
-              style: { fontSize: 8, color: "#94a3b8", marginTop: 4 },
-            }, `+ ${proposal.items.length - 6} more packages…`)
-          : null
-      ),
-      // Bottom — sender contact
-      React.createElement(
-        View,
-        null,
-        React.createElement(View, { style: { width: "100%", height: 1, backgroundColor: "#e2e8f0", marginBottom: 12 } }),
-        proposal.senderLogoUrl
-          ? React.createElement(Image, {
-              src: proposal.senderLogoUrl,
-              style: { width: 80, height: 40, objectFit: "contain", marginBottom: 6 },
-            })
-          : React.createElement(Text, {
-              style: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#0f172a", marginBottom: 4 },
-            }, proposal.senderName),
-        proposal.senderEmail
-          ? React.createElement(Text, { style: { fontSize: 8, color: "#64748b" } }, proposal.senderEmail)
-          : null,
-        proposal.senderPhone
-          ? React.createElement(Text, { style: { fontSize: 8, color: "#64748b", marginTop: 2 } }, proposal.senderPhone)
-          : null,
-      )
-    )
   );
 }
 
-// ── Single-package page (1 pkg per spread) ─────────────────────────────────
-// Left: full-height photo; Right: package details
+// ── Package Page (one per item) ───────────────────────────────────────────────
 
-function SinglePackagePage({
+function PackagePage({
   item,
   index,
-  total,
   proposal,
-  creativity,
-  elegance,
 }: {
-  item: ProposalWithItems["items"][number];
+  item: ProposalWithItems["items"][0];
   index: number;
-  total: number;
   proposal: ProposalWithItems;
-  creativity: number;
-  elegance: number;
 }) {
-  const accent = getAccentColor(creativity);
-  const accentLight = getAccentLight(creativity);
-  const pad = getPad(elegance);
-  const lh = getLineH(elegance);
+  const bg = getBg(proposal);
   let features: string[] = [];
   try { features = JSON.parse(item.features) as string[]; } catch { features = []; }
 
-  const PHOTO_W = Math.round(PAGE_SIZE[0] * 0.52);
-  const INFO_W = PAGE_SIZE[0] - PHOTO_W;
-
   return React.createElement(
     Page,
     { size: PAGE_SIZE, style: { flexDirection: "row" } },
-
-    // ── LEFT: photo ───────────────────────────────────────────────────────────
-    React.createElement(
-      View,
-      { style: { width: PHOTO_W, height: PAGE_SIZE[1], position: "relative", backgroundColor: `${accent}22` } },
-      item.imageUrl
-        ? React.createElement(Image, {
-            src: item.imageUrl,
-            style: { width: PHOTO_W, height: PAGE_SIZE[1], objectFit: "cover" },
-          })
-        : React.createElement(
-            View,
-            {
-              style: {
-                width: PHOTO_W, height: PAGE_SIZE[1],
-                backgroundColor: accentLight,
-                justifyContent: "center", alignItems: "center",
-              },
-            },
-            React.createElement(Text, { style: { fontSize: 60, color: `${accent}40` } }, "✦")
-          ),
-      // Package index badge — bottom left
-      React.createElement(
-        View,
-        {
-          style: {
-            position: "absolute", bottom: pad, left: pad,
-            backgroundColor: accent,
-            borderRadius: 4,
-            paddingHorizontal: 10, paddingVertical: 4,
-          },
-        },
-        React.createElement(Text, {
-          style: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#ffffff", letterSpacing: 2 },
-        }, `${index + 1} / ${total}`)
-      )
-    ),
-
-    // ── RIGHT: info panel ─────────────────────────────────────────────────────
+    // Left photo 40%
     React.createElement(
       View,
       {
         style: {
-          width: INFO_W, height: PAGE_SIZE[1],
-          backgroundColor: "#ffffff",
-          paddingHorizontal: pad,
-          paddingTop: pad,
-          paddingBottom: pad * 0.6,
-          justifyContent: "space-between",
-        },
-      },
-      // Top section
-      React.createElement(
-        View,
-        null,
-        // Header row: logo + "PACKAGE X"
-        React.createElement(
-          View,
-          { style: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } },
-          proposal.senderLogoUrl
-            ? React.createElement(Image, {
-                src: proposal.senderLogoUrl,
-                style: { width: 70, height: 35, objectFit: "contain" },
-              })
-            : React.createElement(Text, {
-                style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#94a3b8" },
-              }, proposal.senderName),
-          React.createElement(Text, {
-            style: { fontSize: 8, fontFamily: "Helvetica-Bold", color: accent, letterSpacing: 2 },
-          }, `PACKAGE ${index + 1}`)
-        ),
-        // Accent line
-        React.createElement(View, { style: { width: "100%", height: 1, backgroundColor: "#f1f5f9", marginBottom: 16 } }),
-        // Best seller badge
-        item.isBestSeller
-          ? React.createElement(
-              View,
-              {
-                style: {
-                  backgroundColor: "#fef3c7",
-                  borderRadius: 4,
-                  paddingHorizontal: 8, paddingVertical: 3,
-                  alignSelf: "flex-start", marginBottom: 10,
-                },
-              },
-              React.createElement(Text, {
-                style: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#92400e" },
-              }, "⭐  BEST SELLER")
-            )
-          : null,
-        // Package name
-        React.createElement(Text, {
-          style: {
-            fontSize: 22, fontFamily: "Helvetica-Bold", color: "#0f172a",
-            lineHeight: lh, marginBottom: 6,
-          },
-        }, item.packageName),
-        // Tagline
-        item.tagline
-          ? React.createElement(Text, {
-              style: { fontSize: 11, color: "#64748b", lineHeight: lh, marginBottom: 14, fontStyle: "italic" },
-            }, item.tagline)
-          : React.createElement(View, { style: { marginBottom: 14 } }),
-        // Price row
-        React.createElement(
-          View,
-          { style: { flexDirection: "row", alignItems: "baseline", marginBottom: 18 } },
-          React.createElement(Text, {
-            style: { fontSize: 30, fontFamily: "Helvetica-Bold", color: accent, marginRight: 10 },
-          }, fmtPrice(item.price)),
-          item.originalPrice
-            ? React.createElement(Text, {
-                style: { fontSize: 14, color: "#94a3b8", textDecoration: "line-through" },
-              }, fmtPrice(item.originalPrice))
-            : null
-        ),
-      ),
-      // Features list
-      React.createElement(
-        View,
-        { style: { flex: 1 } },
-        ...features.map((feat, fi) =>
-          React.createElement(
-            View,
-            { key: fi, style: { flexDirection: "row", marginBottom: 7, alignItems: "flex-start" } },
-            React.createElement(View, {
-              style: {
-                width: 5, height: 5, borderRadius: 2.5,
-                backgroundColor: accent,
-                marginRight: 8, marginTop: 3, flexShrink: 0,
-              },
-            }),
-            React.createElement(Text, {
-              style: { fontSize: 10, color: "#475569", flex: 1, lineHeight: lh },
-            }, feat)
-          )
-        )
-      ),
-      // Footer
-      React.createElement(
-        View,
-        { style: { borderTopWidth: 1, borderTopColor: "#f1f5f9", paddingTop: 8, marginTop: 8 } },
-        React.createElement(Text, {
-          style: { fontSize: 8, color: "#cbd5e1" },
-        }, proposal.eventTitle)
-      )
-    )
-  );
-}
-
-// ── Multi-package grid page ────────────────────────────────────────────────────
-// Header strip + grid of package cards
-
-function MultiPackagePage({
-  items,
-  pageIndex,
-  proposal,
-  creativity,
-  elegance,
-}: {
-  items: ProposalWithItems["items"];
-  pageIndex: number;
-  proposal: ProposalWithItems;
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const accentLight = getAccentLight(creativity);
-  const pad = getPad(elegance);
-  const lh = getLineH(elegance);
-  const cols = items.length <= 3 ? items.length : Math.ceil(items.length / 2) <= 3 ? 3 : 3;
-  const CARD_W = Math.floor((PAGE_SIZE[0] - pad * 2 - (cols - 1) * 10) / cols);
-
-  function PackageCard({ item, idx }: { item: ProposalWithItems["items"][number]; idx: number }) {
-    let features: string[] = [];
-    try { features = JSON.parse(item.features) as string[]; } catch { features = []; }
-    const showFeatures = Math.min(features.length, items.length <= 3 ? 4 : 3);
-
-    return React.createElement(
-      View,
-      {
-        style: {
-          width: CARD_W,
-          backgroundColor: "#ffffff",
-          borderRadius: 8,
+          width: "40%",
+          height: "100%",
+          backgroundColor: "#555",
           overflow: "hidden",
-          borderWidth: 1,
-          borderColor: "#e2e8f0",
         },
       },
-      // Card photo
       item.imageUrl
         ? React.createElement(Image, {
             src: item.imageUrl,
-            style: { width: CARD_W, height: items.length <= 2 ? 200 : 130, objectFit: "cover" },
+            style: {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              objectFit: "cover",
+            },
           })
         : React.createElement(View, {
-            style: {
-              width: CARD_W,
-              height: items.length <= 2 ? 200 : 130,
-              backgroundColor: accentLight,
-              justifyContent: "center", alignItems: "center",
-            },
-          }, React.createElement(Text, { style: { fontSize: 28, color: `${accent}50` } }, "✦")),
-      // Card body
+            style: { position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.35 },
+          }),
+    ),
+    // Right info panel 60%
+    React.createElement(
+      View,
+      {
+        style: {
+          flex: 1,
+          height: "100%",
+          backgroundColor: bg,
+          padding: 36,
+          position: "relative",
+          overflow: "hidden",
+          justifyContent: "center",
+        },
+      },
+      CurlPkgRightSvg(),
+      // PACKAGE N label
       React.createElement(
-        View,
-        { style: { padding: 10 } },
-        item.isBestSeller
-          ? React.createElement(
-              View,
-              {
-                style: {
-                  backgroundColor: "#fef3c7", borderRadius: 3,
-                  paddingHorizontal: 5, paddingVertical: 2,
-                  alignSelf: "flex-start", marginBottom: 4,
-                },
-              },
-              React.createElement(Text, { style: { fontSize: 6, fontFamily: "Helvetica-Bold", color: "#92400e" } }, "⭐ BEST SELLER")
-            )
-          : null,
-        React.createElement(Text, {
-          style: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#0f172a", lineHeight: 1.2, marginBottom: 3 },
-        }, item.packageName),
-        React.createElement(Text, {
-          style: { fontSize: 14, fontFamily: "Helvetica-Bold", color: accent, marginBottom: 6 },
-        }, fmtPrice(item.price)),
-        ...features.slice(0, showFeatures).map((f, fi) =>
-          React.createElement(
-            View,
-            { key: fi, style: { flexDirection: "row", marginBottom: 2.5 } },
-            React.createElement(View, {
-              style: { width: 4, height: 4, borderRadius: 2, backgroundColor: accent, marginRight: 5, marginTop: 2, flexShrink: 0 },
-            }),
-            React.createElement(Text, { style: { fontSize: 7.5, color: "#64748b", flex: 1, lineHeight: 1.35 } }, f)
-          )
-        ),
-        features.length > showFeatures
-          ? React.createElement(Text, {
-              style: { fontSize: 7, color: "#94a3b8", marginTop: 2 },
-            }, `+${features.length - showFeatures} more…`)
-          : null,
-        item.originalPrice
-          ? React.createElement(Text, {
-              style: { fontSize: 8, color: "#94a3b8", textDecoration: "line-through", marginTop: 3 },
-            }, fmtPrice(item.originalPrice))
-          : null
-      )
-    );
-  }
-
-  // Build rows
-  const rows: ProposalWithItems["items"][] = [];
-  for (let i = 0; i < items.length; i += cols) rows.push(items.slice(i, i + cols));
-
-  return React.createElement(
-    Page,
-    { size: PAGE_SIZE, style: { backgroundColor: "#f8fafc" } },
-    // Header strip
-    React.createElement(
-      View,
-      {
-        style: {
-          backgroundColor: accent, height: 50,
-          flexDirection: "row", alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: pad,
-        },
-      },
-      proposal.senderLogoUrl
-        ? React.createElement(Image, {
-            src: proposal.senderLogoUrl,
-            style: { width: 80, height: 38, objectFit: "contain" },
-          })
-        : React.createElement(Text, {
-            style: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#ffffff" },
-          }, proposal.senderName),
-      React.createElement(Text, {
-        style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)", letterSpacing: 2 },
-      }, `PACKAGES — PAGE ${pageIndex + 1}`)
-    ),
-    // Cards grid
-    React.createElement(
-      View,
-      { style: { flex: 1, paddingHorizontal: pad, paddingVertical: pad * 0.6 } },
-      ...rows.map((row, ri) =>
-        React.createElement(
-          View,
-          {
-            key: ri,
-            style: {
-              flexDirection: "row",
-              gap: 10,
-              marginBottom: ri < rows.length - 1 ? 10 : 0,
-              justifyContent: "flex-start",
-            },
-          },
-          ...row.map((item, ci) =>
-            React.createElement(PackageCard, { key: ci, item, idx: rows.flat().indexOf(item) })
-          )
-        )
-      )
-    ),
-    // Footer
-    React.createElement(
-      View,
-      {
-        style: {
-          height: 28, backgroundColor: "#ffffff",
-          flexDirection: "row", alignItems: "center",
-          paddingHorizontal: pad, justifyContent: "space-between",
-          borderTopWidth: 1, borderTopColor: "#e2e8f0",
-        },
-      },
-      React.createElement(Text, { style: { fontSize: 7, color: "#94a3b8" } }, proposal.eventTitle),
-      React.createElement(Text, { style: { fontSize: 7, color: "#94a3b8" } }, proposal.senderName)
-    )
-  );
-}
-
-// ── Add-ons Page ──────────────────────────────────────────────────────────────
-
-function AddOnsPage({
-  proposal,
-  creativity,
-  elegance,
-}: {
-  proposal: ProposalWithItems;
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const accentLight = getAccentLight(creativity);
-  const pad = getPad(elegance);
-  const addOns = proposal.addOns;
-  const COLS = 4;
-  const CARD_W = Math.floor((PAGE_SIZE[0] - pad * 2 - (COLS - 1) * 10) / COLS);
-
-  const rows: typeof addOns[] = [];
-  for (let i = 0; i < addOns.length; i += COLS) rows.push(addOns.slice(i, i + COLS));
-
-  return React.createElement(
-    Page,
-    { size: PAGE_SIZE, style: { backgroundColor: "#f8fafc" } },
-    // Header
-    React.createElement(
-      View,
-      {
-        style: {
-          backgroundColor: accent, height: 50,
-          flexDirection: "row", alignItems: "center",
-          justifyContent: "space-between", paddingHorizontal: pad,
-        },
-      },
-      proposal.senderLogoUrl
-        ? React.createElement(Image, {
-            src: proposal.senderLogoUrl,
-            style: { width: 80, height: 38, objectFit: "contain" },
-          })
-        : React.createElement(Text, {
-            style: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#ffffff" },
-          }, proposal.senderName),
-      React.createElement(Text, {
-        style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.8)", letterSpacing: 2 },
-      }, "OPTIONAL ADD-ONS")
-    ),
-    // Grid
-    React.createElement(
-      View,
-      { style: { flex: 1, paddingHorizontal: pad, paddingVertical: pad * 0.7 } },
-      ...rows.map((row, ri) =>
-        React.createElement(
-          View,
-          { key: ri, style: { flexDirection: "row", gap: 10, marginBottom: 10 } },
-          ...row.map((ao, ci) =>
-            React.createElement(
-              View,
-              {
-                key: ci,
-                style: {
-                  width: CARD_W,
-                  backgroundColor: "#ffffff",
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  borderWidth: 1,
-                  borderColor: "#e2e8f0",
-                },
-              },
-              ao.imageUrl
-                ? React.createElement(Image, {
-                    src: ao.imageUrl,
-                    style: { width: CARD_W, height: 110, objectFit: "cover" },
-                  })
-                : React.createElement(View, {
-                    style: {
-                      width: CARD_W, height: 110,
-                      backgroundColor: accentLight,
-                      justifyContent: "center", alignItems: "center",
-                    },
-                  }, React.createElement(Text, { style: { fontSize: 22, color: `${accent}50` } }, "✦")),
-              // Card body
-              React.createElement(
-                View,
-                { style: { padding: 8, borderTopWidth: 2, borderTopColor: accent } },
-                React.createElement(Text, {
-                  style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#0f172a", marginBottom: 2, lineHeight: 1.3 },
-                }, ao.addOnName),
-                ao.priceLabel || ao.price
-                  ? React.createElement(Text, {
-                      style: { fontSize: 9, color: accent, fontFamily: "Helvetica-Bold" },
-                    }, ao.priceLabel ?? fmtPrice(ao.price!))
-                  : null,
-                ao.quantity > 1
-                  ? React.createElement(Text, {
-                      style: { fontSize: 7, color: "#94a3b8", marginTop: 2 },
-                    }, `Qty: ${ao.quantity}`)
-                  : null
-              )
-            )
-          )
-        )
-      )
-    ),
-    // Footer
-    React.createElement(
-      View,
-      {
-        style: {
-          height: 28, backgroundColor: "#ffffff",
-          flexDirection: "row", alignItems: "center",
-          paddingHorizontal: pad, justifyContent: "space-between",
-          borderTopWidth: 1, borderTopColor: "#e2e8f0",
-        },
-      },
-      React.createElement(Text, { style: { fontSize: 7, color: "#94a3b8" } }, proposal.eventTitle),
-      React.createElement(Text, { style: { fontSize: 7, color: "#94a3b8" } }, proposal.senderName)
-    )
-  );
-}
-
-// ── Terms / Contact Page ───────────────────────────────────────────────────────
-
-function TermsPage({
-  proposal,
-  creativity,
-  elegance,
-}: {
-  proposal: ProposalWithItems;
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const accentLight = getAccentLight(creativity);
-  const pad = getPad(elegance);
-  const lh = getLineH(elegance);
-  const SIDEBAR_W = 220;
-
-  return React.createElement(
-    Page,
-    { size: PAGE_SIZE, style: { flexDirection: "row" } },
-
-    // ── LEFT sidebar ──────────────────────────────────────────────────────────
-    React.createElement(
-      View,
-      {
-        style: {
-          width: SIDEBAR_W, height: PAGE_SIZE[1],
-          backgroundColor: accent,
-          paddingHorizontal: pad * 0.9,
-          paddingVertical: pad,
-          justifyContent: "space-between",
-        },
-      },
-      // Logo / name
-      React.createElement(
-        View,
-        null,
-        proposal.senderLogoUrl
-          ? React.createElement(Image, {
-              src: proposal.senderLogoUrl,
-              style: { width: SIDEBAR_W - pad * 1.8, height: 70, objectFit: "contain", marginBottom: 24 },
-            })
-          : React.createElement(Text, {
-              style: {
-                fontSize: 14, fontFamily: "Helvetica-Bold", color: "#ffffff",
-                marginBottom: 24, letterSpacing: 0.5,
-              },
-            }, proposal.senderName || "HALO BALLOON"),
-        React.createElement(View, { style: { width: 30, height: 2, backgroundColor: "rgba(255,255,255,0.4)", marginBottom: 16 } }),
-        React.createElement(Text, {
-          style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.6)", letterSpacing: 2, marginBottom: 12 },
-        }, "CONTACT US"),
-        proposal.senderEmail
-          ? React.createElement(Text, { style: { fontSize: 9, color: "rgba(255,255,255,0.85)", marginBottom: 5, lineHeight: lh } }, `✉ ${proposal.senderEmail}`)
-          : null,
-        proposal.senderPhone
-          ? React.createElement(Text, { style: { fontSize: 9, color: "rgba(255,255,255,0.85)", marginBottom: 5, lineHeight: lh } }, `📞 ${proposal.senderPhone}`)
-          : null,
-        proposal.leadEmail
-          ? React.createElement(
-              View,
-              { style: { marginTop: 20 } },
-              React.createElement(Text, {
-                style: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "rgba(255,255,255,0.6)", letterSpacing: 2, marginBottom: 8 },
-              }, "PREPARED FOR"),
-              React.createElement(Text, { style: { fontSize: 9, color: "rgba(255,255,255,0.85)", lineHeight: lh } }, proposal.leadName),
-              React.createElement(Text, { style: { fontSize: 9, color: "rgba(255,255,255,0.7)", lineHeight: lh, marginTop: 2 } }, proposal.leadEmail)
-            )
-          : null
-      ),
-      // Event title at bottom
-      React.createElement(
-        View,
-        null,
-        React.createElement(View, { style: { width: "100%", height: 1, backgroundColor: "rgba(255,255,255,0.2)", marginBottom: 10 } }),
-        React.createElement(Text, {
-          style: { fontSize: 8, color: "rgba(255,255,255,0.5)", lineHeight: lh },
-        }, proposal.eventTitle)
-      )
-    ),
-
-    // ── RIGHT: terms content ──────────────────────────────────────────────────
-    React.createElement(
-      View,
-      {
-        style: {
-          flex: 1, height: PAGE_SIZE[1],
-          backgroundColor: "#ffffff",
-          paddingHorizontal: pad,
-          paddingVertical: pad,
-        },
-      },
-      React.createElement(Text, {
-        style: {
-          fontSize: 9, fontFamily: "Helvetica-Bold", color: accent,
-          letterSpacing: 3, marginBottom: 14,
-        },
-      }, "TERMS & CONDITIONS"),
-      React.createElement(View, { style: { width: 40, height: 2, backgroundColor: accent, marginBottom: 18 } }),
-      proposal.termsText
-        ? React.createElement(Text, {
-            style: { fontSize: 10, color: "#475569", lineHeight: lh + 0.2 },
-          }, proposal.termsText)
-        : React.createElement(
-            View,
-            null,
-            ...[
-              "Payment of 50% deposit is required upon confirmation of booking.",
-              "Remaining balance to be paid on the day of event.",
-              "Cancellation within 7 days of event: deposit is non-refundable.",
-              "Halo Balloon reserves the right to substitute items of equal or greater value.",
-            ].map((line, i) =>
-              React.createElement(
-                View,
-                { key: i, style: { flexDirection: "row", marginBottom: 8 } },
-                React.createElement(View, {
-                  style: { width: 4, height: 4, borderRadius: 2, backgroundColor: accent, marginRight: 8, marginTop: 3, flexShrink: 0 },
-                }),
-                React.createElement(Text, { style: { fontSize: 10, color: "#475569", flex: 1, lineHeight: lh } }, line)
-              )
-            )
-          ),
-      // Thank you note
-      React.createElement(
-        View,
+        Text,
         {
           style: {
-            position: "absolute",
-            bottom: pad,
-            left: pad,
-            right: pad,
-            backgroundColor: accentLight,
-            borderRadius: 8,
-            padding: 14,
+            color: GOLD,
+            fontSize: 9,
+            fontWeight: "bold",
+            letterSpacing: 3,
+            marginBottom: 8,
           },
         },
-        React.createElement(Text, {
-          style: {
-            fontSize: 11, fontFamily: "Helvetica-Bold", color: accent,
-            textAlign: "center", marginBottom: 4,
-          },
-        }, "Thank you for choosing us! 🎈"),
-        React.createElement(Text, {
-          style: { fontSize: 9, color: "#64748b", textAlign: "center", lineHeight: lh },
-        }, "We look forward to making your event beautiful and memorable.")
-      )
-    )
+        `PACKAGE ${index + 1}`
+      ),
+      // Price row
+      React.createElement(
+        View,
+        { style: { flexDirection: "row", alignItems: "flex-end", marginBottom: 14 } },
+        React.createElement(
+          Text,
+          { style: { color: GOLD, fontSize: 44, fontWeight: "bold", lineHeight: 1 } },
+          fmtRm(item.price)
+        ),
+        item.originalPrice != null
+          ? React.createElement(
+              Text,
+              {
+                style: {
+                  color: GOLD,
+                  fontSize: 18,
+                  marginLeft: 12,
+                  textDecoration: "line-through",
+                  opacity: 0.8,
+                  marginBottom: 4,
+                },
+              },
+              fmtRm(item.originalPrice)
+            )
+          : null,
+      ),
+      // Package name
+      React.createElement(
+        Text,
+        { style: { color: "white", fontSize: 18, fontWeight: "bold", marginBottom: item.tagline ? 4 : 12 } },
+        item.packageName
+      ),
+      // Tagline
+      item.tagline
+        ? React.createElement(
+            Text,
+            { style: { color: "rgba(255,255,255,0.75)", fontSize: 10, marginBottom: 12 } },
+            item.tagline
+          )
+        : null,
+      // Features
+      React.createElement(
+        View,
+        { style: { gap: 5 } },
+        ...features.slice(0, 6).map((f, i) =>
+          React.createElement(
+            View,
+            { key: i, style: { flexDirection: "row", gap: 8, alignItems: "flex-start" } },
+            React.createElement(
+              Text,
+              { style: { color: GOLD, fontSize: 11, lineHeight: 1.2 } },
+              "•"
+            ),
+            React.createElement(
+              Text,
+              { style: { color: "rgba(255,255,255,0.9)", fontSize: 9, lineHeight: 1.4, flex: 1 } },
+              f
+            ),
+          )
+        ),
+      ),
+      // Logo bottom-right
+      React.createElement(
+        View,
+        { style: { position: "absolute", bottom: 20, right: 26 } },
+        logoEl(proposal.senderLogoUrl, proposal.senderName, true),
+        React.createElement(
+          Text,
+          { style: { color: "rgba(255,255,255,0.6)", fontSize: 6, marginTop: 2 } },
+          "Your Vision. Our Craft."
+        ),
+      ),
+    ),
   );
 }
 
-// ── Main entry ─────────────────────────────────────────────────────────────────
+// ── Add-Ons Page ──────────────────────────────────────────────────────────────
 
-export async function generateProposalPDF(proposal: ProposalWithItems): Promise<Buffer> {
-  const creativity = (proposal as { creativity?: number }).creativity ?? 50;
-  const elegance = (proposal as { elegance?: number }).elegance ?? 50;
-  const pagesCount = (proposal as { pagesCount?: number }).pagesCount ?? 1;
-  const addOnsEnabled = (proposal as { addOnsEnabled?: boolean }).addOnsEnabled ?? false;
+function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
+  const bg = getBg(proposal);
+  const addOns = proposal.addOns;
 
-  const items = proposal.items;
-  const pkgsPerPage = Math.ceil(items.length / pagesCount);
-
-  // Build package pages
-  const pkgPages: React.ReactElement[] = [];
-  for (let p = 0; p < pagesCount; p++) {
-    const slice = items.slice(p * pkgsPerPage, (p + 1) * pkgsPerPage);
-    if (slice.length === 0) continue;
-    if (pkgsPerPage === 1) {
-      pkgPages.push(
-        React.createElement(SinglePackagePage, {
-          key: `pkg-${p}`,
-          item: slice[0],
-          index: p,
-          total: pagesCount,
-          proposal,
-          creativity,
-          elegance,
-        })
-      );
-    } else {
-      pkgPages.push(
-        React.createElement(MultiPackagePage, {
-          key: `pkg-${p}`,
-          items: slice,
-          pageIndex: p,
-          proposal,
-          creativity,
-          elegance,
-        })
-      );
-    }
+  function fmtAoPrice(ao: typeof addOns[0]) {
+    if (ao.priceLabel) return ao.priceLabel;
+    if (ao.price != null) return `RM${Math.round(ao.price / 100)}`;
+    return null;
   }
 
-  const docEl = React.createElement(
-    Document as React.ComponentType<DocumentProps>,
-    { title: proposal.eventTitle, author: proposal.senderName },
-    React.createElement(CoverPage, { proposal, creativity, elegance }),
-    ...pkgPages,
-    ...(addOnsEnabled && proposal.addOns.length > 0
-      ? [React.createElement(AddOnsPage, { key: "addons", proposal, creativity, elegance })]
-      : []),
-    React.createElement(TermsPage, { proposal, creativity, elegance })
+  return React.createElement(
+    Page,
+    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative", overflow: "hidden" } },
+    CurlTopLeftSvg(),
+    CurlTopRightSvg(),
+    // ADD ONS title
+    React.createElement(
+      View,
+      { style: { alignItems: "center", marginTop: 42 } },
+      React.createElement(
+        Text,
+        {
+          style: {
+            color: GOLD,
+            fontSize: 24,
+            fontWeight: "bold",
+            letterSpacing: 8,
+          },
+        },
+        "ADD ONS"
+      ),
+    ),
+    // Grid: up to 4 columns, wrap
+    React.createElement(
+      View,
+      {
+        style: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: 20,
+          marginTop: 24,
+          paddingHorizontal: 40,
+        },
+      },
+      ...addOns.map((ao, i) => {
+        const price = fmtAoPrice(ao);
+        return React.createElement(
+          View,
+          { key: i, style: { alignItems: "center", width: 110 } },
+          ao.imageUrl
+            ? React.createElement(Image, {
+                src: ao.imageUrl,
+                style: { width: 65, height: 65, objectFit: "contain" },
+              })
+            : React.createElement(View, {
+                style: {
+                  width: 65,
+                  height: 65,
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderRadius: 4,
+                },
+              }),
+          React.createElement(
+            Text,
+            {
+              style: {
+                color: "white",
+                fontWeight: "bold",
+                fontSize: 9,
+                marginTop: 6,
+                textAlign: "center",
+              },
+            },
+            ao.addOnName
+          ),
+          price
+            ? React.createElement(
+                Text,
+                { style: { color: GOLD, fontSize: 9, textAlign: "center" } },
+                price
+              )
+            : null,
+        );
+      }),
+    ),
+    // Logo bottom-right
+    React.createElement(
+      View,
+      { style: { position: "absolute", bottom: 18, right: 24 } },
+      logoEl(proposal.senderLogoUrl, proposal.senderName, true),
+      React.createElement(
+        Text,
+        { style: { color: "rgba(255,255,255,0.6)", fontSize: 6, marginTop: 2 } },
+        "Your Vision. Our Craft."
+      ),
+    ),
+  );
+}
+
+// ── Terms Page ────────────────────────────────────────────────────────────────
+
+function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
+  const bg = getBg(proposal);
+  const terms = proposal.termsText || "";
+
+  return React.createElement(
+    Page,
+    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative", overflow: "hidden" } },
+    CurlTopLeftSvg(),
+    CurlTopRightSvg(),
+    // Header: centered logo
+    React.createElement(
+      View,
+      {
+        style: {
+          alignItems: "center",
+          paddingTop: 26,
+          paddingBottom: 10,
+          borderBottom: "1px solid rgba(255,255,255,0.25)",
+          marginHorizontal: 36,
+        },
+      },
+      logoEl(proposal.senderLogoUrl, proposal.senderName),
+      React.createElement(View, {
+        style: {
+          width: 160,
+          height: 1,
+          backgroundColor: "rgba(255,255,255,0.3)",
+          marginVertical: 6,
+        },
+      }),
+      React.createElement(
+        Text,
+        { style: { color: "rgba(255,255,255,0.7)", fontSize: 7 } },
+        "Your Vision. Our Craft."
+      ),
+    ),
+    // Terms content
+    React.createElement(
+      View,
+      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 14, overflow: "hidden" } },
+      React.createElement(
+        Text,
+        { style: { color: "rgba(255,255,255,0.9)", fontSize: 9, lineHeight: 1.6 } },
+        terms
+      ),
+    ),
+    // Enquiry footer
+    React.createElement(
+      View,
+      {
+        style: {
+          paddingHorizontal: 36,
+          paddingTop: 10,
+          paddingBottom: 16,
+          borderTop: "1px solid rgba(255,255,255,0.2)",
+        },
+      },
+      React.createElement(
+        Text,
+        {
+          style: {
+            color: "rgba(255,255,255,0.6)",
+            fontSize: 7,
+            letterSpacing: 2,
+            fontWeight: "bold",
+            marginBottom: 4,
+          },
+        },
+        "FOR ENQUIRY:"
+      ),
+      React.createElement(
+        Text,
+        { style: { color: "white", fontSize: 9 } },
+        proposal.senderName
+      ),
+      proposal.senderPhone
+        ? React.createElement(Text, { style: { color: "white", fontSize: 9 } }, `T: ${proposal.senderPhone}`)
+        : null,
+      proposal.senderEmail
+        ? React.createElement(Text, { style: { color: "white", fontSize: 9 } }, `E: ${proposal.senderEmail}`)
+        : null,
+    ),
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+export async function generateProposalPDF(proposal: ProposalWithItems): Promise<Buffer> {
+  const showAddOns = proposal.addOns.length > 0 &&
+    ((proposal as unknown as { addOnsEnabled?: boolean }).addOnsEnabled ?? false);
+
+  const doc = React.createElement(
+    Document,
+    {},
+    React.createElement(CoverPage, { proposal }),
+    ...proposal.items.map((item, i) =>
+      React.createElement(PackagePage, { key: item.id, item, index: i, proposal })
+    ),
+    ...(showAddOns ? [React.createElement(AddOnsPage, { proposal })] : []),
+    React.createElement(TermsPage, { proposal }),
   );
 
-  return renderToBuffer(docEl);
+  const buffer = await renderToBuffer(doc as React.ReactElement);
+  return Buffer.from(buffer);
 }

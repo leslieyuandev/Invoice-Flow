@@ -60,7 +60,6 @@ export interface ProposalAddOnFormItem {
   price: number | null;
   priceLabel: string | null;
   imageUrl: string | null;
-  quantity: number;
   sortOrder: number;
 }
 
@@ -71,12 +70,11 @@ export interface ProposalFormData {
   clientId: string;
   eventTitle: string;
   eventCategoryId: string;
+  bgColor: string;
+  coverTitle: string;
   coverImageUrl: string;
   termsText: string;
   selectedPackages: ProposalPackageFormItem[];
   selectedAddOns: ProposalAddOnFormItem[];
-  pagesCount: number;
   addOnsEnabled: boolean;
-  creativity: number;
-  elegance: number;
 }

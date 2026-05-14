@@ -299,6 +299,8 @@ model Proposal {
   sentAt    DateTime?
   deletedAt DateTime?
 
+  bgColor       String?
+  coverTitle    String?
   pagesCount    Int     @default(1)
   addOnsEnabled Boolean @default(false)
   creativity    Int     @default(50)

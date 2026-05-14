@@ -27,6 +27,8 @@ interface ProposalBuilderProps {
   addOns: CatalogAddOnData[];
   senderName: string;
   senderLogoUrl?: string | null;
+  senderPhone?: string | null;
+  senderEmail?: string | null;
   mode?: "create" | "edit";
   initialData?: ProposalFormData;
   proposalId?: string;
@@ -34,49 +36,11 @@ interface ProposalBuilderProps {
   defaultLeadPhone?: string;
 }
 
-function StyleSlider({
-  label,
-  hint,
-  value,
-  onChange,
-  leftLabel,
-  rightLabel,
-  color,
-}: {
-  label: string;
-  hint: string;
-  value: number;
-  onChange: (v: number) => void;
-  leftLabel: string;
-  rightLabel: string;
-  color: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-surface-900">{label}</p>
-          <p className="text-xs text-surface-400">{hint}</p>
-        </div>
-        <span className="text-sm font-semibold text-surface-700 w-9 text-right">{value}%</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-surface-400 w-16 shrink-0">{leftLabel}</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
-          style={{ accentColor: color === "brand" ? "#4f46e5" : "#7c3aed" }}
-        />
-        <span className="text-xs text-surface-400 w-16 text-right shrink-0">{rightLabel}</span>
-      </div>
-    </div>
-  );
-}
+const PRESET_COLORS = [
+  "#C8151B", "#B71C1C", "#880E4F", "#4A148C",
+  "#1A237E", "#006064", "#1B5E20", "#E65100",
+  "#212121", "#37474F",
+];
 
 export function ProposalBuilder({
   categoryTree,
@@ -84,6 +48,8 @@ export function ProposalBuilder({
   addOns,
   senderName,
   senderLogoUrl,
+  senderPhone,
+  senderEmail,
   mode = "create",
   initialData,
   proposalId,
@@ -104,34 +70,24 @@ export function ProposalBuilder({
       clientId: "",
       eventTitle: "",
       eventCategoryId: "",
+      bgColor: "#C8151B",
+      coverTitle: "",
       coverImageUrl: "",
       termsText: "",
       selectedPackages: [],
       selectedAddOns: [],
-      pagesCount: 1,
       addOnsEnabled: false,
-      creativity: 50,
-      elegance: 50,
     },
   });
 
   const watchedValues = useWatch({ control: form.control });
   const selectedPkgs = watchedValues.selectedPackages ?? [];
   const addOnsEnabled = watchedValues.addOnsEnabled ?? false;
-  const pagesCount = watchedValues.pagesCount ?? 1;
-  const creativity = watchedValues.creativity ?? 50;
-  const elegance = watchedValues.elegance ?? 50;
-
-  const maxPackages = pagesCount * 6;
-  const pkgCountWarning = selectedPkgs.length > maxPackages
-    ? `Too many packages (${selectedPkgs.length}/${maxPackages} max). Increase pages or deselect packages.`
-    : null;
 
   const canSend = Boolean(
     watchedValues.leadName &&
     watchedValues.eventCategoryId &&
-    selectedPkgs.length > 0 &&
-    !pkgCountWarning
+    selectedPkgs.length > 0
   );
 
   async function saveProposal(data: ProposalFormData): Promise<string | null> {
@@ -210,38 +166,47 @@ export function ProposalBuilder({
         <div className={`overflow-y-auto ${showPreview ? "w-full md:w-1/2" : "w-full max-w-3xl mx-auto"}`}>
           <form id="proposal-form" onSubmit={form.handleSubmit(onSubmit)} noValidate className="p-4 md:p-6 space-y-6 pb-28 md:pb-10">
 
-            {/* Style Settings */}
+            {/* Style — background color */}
             <Card>
               <CardHeader><CardTitle>Style</CardTitle></CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-3">
+                <Label>Background Color</Label>
+                <p className="text-xs text-surface-400 -mt-1">Applied to all slides</p>
                 <Controller
                   control={form.control}
-                  name="creativity"
+                  name="bgColor"
                   render={({ field }) => (
-                    <StyleSlider
-                      label="Creativity"
-                      hint="Bold colors and decorative elements"
-                      value={field.value}
-                      onChange={field.onChange}
-                      leftLabel="Minimal"
-                      rightLabel="Vibrant"
-                      color="brand"
-                    />
-                  )}
-                />
-                <Controller
-                  control={form.control}
-                  name="elegance"
-                  render={({ field }) => (
-                    <StyleSlider
-                      label="Elegance"
-                      hint="Whitespace and typography refinement"
-                      value={field.value}
-                      onChange={field.onChange}
-                      leftLabel="Compact"
-                      rightLabel="Spacious"
-                      color="violet"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={field.value || "#C8151B"}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          className="w-9 h-9 rounded cursor-pointer border border-surface-200 p-0.5"
+                        />
+                        <Input
+                          value={field.value || "#C8151B"}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          placeholder="#C8151B"
+                          className="w-32 font-mono text-sm"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {PRESET_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => field.onChange(c)}
+                            title={c}
+                            className={cn(
+                              "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
+                              field.value === c ? "border-surface-900 scale-110" : "border-white shadow"
+                            )}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 />
               </CardContent>
@@ -262,35 +227,7 @@ export function ProposalBuilder({
             {/* Packages */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>{t("proposalBuilder.packages")}</CardTitle>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-surface-500 font-medium">Pages</label>
-                      <Controller
-                        control={form.control}
-                        name="pagesCount"
-                        render={({ field }) => (
-                          <select
-                            value={field.value}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
-                            className="text-sm border border-surface-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-600"
-                          >
-                            {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                              <option key={n} value={n}>{n} page{n > 1 ? "s" : ""}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-                    </div>
-                    <span className={cn("text-xs font-medium", pkgCountWarning ? "text-red-500" : "text-surface-400")}>
-                      {selectedPkgs.length}/{maxPackages} pkgs
-                    </span>
-                  </div>
-                </div>
-                {pkgCountWarning && (
-                  <p className="text-xs text-red-500 mt-1">{pkgCountWarning}</p>
-                )}
+                <CardTitle>{t("proposalBuilder.packages")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <PackageSelectionSection form={form} packages={packages} categoryTree={categoryTree} />
@@ -337,16 +274,25 @@ export function ProposalBuilder({
               )}
             </Card>
 
-            {/* Cover Image & Terms */}
+            {/* Cover & Terms */}
             <Card>
               <CardHeader><CardTitle>Cover & Contact Info</CardTitle></CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="coverTitle">Cover Title</Label>
+                  <p className="text-xs text-surface-400">The large title shown on the cover page left panel</p>
+                  <Input
+                    id="coverTitle"
+                    {...form.register("coverTitle")}
+                    placeholder="e.g. Wedding Dinner Balloon Packages"
+                  />
+                </div>
                 <Controller
                   control={form.control}
                   name="coverImageUrl"
                   render={({ field }) => (
                     <ImageUploadField
-                      label="Cover Photo"
+                      label="Cover Photo (right side)"
                       value={field.value || null}
                       onChange={(url) => field.onChange(url ?? "")}
                       previewHeight="h-40"
@@ -355,12 +301,12 @@ export function ProposalBuilder({
                 />
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="termsText">Payment Terms & Contact Info</Label>
-                  <p className="text-xs text-surface-400">This appears on the last page of the proposal — include your bank details, payment schedule, and contact info.</p>
+                  <p className="text-xs text-surface-400">Appears on the last page — include your payment schedule, bank details, and any remarks.</p>
                   <textarea
                     id="termsText"
                     {...form.register("termsText")}
                     rows={6}
-                    placeholder={"50% booking fees upon confirmation\n\nPayment to:\nBank: Public Bank\nAcc: 1234567890\n\nContact: +60 12-345 6789\nhaloballoon@gmail.com"}
+                    placeholder={"50% booking fees upon confirmation\n\nPayment to:\nBank: Public Bank\nAcc: 1234567890\n\nRemarks: Balloons are yours to take home!"}
                     className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
                   />
                 </div>
@@ -376,6 +322,8 @@ export function ProposalBuilder({
               data={watchedValues as Partial<ProposalFormData>}
               senderName={senderName}
               senderLogoUrl={senderLogoUrl}
+              senderPhone={senderPhone}
+              senderEmail={senderEmail}
             />
           </div>
         )}

@@ -25,8 +25,8 @@ export default async function NewProposalPage() {
   ]);
 
   const contactLines = [
-    user?.companyPhone && `📞 ${user.companyPhone}`,
-    user?.companyEmail && `✉ ${user.companyEmail}`,
+    user?.companyPhone && `T: ${user.companyPhone}`,
+    user?.companyEmail && `E: ${user.companyEmail}`,
   ].filter(Boolean).join("\n");
 
   const initialTermsText = [
@@ -42,6 +42,8 @@ export default async function NewProposalPage() {
         addOns={addOns}
         senderName={user?.name ?? ""}
         senderLogoUrl={user?.logoUrl ?? null}
+        senderPhone={user?.companyPhone ?? null}
+        senderEmail={user?.companyEmail ?? null}
         mode="create"
         initialData={{
           leadName: "",
@@ -50,14 +52,13 @@ export default async function NewProposalPage() {
           clientId: "",
           eventTitle: "",
           eventCategoryId: "",
+          bgColor: "#C8151B",
+          coverTitle: "",
           coverImageUrl: "",
           termsText: initialTermsText,
           selectedPackages: [],
           selectedAddOns: [],
-          pagesCount: 1,
           addOnsEnabled: false,
-          creativity: 50,
-          elegance: 50,
         }}
       />
     </div>
