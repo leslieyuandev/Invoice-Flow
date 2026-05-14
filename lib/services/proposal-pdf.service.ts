@@ -175,7 +175,7 @@ function CoverPage({ proposal }: { proposal: ProposalWithItems }) {
             },
           })
         : React.createElement(View, {
-            style: { position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.3 },
+            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.3 },
           }),
     ),
   );
@@ -223,7 +223,7 @@ function PackagePage({
             },
           })
         : React.createElement(View, {
-            style: { position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.35 },
+            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.35 },
           }),
     ),
     // Right info panel 60%
@@ -441,7 +441,7 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
 
   return React.createElement(
     Page,
-    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative", overflow: "hidden" } },
+    { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative" } },
     CurlTopLeftSvg(),
     CurlTopRightSvg(),
     // Header: centered logo
@@ -452,7 +452,8 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
           alignItems: "center",
           paddingTop: 26,
           paddingBottom: 10,
-          borderBottom: "1px solid rgba(255,255,255,0.25)",
+          borderBottomWidth: 1,
+          borderBottomColor: "rgba(255,255,255,0.25)",
           marginHorizontal: 36,
         },
       },
@@ -474,7 +475,7 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
     // Terms content
     React.createElement(
       View,
-      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 14, overflow: "hidden" } },
+      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 14 } },
       React.createElement(
         Text,
         { style: { color: "rgba(255,255,255,0.9)", fontSize: 9, lineHeight: 1.6 } },
@@ -489,7 +490,8 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
           paddingHorizontal: 36,
           paddingTop: 10,
           paddingBottom: 16,
-          borderTop: "1px solid rgba(255,255,255,0.2)",
+          borderTopWidth: 1,
+          borderTopColor: "rgba(255,255,255,0.2)",
         },
       },
       React.createElement(
