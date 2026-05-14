@@ -803,7 +803,7 @@ function TermsPage({
       React.createElement(View, { style: { width: 40, height: 2, backgroundColor: accent, marginBottom: 18 } }),
       proposal.termsText
         ? React.createElement(Text, {
-            style: { fontSize: 10, color: "#475569", lineHeight: lh + 0.2, whiteSpace: "pre-wrap" },
+            style: { fontSize: 10, color: "#475569", lineHeight: lh + 0.2 },
           }, proposal.termsText)
         : React.createElement(
             View,
