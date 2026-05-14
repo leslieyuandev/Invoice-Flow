@@ -539,6 +539,6 @@ export async function generateProposalPDF(proposal: ProposalWithItems): Promise<
     React.createElement(TermsPage, { proposal }),
   );
 
-  const buffer = await renderToBuffer(doc as React.ReactElement);
+  const buffer = await renderToBuffer(doc as unknown as React.ReactElement);
   return Buffer.from(buffer);
 }
