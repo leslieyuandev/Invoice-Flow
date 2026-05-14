@@ -9,6 +9,7 @@ import {
   renderToBuffer,
   Font,
 } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
 import type { ProposalWithItems } from "@/types/proposal";
 
@@ -539,6 +540,6 @@ export async function generateProposalPDF(proposal: ProposalWithItems): Promise<
     React.createElement(TermsPage, { proposal }),
   );
 
-  const buffer = await renderToBuffer(doc as unknown as React.ReactElement);
+  const buffer = await renderToBuffer(doc as unknown as React.ReactElement<DocumentProps>);
   return Buffer.from(buffer);
 }
