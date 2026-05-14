@@ -9,13 +9,17 @@ import type {
 import type { CreateProposalInput } from "@/lib/validations/proposal";
 
 export async function getCatalogCategoryTree(): Promise<CatalogCategoryTree[]> {
-  const all = await db.eventCategory.findMany({
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-  });
+  const [all, pkgCounts] = await Promise.all([
+    db.eventCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
+    db.catalogPackage.groupBy({ by: ["categoryId"], where: { isActive: true }, _count: true }),
+  ]);
+
+  const countMap = new Map<string, number>();
+  for (const p of pkgCounts) countMap.set(p.categoryId, p._count);
 
   const map = new Map<string, CatalogCategoryTree>();
   for (const c of all) {
-    map.set(c.id, { id: c.id, name: c.name, slug: c.slug, children: [] });
+    map.set(c.id, { id: c.id, name: c.name, slug: c.slug, children: [], packageCount: countMap.get(c.id) ?? 0 });
   }
 
   const roots: CatalogCategoryTree[] = [];
@@ -27,6 +31,15 @@ export async function getCatalogCategoryTree(): Promise<CatalogCategoryTree[]> {
       roots.push(node);
     }
   }
+
+  // Propagate counts up: a parent has packages if any descendant does
+  function propagate(node: CatalogCategoryTree): number {
+    const childTotal = node.children.reduce((sum, ch) => sum + propagate(ch), 0);
+    node.packageCount = node.packageCount + childTotal;
+    return node.packageCount;
+  }
+  for (const r of roots) propagate(r);
+
   return roots;
 }
 
@@ -61,6 +74,7 @@ export async function getAddOns(): Promise<CatalogAddOnData[]> {
     name: a.name,
     price: a.price,
     priceLabel: a.priceLabel,
+    unit: (a as { unit?: string | null }).unit ?? null,
     imageUrl: a.imageUrl,
   }));
 }

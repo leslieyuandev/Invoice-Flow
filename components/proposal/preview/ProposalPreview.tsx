@@ -1,476 +1,383 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import type { ProposalFormData, ProposalPackageFormItem, ProposalAddOnFormItem } from "@/types/proposal";
+import { useEffect, useRef, useState } from "react";
+import type { ProposalFormData } from "@/types/proposal";
+
+function getAccent(c: number) {
+  if (c < 30) return "#64748b";
+  if (c < 65) return "#4f46e5";
+  return "#7c3aed";
+}
+function getAccentLight(c: number) {
+  if (c < 30) return "#f1f5f9";
+  if (c < 65) return "#eef2ff";
+  return "#f5f3ff";
+}
+function getPad(e: number) { return 28 + Math.round((e / 100) * 24); }
+function fmtPrice(cents: number) { return `RM ${(cents / 100).toFixed(0)}`; }
+
+// ── Cover ─────────────────────────────────────────────────────────────────────
+
+function CoverSlide({ data, senderName, senderLogoUrl, accent, accentLight, pad }: {
+  data: Partial<ProposalFormData>; senderName: string; senderLogoUrl?: string | null;
+  accent: string; accentLight: string; pad: number;
+}) {
+  return (
+    <div className="relative flex h-full">
+      <div className="relative flex-shrink-0 h-full overflow-hidden" style={{ width: "62%", backgroundColor: accent }}>
+        {data.coverImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={data.coverImageUrl} alt="cover" className="absolute inset-0 w-full h-full object-cover" />
+        )}
+        <div className="absolute inset-0 bg-black/35" />
+        <div className="absolute top-0 right-0 w-2 h-full" style={{ backgroundColor: accent }} />
+        <div className="absolute" style={{ top: pad * 0.45, left: pad * 0.45 }}>
+          {senderLogoUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={senderLogoUrl} alt="logo" className="object-contain" style={{ width: 100, height: 50 }} />
+            : <div className="text-white font-bold tracking-widest rounded px-2 py-1" style={{ backgroundColor: "rgba(255,255,255,0.15)", fontSize: 9 }}>{senderName || "HALO BALLOON"}</div>
+          }
+        </div>
+        <div className="absolute bottom-0 left-0 right-2" style={{ padding: pad * 0.45 }}>
+          <div className="w-8 h-0.5 mb-2" style={{ backgroundColor: accent }} />
+          <p className="text-white font-bold leading-tight mb-1.5" style={{ fontSize: 18 }}>{data.eventTitle || "Event Proposal"}</p>
+          <p className="text-white/80" style={{ fontSize: 9 }}>Prepared for {data.leadName || "…"}</p>
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col justify-between bg-white" style={{ padding: pad * 0.45 }}>
+        <div>
+          <p className="font-bold tracking-widest mb-2" style={{ fontSize: 7, color: accent, letterSpacing: 3 }}>PROPOSAL</p>
+          <div className="w-5 h-0.5 mb-3" style={{ backgroundColor: accent }} />
+          <p className="font-bold text-slate-900 leading-snug mb-1" style={{ fontSize: 9 }}>{data.eventTitle || "Event Proposal"}</p>
+          <p className="text-slate-500" style={{ fontSize: 7 }}>Prepared for: {data.leadName || "…"}</p>
+          {data.leadPhone && <p className="text-slate-500 mt-0.5" style={{ fontSize: 7 }}>📞 {data.leadPhone}</p>}
+        </div>
+        {(data.selectedPackages ?? []).length > 0 && (
+          <div className="rounded-lg px-2.5 py-2" style={{ backgroundColor: accentLight }}>
+            <p className="font-bold tracking-widest mb-1.5" style={{ fontSize: 6, color: accent, letterSpacing: 2 }}>PACKAGES INCLUDED</p>
+            {(data.selectedPackages ?? []).slice(0, 5).map((p, i) => (
+              <div key={i} className="flex items-center gap-1.5 mb-1">
+                <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ backgroundColor: accent, fontSize: 5 }}>{i + 1}</div>
+                <span className="text-slate-700 truncate flex-1" style={{ fontSize: 7 }}>{p.packageName}</span>
+                <span className="font-bold flex-shrink-0" style={{ fontSize: 7, color: accent }}>{fmtPrice(p.price)}</span>
+              </div>
+            ))}
+            {(data.selectedPackages ?? []).length > 5 && <p className="text-slate-400 mt-0.5" style={{ fontSize: 6 }}>+{(data.selectedPackages ?? []).length - 5} more…</p>}
+          </div>
+        )}
+        <div>
+          <div className="w-full h-px bg-slate-200 mb-2" />
+          {senderLogoUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={senderLogoUrl} alt="logo" className="object-contain" style={{ width: 60, height: 30 }} />
+            : <p className="font-bold text-slate-800" style={{ fontSize: 8 }}>{senderName}</p>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Single Package ────────────────────────────────────────────────────────────
+
+function SinglePackageSlide({ pkg, index, total, senderName, senderLogoUrl, accent, accentLight, pad }: {
+  pkg: ProposalFormData["selectedPackages"][number]; index: number; total: number;
+  senderName: string; senderLogoUrl?: string | null;
+  accent: string; accentLight: string; pad: number;
+}) {
+  const displayImage = pkg.imageOverride || pkg.imageUrl;
+  return (
+    <div className="flex h-full">
+      <div className="flex-shrink-0 relative h-full" style={{ width: "52%", backgroundColor: accentLight }}>
+        {displayImage
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={displayImage} alt={pkg.packageName} className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center"><span style={{ fontSize: 48, color: `${accent}30` }}>✦</span></div>
+        }
+        <div className="absolute text-white font-bold rounded"
+          style={{ bottom: pad * 0.35, left: pad * 0.35, backgroundColor: accent, fontSize: 6, padding: "3px 7px", letterSpacing: 1 }}>
+          {index + 1} / {total}
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col justify-between bg-white" style={{ padding: pad * 0.45 }}>
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            {senderLogoUrl
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={senderLogoUrl} alt="logo" className="object-contain" style={{ width: 50, height: 25 }} />
+              : <span className="text-slate-400 font-bold" style={{ fontSize: 6 }}>{senderName}</span>
+            }
+            <span className="font-bold tracking-widest" style={{ fontSize: 6, color: accent, letterSpacing: 2 }}>PACKAGE {index + 1}</span>
+          </div>
+          <div className="w-full h-px bg-slate-100 mb-3" />
+          {pkg.isBestSeller && (
+            <div className="inline-block rounded mb-2 px-1.5 py-0.5" style={{ backgroundColor: "#fef3c7", fontSize: 6 }}>
+              <span className="font-bold text-amber-800">⭐ BEST SELLER</span>
+            </div>
+          )}
+          <p className="font-bold text-slate-900 leading-snug mb-1" style={{ fontSize: 14 }}>{pkg.packageName}</p>
+          {pkg.tagline && <p className="text-slate-500 italic mb-2" style={{ fontSize: 8 }}>{pkg.tagline}</p>}
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="font-bold" style={{ fontSize: 20, color: accent }}>{fmtPrice(pkg.price)}</span>
+            {pkg.originalPrice && <span className="line-through text-slate-400" style={{ fontSize: 9 }}>{fmtPrice(pkg.originalPrice)}</span>}
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          {(pkg.features ?? []).slice(0, 7).map((f, i) => (
+            <div key={i} className="flex items-start gap-1.5 mb-1">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: accent }} />
+              <span className="text-slate-600 leading-snug" style={{ fontSize: 8 }}>{f}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Multi Package ─────────────────────────────────────────────────────────────
+
+function MultiPackageSlide({ pkgs, pageIndex, senderName, senderLogoUrl, accent, accentLight, pad }: {
+  pkgs: ProposalFormData["selectedPackages"]; pageIndex: number;
+  senderName: string; senderLogoUrl?: string | null;
+  accent: string; accentLight: string; pad: number;
+}) {
+  const cols = pkgs.length <= 3 ? pkgs.length : 3;
+  return (
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#f8fafc" }}>
+      <div className="flex items-center justify-between flex-shrink-0"
+        style={{ backgroundColor: accent, height: 36, paddingInline: pad * 0.5 }}>
+        {senderLogoUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={senderLogoUrl} alt="logo" className="object-contain" style={{ width: 60, height: 28 }} />
+          : <span className="text-white font-bold" style={{ fontSize: 8 }}>{senderName}</span>
+        }
+        <span className="text-white/80 font-bold tracking-widest" style={{ fontSize: 6, letterSpacing: 2 }}>PACKAGES — PAGE {pageIndex + 1}</span>
+      </div>
+      <div className="flex-1 overflow-hidden" style={{ padding: pad * 0.35 }}>
+        <div className="grid h-full gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+          {pkgs.map((pkg, i) => {
+            const displayImage = pkg.imageOverride || pkg.imageUrl;
+            return (
+              <div key={i} className="bg-white rounded-lg overflow-hidden border border-slate-200 flex flex-col">
+                {displayImage
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={displayImage} alt={pkg.packageName} className="w-full object-cover flex-shrink-0" style={{ height: pkgs.length <= 2 ? 120 : 80 }} />
+                  : <div className="w-full flex items-center justify-center flex-shrink-0" style={{ height: pkgs.length <= 2 ? 120 : 80, backgroundColor: accentLight }}>
+                      <span style={{ fontSize: 20, color: `${accent}40` }}>✦</span>
+                    </div>
+                }
+                <div className="p-2 flex-1 flex flex-col">
+                  {pkg.isBestSeller && (
+                    <div className="inline-block rounded mb-1 px-1 py-0.5" style={{ backgroundColor: "#fef3c7", fontSize: 5 }}>
+                      <span className="font-bold text-amber-800">⭐ BEST</span>
+                    </div>
+                  )}
+                  <p className="font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 8 }}>{pkg.packageName}</p>
+                  <p className="font-bold mb-1" style={{ fontSize: 10, color: accent }}>{fmtPrice(pkg.price)}</p>
+                  {(pkg.features ?? []).slice(0, pkgs.length <= 2 ? 4 : 3).map((f, fi) => (
+                    <div key={fi} className="flex items-start gap-1 mb-0.5">
+                      <div className="w-1 h-1 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: accent }} />
+                      <span className="text-slate-500 leading-tight" style={{ fontSize: 6 }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex items-center flex-shrink-0 bg-white border-t border-slate-200"
+        style={{ height: 18, paddingInline: pad * 0.4 }}>
+        <span className="text-slate-300" style={{ fontSize: 5 }}>{senderName}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Add-ons ───────────────────────────────────────────────────────────────────
+
+function AddOnsSlide({ data, senderName, senderLogoUrl, accent, accentLight, pad }: {
+  data: Partial<ProposalFormData>; senderName: string; senderLogoUrl?: string | null;
+  accent: string; accentLight: string; pad: number;
+}) {
+  const addOns = data.selectedAddOns ?? [];
+  const cols = Math.min(4, addOns.length || 1);
+  return (
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#f8fafc" }}>
+      <div className="flex items-center justify-between flex-shrink-0"
+        style={{ backgroundColor: accent, height: 36, paddingInline: pad * 0.5 }}>
+        {senderLogoUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={senderLogoUrl} alt="logo" className="object-contain" style={{ width: 60, height: 28 }} />
+          : <span className="text-white font-bold" style={{ fontSize: 8 }}>{senderName}</span>
+        }
+        <span className="text-white/80 font-bold tracking-widest" style={{ fontSize: 6, letterSpacing: 2 }}>OPTIONAL ADD-ONS</span>
+      </div>
+      <div className="flex-1 overflow-hidden" style={{ padding: pad * 0.35 }}>
+        <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+          {addOns.map((ao, i) => (
+            <div key={i} className="bg-white rounded-lg overflow-hidden border border-slate-200 flex flex-col">
+              {ao.imageUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={ao.imageUrl} alt={ao.addOnName} className="w-full object-cover flex-shrink-0" style={{ height: 80 }} />
+                : <div className="w-full flex items-center justify-center flex-shrink-0" style={{ height: 80, backgroundColor: accentLight }}>
+                    <span style={{ fontSize: 16, color: `${accent}40` }}>✦</span>
+                  </div>
+              }
+              <div className="p-1.5 border-t-2 flex-1" style={{ borderColor: accent }}>
+                <p className="font-bold text-slate-800 leading-tight mb-0.5" style={{ fontSize: 7 }}>{ao.addOnName}</p>
+                {(ao.priceLabel ?? ao.price) && (
+                  <p className="font-bold" style={{ fontSize: 7, color: accent }}>
+                    {ao.priceLabel ?? (ao.price != null ? fmtPrice(ao.price) : "")}
+                  </p>
+                )}
+                {ao.quantity > 1 && <p className="text-slate-400" style={{ fontSize: 6 }}>Qty: {ao.quantity}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center flex-shrink-0 bg-white border-t border-slate-200"
+        style={{ height: 18, paddingInline: pad * 0.4 }}>
+        <span className="text-slate-300" style={{ fontSize: 5 }}>{senderName}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Terms ─────────────────────────────────────────────────────────────────────
+
+function TermsSlide({ data, senderName, senderLogoUrl, accent, accentLight, pad }: {
+  data: Partial<ProposalFormData>; senderName: string; senderLogoUrl?: string | null;
+  accent: string; accentLight: string; pad: number;
+}) {
+  return (
+    <div className="flex h-full">
+      <div className="flex-shrink-0 flex flex-col justify-between h-full"
+        style={{ width: "28%", backgroundColor: accent, padding: pad * 0.45 }}>
+        <div>
+          {senderLogoUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={senderLogoUrl} alt="logo" className="object-contain mb-4" style={{ width: "80%", height: 45 }} />
+            : <p className="text-white font-bold mb-4" style={{ fontSize: 9 }}>{senderName || "HALO BALLOON"}</p>
+          }
+          <div className="w-6 h-0.5 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.4)" }} />
+          <p className="font-bold tracking-widest mb-2" style={{ fontSize: 5.5, color: "rgba(255,255,255,0.6)", letterSpacing: 2 }}>CONTACT US</p>
+          <p className="text-white/80 leading-relaxed" style={{ fontSize: 7 }}>{senderName}</p>
+        </div>
+        <p className="text-white/40 truncate" style={{ fontSize: 6 }}>{data.eventTitle}</p>
+      </div>
+      <div className="flex-1 bg-white flex flex-col" style={{ padding: pad * 0.45 }}>
+        <p className="font-bold tracking-widest mb-2" style={{ fontSize: 7, color: accent, letterSpacing: 3 }}>TERMS & CONDITIONS</p>
+        <div className="w-8 h-0.5 mb-3" style={{ backgroundColor: accent }} />
+        {data.termsText
+          ? <p className="text-slate-500 leading-relaxed whitespace-pre-wrap overflow-hidden" style={{ fontSize: 8 }}>{data.termsText}</p>
+          : <p className="text-slate-300 italic" style={{ fontSize: 8 }}>Payment terms will appear here.</p>
+        }
+        <div className="mt-auto rounded-lg p-3 text-center" style={{ backgroundColor: accentLight }}>
+          <p className="font-bold mb-0.5" style={{ fontSize: 9, color: accent }}>Thank you for choosing us! 🎈</p>
+          <p className="text-slate-500" style={{ fontSize: 7 }}>We look forward to making your event beautiful.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ProposalPreview ──────────────────────────────────────────────────────
 
 interface ProposalPreviewProps {
   data: Partial<ProposalFormData>;
-  senderName?: string;
+  senderName: string;
+  senderLogoUrl?: string | null;
 }
 
-// A4 landscape: 842 × 595
-const A4_W = 842;
-const A4_H = 595;
-
-// Style helpers derived from creativity / elegance sliders
-function getAccentColor(creativity: number): string {
-  if (creativity < 30) return "#64748b";
-  if (creativity < 65) return "#4f46e5";
-  return "#7c3aed";
-}
-
-function getSecondaryColor(creativity: number): string {
-  if (creativity < 30) return "#94a3b8";
-  if (creativity < 65) return "#818cf8";
-  return "#c084fc";
-}
-
-function getPad(elegance: number): number {
-  return 28 + Math.round((elegance / 100) * 24); // 28–52 px
-}
-
-function getLineHeight(elegance: number): number {
-  return 1.3 + (elegance / 100) * 0.5; // 1.3–1.8
-}
-
-// ── Cover Slide ───────────────────────────────────────────────────────────────
-
-function CoverSlide({
-  eventTitle,
-  leadName,
-  senderName,
-  creativity,
-  elegance,
-  coverImageUrl,
-}: {
-  eventTitle?: string;
-  leadName?: string;
-  senderName?: string;
-  creativity: number;
-  elegance: number;
-  coverImageUrl?: string;
-}) {
-  const accent = getAccentColor(creativity);
-  const secondary = getSecondaryColor(creativity);
-  const pad = getPad(elegance);
-
-  return (
-    <div
-      style={{
-        width: A4_W,
-        height: A4_H,
-        position: "relative",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        background: coverImageUrl
-          ? `url(${coverImageUrl}) center/cover no-repeat`
-          : `linear-gradient(135deg, ${accent} 0%, ${secondary} 100%)`,
-      }}
-    >
-      {/* Overlay for image backgrounds */}
-      {coverImageUrl && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
-      )}
-
-      {/* Decorative circles (creativity-driven) */}
-      {creativity > 40 && (
-        <>
-          <div style={{
-            position: "absolute", top: -60, right: -60, width: 240, height: 240,
-            borderRadius: "50%", background: "rgba(255,255,255,0.08)",
-          }} />
-          <div style={{
-            position: "absolute", bottom: -40, left: -40, width: 160, height: 160,
-            borderRadius: "50%", background: "rgba(255,255,255,0.06)",
-          }} />
-        </>
-      )}
-
-      {/* Sender name — top left */}
-      {senderName && (
-        <div style={{
-          position: "absolute", top: pad, left: pad,
-          fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)",
-          letterSpacing: 1,
-        }}>
-          {senderName}
-        </div>
-      )}
-
-      {/* Center content */}
-      <div style={{ position: "relative", textAlign: "center", padding: `0 ${pad * 2}px` }}>
-        {creativity > 55 && (
-          <div style={{
-            width: 48, height: 2, background: "rgba(255,255,255,0.6)",
-            margin: "0 auto 20px",
-          }} />
-        )}
-        <div style={{
-          fontSize: 40, fontWeight: 800, color: "#fff",
-          lineHeight: getLineHeight(elegance),
-          textShadow: "0 2px 12px rgba(0,0,0,0.3)",
-        }}>
-          {eventTitle || <span style={{ opacity: 0.4 }}>Event Title</span>}
-        </div>
-        {leadName && (
-          <div style={{
-            marginTop: 16, fontSize: 16,
-            color: "rgba(255,255,255,0.8)",
-            fontStyle: "italic",
-          }}>
-            Prepared for {leadName}
-          </div>
-        )}
-        {creativity > 55 && (
-          <div style={{
-            width: 48, height: 2, background: "rgba(255,255,255,0.6)",
-            margin: "20px auto 0",
-          }} />
-        )}
-      </div>
-
-      {/* Bottom bar */}
-      {elegance > 40 && (
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          height: 4, background: "rgba(255,255,255,0.25)",
-        }} />
-      )}
-    </div>
-  );
-}
-
-// ── Single Package Card (for multi-package pages) ──────────────────────────────
-
-function PackageCard({
-  pkg,
-  index,
-  accent,
-  secondary,
-  elegance,
-  isCompact,
-}: {
-  pkg: ProposalPackageFormItem;
-  index: number;
-  accent: string;
-  secondary: string;
-  elegance: number;
-  isCompact: boolean;
-}) {
-  const imgUrl = pkg.imageOverride || pkg.imageUrl;
-  const pad = isCompact ? 16 : 24;
-
-  return (
-    <div style={{
-      flex: 1, display: "flex", flexDirection: "row",
-      background: "#fff", overflow: "hidden",
-      border: "1px solid #e2e8f0", borderRadius: 8,
-    }}>
-      {/* Photo */}
-      <div style={{
-        width: isCompact ? 120 : 180, flexShrink: 0,
-        background: imgUrl ? `url(${imgUrl}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}22, ${secondary}33)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        {!imgUrl && (
-          <span style={{ fontSize: 28, color: accent, opacity: 0.5 }}>✦</span>
-        )}
-      </div>
-
-      {/* Info */}
-      <div style={{ flex: 1, padding: pad, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>
-          Package {index + 1}
-        </div>
-        <div style={{ fontSize: isCompact ? 14 : 18, fontWeight: 800, color: "#0f172a", lineHeight: 1.2, marginBottom: 4 }}>
-          {pkg.packageName}
-        </div>
-        {pkg.tagline && !isCompact && (
-          <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>{pkg.tagline}</div>
-        )}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: isCompact ? 15 : 20, fontWeight: 800, color: accent }}>
-            RM {(pkg.price / 100).toFixed(2)}
-          </span>
-          {pkg.originalPrice && !isCompact && (
-            <span style={{ fontSize: 11, color: "#94a3b8", textDecoration: "line-through" }}>
-              RM {(pkg.originalPrice / 100).toFixed(2)}
-            </span>
-          )}
-        </div>
-        {pkg.features.slice(0, isCompact ? 2 : 4).map((f, fi) => (
-          <div key={fi} style={{ display: "flex", gap: 6, marginBottom: 3 }}>
-            <span style={{ color: accent, fontSize: 9, marginTop: 1, flexShrink: 0 }}>●</span>
-            <span style={{ fontSize: 9, color: "#475569", lineHeight: 1.4 }}>{f}</span>
-          </div>
-        ))}
-        {pkg.isBestSeller && (
-          <div style={{
-            display: "inline-flex", alignItems: "center",
-            background: "#fef9c3", borderRadius: 3,
-            padding: "2px 6px", fontSize: 8, fontWeight: 700, color: "#854d0e",
-            marginTop: 6, alignSelf: "flex-start",
-          }}>
-            ⭐ BEST SELLER
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Package Page Slide ─────────────────────────────────────────────────────────
-
-function PackagePageSlide({
-  pkgsOnPage,
-  pageIndex,
-  totalPages,
-  creativity,
-  elegance,
-}: {
-  pkgsOnPage: ProposalPackageFormItem[];
-  pageIndex: number;
-  totalPages: number;
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const secondary = getSecondaryColor(creativity);
-  const pad = getPad(elegance);
-  const isCompact = pkgsOnPage.length > 2;
-  const isSingle = pkgsOnPage.length === 1;
-
-  if (isSingle) {
-    // Full-page split: photo left / info right
-    const pkg = pkgsOnPage[0];
-    const imgUrl = pkg.imageOverride || pkg.imageUrl;
-    const pkgIndex = pageIndex; // approximate — exact index not needed in preview
-
-    return (
-      <div style={{ width: A4_W, height: A4_H, display: "flex", background: "#fff" }}>
-        {/* Left: photo */}
-        <div style={{
-          width: 380, height: A4_H, flexShrink: 0, overflow: "hidden",
-          background: imgUrl
-            ? `url(${imgUrl}) center/cover no-repeat`
-            : `linear-gradient(160deg, ${accent}20, ${secondary}35)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {!imgUrl && <span style={{ fontSize: 56, color: accent, opacity: 0.3 }}>✦</span>}
-        </div>
-        {/* Right: info */}
-        <div style={{ flex: 1, padding: pad, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
-            Package {pkgIndex + 1} · {totalPages > 1 ? `Page ${pageIndex + 1} of ${totalPages}` : ""}
-          </div>
-          <div style={{ width: 40, height: 2, background: accent, marginBottom: 16 }} />
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", lineHeight: 1.2, marginBottom: 8 }}>
-            {pkg.packageName}
-          </div>
-          {pkg.tagline && (
-            <div style={{ fontSize: 13, color: "#475569", marginBottom: 16, lineHeight: getLineHeight(elegance) }}>{pkg.tagline}</div>
-          )}
-          {pkg.isBestSeller && (
-            <div style={{
-              background: "#fef9c3", display: "inline-flex", alignItems: "center",
-              borderRadius: 4, padding: "3px 8px", fontSize: 10, fontWeight: 700,
-              color: "#854d0e", marginBottom: 14, alignSelf: "flex-start",
-            }}>
-              ⭐ BEST SELLER
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20 }}>
-            <span style={{ fontSize: 30, fontWeight: 800, color: accent }}>RM {(pkg.price / 100).toFixed(2)}</span>
-            {pkg.originalPrice && (
-              <span style={{ fontSize: 14, color: "#94a3b8", textDecoration: "line-through" }}>
-                RM {(pkg.originalPrice / 100).toFixed(2)}
-              </span>
-            )}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {pkg.features.slice(0, 6).map((f, fi) => (
-              <div key={fi} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <span style={{ color: accent, fontSize: 10, marginTop: 1, flexShrink: 0 }}>●</span>
-                <span style={{ fontSize: 11, color: "#475569", lineHeight: getLineHeight(elegance) }}>{f}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Multi-package grid on one page
-  const cols = pkgsOnPage.length <= 2 ? 1 : 2;
-  const rows = Math.ceil(pkgsOnPage.length / cols);
-
-  return (
-    <div style={{
-      width: A4_W, height: A4_H, padding: pad,
-      background: "#f8fafc",
-      display: "flex", flexDirection: "column", gap: 8,
-    }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <div style={{ width: 4, height: 20, background: accent, borderRadius: 2 }} />
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-          Our Packages
-          {totalPages > 1 && (
-            <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 8 }}>
-              (Page {pageIndex + 1} of {totalPages})
-            </span>
-          )}
-        </div>
-      </div>
-      {/* Grid */}
-      <div style={{
-        flex: 1, display: "grid",
-        gridTemplateColumns: `repeat(${cols}, 1fr)`,
-        gridTemplateRows: `repeat(${rows}, 1fr)`,
-        gap: 8,
-      }}>
-        {pkgsOnPage.map((pkg, i) => (
-          <PackageCard
-            key={pkg.catalogPackageId}
-            pkg={pkg}
-            index={i}
-            accent={accent}
-            secondary={secondary}
-            elegance={elegance}
-            isCompact={isCompact}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Add-Ons Slide ──────────────────────────────────────────────────────────────
-
-function AddOnsSlide({
-  addOns,
-  creativity,
-  elegance,
-}: {
-  addOns: ProposalAddOnFormItem[];
-  creativity: number;
-  elegance: number;
-}) {
-  const accent = getAccentColor(creativity);
-  const pad = getPad(elegance);
-  return (
-    <div style={{ width: A4_W, height: A4_H, padding: pad, background: "#f8fafc" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <div style={{ width: 4, height: 24, background: accent, borderRadius: 2 }} />
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Optional Add-Ons</div>
-          <div style={{ fontSize: 12, color: "#475569" }}>Enhance your event with these extras</div>
-        </div>
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
-        {addOns.map((ao) => (
-          <div key={ao.catalogAddOnId} style={{
-            background: "#fff", borderRadius: 8, padding: "12px 16px",
-            border: `1px solid ${accent}30`, minWidth: 140,
-            borderTop: `3px solid ${accent}`,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{ao.addOnName}</div>
-            {ao.priceLabel && <div style={{ fontSize: 12, color: accent, fontWeight: 600 }}>{ao.priceLabel}</div>}
-            {ao.quantity > 1 && <div style={{ fontSize: 10, color: "#94a3b8" }}>Qty: {ao.quantity}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────────────────
-
-export function ProposalPreview({ data, senderName }: ProposalPreviewProps) {
+export function ProposalPreview({ data, senderName, senderLogoUrl }: ProposalPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const BASE_W = 842;
+  const BASE_H = 595;
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const available = entry.contentRect.width - 32;
-      setScale(Math.min(1, available / A4_W));
+    const ro = new ResizeObserver(() => {
+      const { width, height } = el.getBoundingClientRect();
+      setScale(Math.min(width / BASE_W, (height - 8) / BASE_H));
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const packages = data.selectedPackages ?? [];
-  const addOns = data.selectedAddOns ?? [];
-  const addOnsEnabled = data.addOnsEnabled ?? false;
-  const pagesCount = Math.max(1, data.pagesCount ?? 1);
   const creativity = data.creativity ?? 50;
   const elegance = data.elegance ?? 50;
+  const accent = getAccent(creativity);
+  const accentLight = getAccentLight(creativity);
+  const pad = getPad(elegance);
+  const pagesCount = data.pagesCount ?? 1;
+  const selectedPkgs = data.selectedPackages ?? [];
+  const pkgsPerPage = Math.ceil(selectedPkgs.length / Math.max(pagesCount, 1));
 
-  // Distribute packages across pages
-  const pkgsPerPage = pagesCount > 0 ? Math.ceil(packages.length / pagesCount) : packages.length;
-  const packagePages: ProposalPackageFormItem[][] = [];
-  for (let i = 0; i < pagesCount; i++) {
-    const slice = packages.slice(i * pkgsPerPage, (i + 1) * pkgsPerPage);
-    if (slice.length > 0) packagePages.push(slice);
+  type Slide = { key: string; label: string; el: React.ReactNode };
+  const slides: Slide[] = [];
+
+  slides.push({ key: "cover", label: "Cover",
+    el: <CoverSlide data={data} senderName={senderName} senderLogoUrl={senderLogoUrl}
+          accent={accent} accentLight={accentLight} pad={pad} /> });
+
+  for (let p = 0; p < pagesCount; p++) {
+    const slice = selectedPkgs.slice(p * pkgsPerPage, (p + 1) * pkgsPerPage);
+    if (slice.length === 0) continue;
+    if (pkgsPerPage === 1) {
+      slides.push({ key: `pkg-${p}`, label: `Package ${p + 1}`,
+        el: <SinglePackageSlide pkg={slice[0]} index={p} total={pagesCount}
+              senderName={senderName} senderLogoUrl={senderLogoUrl}
+              accent={accent} accentLight={accentLight} pad={pad} /> });
+    } else {
+      slides.push({ key: `pkgs-${p}`, label: `Packages ${p + 1}`,
+        el: <MultiPackageSlide pkgs={slice} pageIndex={p}
+              senderName={senderName} senderLogoUrl={senderLogoUrl}
+              accent={accent} accentLight={accentLight} pad={pad} /> });
+    }
   }
 
-  const totalSlides = 1 + packagePages.length + (addOnsEnabled && addOns.length > 0 ? 1 : 0);
-  const totalHeight = totalSlides * A4_H + (totalSlides - 1) * 16;
+  if ((data.addOnsEnabled ?? false) && (data.selectedAddOns ?? []).length > 0) {
+    slides.push({ key: "addons", label: "Add-Ons",
+      el: <AddOnsSlide data={data} senderName={senderName} senderLogoUrl={senderLogoUrl}
+            accent={accent} accentLight={accentLight} pad={pad} /> });
+  }
+
+  slides.push({ key: "terms", label: "Terms",
+    el: <TermsSlide data={data} senderName={senderName} senderLogoUrl={senderLogoUrl}
+          accent={accent} accentLight={accentLight} pad={pad} /> });
+
+  const safeSlide = Math.min(currentSlide, slides.length - 1);
 
   return (
-    <div ref={containerRef} className="overflow-y-auto h-full bg-surface-100 p-4 flex flex-col items-center">
-      <div
-        style={{
-          transform: `scale(${scale})`,
-          transformOrigin: "top center",
-          marginBottom: `${(scale - 1) * totalHeight}px`,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        {/* Cover */}
-        <CoverSlide
-          eventTitle={data.eventTitle}
-          leadName={data.leadName}
-          senderName={senderName}
-          creativity={creativity}
-          elegance={elegance}
-          coverImageUrl={data.coverImageUrl}
-        />
-
-        {/* Package pages */}
-        {packagePages.map((pkgsOnPage, pi) => (
-          <PackagePageSlide
-            key={pi}
-            pkgsOnPage={pkgsOnPage}
-            pageIndex={pi}
-            totalPages={packagePages.length}
-            creativity={creativity}
-            elegance={elegance}
-          />
+    <div className="flex flex-col h-full">
+      <div className="flex overflow-x-auto gap-1 px-3 py-2 bg-surface-100 border-b border-surface-200 shrink-0">
+        {slides.map((s, i) => (
+          <button key={s.key} type="button" onClick={() => setCurrentSlide(i)}
+            className={`text-xs px-2.5 py-1 rounded-md whitespace-nowrap transition-colors font-medium shrink-0 ${
+              i === safeSlide ? "bg-white text-surface-900 shadow-sm" : "text-surface-500 hover:text-surface-700"
+            }`}>
+            {s.label}
+          </button>
         ))}
-
-        {/* Add-ons page */}
-        {addOnsEnabled && addOns.length > 0 && (
-          <AddOnsSlide addOns={addOns} creativity={creativity} elegance={elegance} />
-        )}
-
-        {packages.length === 0 && (
-          <div style={{
-            width: A4_W, height: 200,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "#fff", borderRadius: 8, border: "1px dashed #e2e8f0",
-            color: "#94a3b8", fontSize: 14,
-          }}>
-            Select packages to see the preview
-          </div>
-        )}
+      </div>
+      <div ref={containerRef} className="flex-1 flex items-center justify-center bg-surface-200 overflow-hidden">
+        <div style={{
+          width: BASE_W, height: BASE_H,
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+        }}>
+          {slides[safeSlide]?.el}
+        </div>
       </div>
     </div>
   );

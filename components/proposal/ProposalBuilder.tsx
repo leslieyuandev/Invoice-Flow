@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { ImageUploadField } from "@/components/ui/ImageUploadField";
 import { LeadInfoSection } from "./form/LeadInfoSection";
 import { EventCategorySection } from "./form/EventCategorySection";
 import { PackageSelectionSection } from "./form/PackageSelectionSection";
@@ -25,6 +26,7 @@ interface ProposalBuilderProps {
   packages: CatalogPackageData[];
   addOns: CatalogAddOnData[];
   senderName: string;
+  senderLogoUrl?: string | null;
   mode?: "create" | "edit";
   initialData?: ProposalFormData;
   proposalId?: string;
@@ -67,7 +69,7 @@ function StyleSlider({
           step={5}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className={`flex-1 h-2 rounded-full appearance-none cursor-pointer accent-${color}`}
+          className="flex-1 h-2 rounded-full appearance-none cursor-pointer"
           style={{ accentColor: color === "brand" ? "#4f46e5" : "#7c3aed" }}
         />
         <span className="text-xs text-surface-400 w-16 text-right shrink-0">{rightLabel}</span>
@@ -81,6 +83,7 @@ export function ProposalBuilder({
   packages,
   addOns,
   senderName,
+  senderLogoUrl,
   mode = "create",
   initialData,
   proposalId,
@@ -290,7 +293,7 @@ export function ProposalBuilder({
                 )}
               </CardHeader>
               <CardContent>
-                <PackageSelectionSection form={form} packages={packages} />
+                <PackageSelectionSection form={form} packages={packages} categoryTree={categoryTree} />
               </CardContent>
             </Card>
 
@@ -334,21 +337,30 @@ export function ProposalBuilder({
               )}
             </Card>
 
-            {/* Terms & Cover */}
+            {/* Cover Image & Terms */}
             <Card>
-              <CardHeader><CardTitle>{t("proposalBuilder.terms")}</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Cover & Contact Info</CardTitle></CardHeader>
               <CardContent className="space-y-4">
+                <Controller
+                  control={form.control}
+                  name="coverImageUrl"
+                  render={({ field }) => (
+                    <ImageUploadField
+                      label="Cover Photo"
+                      value={field.value || null}
+                      onChange={(url) => field.onChange(url ?? "")}
+                      previewHeight="h-40"
+                    />
+                  )}
+                />
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="coverImageUrl">{t("proposalBuilder.coverImage")}</Label>
-                  <Input id="coverImageUrl" {...form.register("coverImageUrl")} type="url" placeholder="https://..." />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="termsText">Terms & Contact Info</Label>
+                  <Label htmlFor="termsText">Payment Terms & Contact Info</Label>
+                  <p className="text-xs text-surface-400">This appears on the last page of the proposal — include your bank details, payment schedule, and contact info.</p>
                   <textarea
                     id="termsText"
                     {...form.register("termsText")}
-                    rows={5}
-                    placeholder="Payment terms, contact details, terms & conditions..."
+                    rows={6}
+                    placeholder={"50% booking fees upon confirmation\n\nPayment to:\nBank: Public Bank\nAcc: 1234567890\n\nContact: +60 12-345 6789\nhaloballoon@gmail.com"}
                     className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
                   />
                 </div>
@@ -363,6 +375,7 @@ export function ProposalBuilder({
             <ProposalPreview
               data={watchedValues as Partial<ProposalFormData>}
               senderName={senderName}
+              senderLogoUrl={senderLogoUrl}
             />
           </div>
         )}

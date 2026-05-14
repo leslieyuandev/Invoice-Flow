@@ -17,6 +17,7 @@ export interface CatalogCategoryTree {
   name: string;
   slug: string;
   children: CatalogCategoryTree[];
+  packageCount: number;
 }
 
 export interface CatalogPackageData {
@@ -36,6 +37,7 @@ export interface CatalogAddOnData {
   name: string;
   price: number | null;
   priceLabel: string | null;
+  unit: string | null;
   imageUrl: string | null;
 }
 

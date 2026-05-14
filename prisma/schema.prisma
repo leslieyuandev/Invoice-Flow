@@ -267,6 +267,7 @@ model CatalogAddOn {
   name       String
   price      Int?
   priceLabel String?
+  unit       String?
   imageUrl   String?
   isActive   Boolean @default(true)
   sortOrder  Int     @default(0)

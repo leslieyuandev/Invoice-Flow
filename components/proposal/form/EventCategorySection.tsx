@@ -13,21 +13,29 @@ interface EventCategorySectionProps {
   categoryTree: CatalogCategoryTree[];
 }
 
+function hasAnyPackages(node: CatalogCategoryTree): boolean {
+  return node.packageCount > 0;
+}
+
 export function EventCategorySection({ form, categoryTree }: EventCategorySectionProps) {
   const { t } = useTranslation();
   const { register, setValue, formState: { errors } } = form;
   const selectedCategoryId = useWatch({ control: form.control, name: "eventCategoryId" });
 
-  // Find which top-level node is "active" (either directly selected or a parent of selected)
   const allCategories = categoryTree.flatMap((top) => [top, ...top.children]);
-
   const selectedNode = allCategories.find((c) => c.id === selectedCategoryId);
   const activeTopLevel = categoryTree.find(
     (top) => top.id === selectedCategoryId || top.children.some((c) => c.id === selectedCategoryId)
   );
 
-  function selectCategory(id: string) {
-    setValue("eventCategoryId", id, { shouldValidate: true, shouldDirty: true });
+  function selectCategory(node: CatalogCategoryTree) {
+    if (!hasAnyPackages(node)) return;
+    if (node.children.length > 0) {
+      const firstWithPkgs = node.children.find(hasAnyPackages);
+      if (firstWithPkgs) setValue("eventCategoryId", firstWithPkgs.id, { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("eventCategoryId", node.id, { shouldValidate: true, shouldDirty: true });
+    }
   }
 
   return (
@@ -51,46 +59,50 @@ export function EventCategorySection({ form, categoryTree }: EventCategorySectio
         <div className="flex flex-wrap gap-2">
           {categoryTree.map((top) => {
             const isActive = top.id === selectedCategoryId || top.children.some((c) => c.id === selectedCategoryId);
+            const enabled = hasAnyPackages(top);
             return (
               <button
                 key={top.id}
                 type="button"
-                onClick={() => {
-                  if (top.children.length === 0) {
-                    selectCategory(top.id);
-                  } else {
-                    // Select first child by default when expanding a parent
-                    selectCategory(top.children[0].id);
-                  }
-                }}
+                disabled={!enabled}
+                onClick={() => selectCategory(top)}
+                title={!enabled ? "No packages available for this category yet" : undefined}
                 className={cn(
                   "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
                   isActive
                     ? "bg-brand-600 text-white border-brand-600"
-                    : "bg-white text-surface-700 border-surface-200 hover:border-brand-400 hover:text-brand-600"
+                    : enabled
+                    ? "bg-white text-surface-700 border-surface-200 hover:border-brand-400 hover:text-brand-600"
+                    : "bg-surface-50 text-surface-300 border-surface-100 cursor-not-allowed"
                 )}
               >
                 {top.name}
+                {!enabled && <span className="ml-1 text-[10px] opacity-60">(no packages)</span>}
               </button>
             );
           })}
         </div>
 
-        {/* Sub-category pills (shown when active top-level has children) */}
+        {/* Sub-category pills */}
         {activeTopLevel && activeTopLevel.children.length > 0 && (
           <div className="flex flex-wrap gap-2 pl-2 border-l-2 border-brand-100">
             {activeTopLevel.children.map((sub) => {
               const isActive = sub.id === selectedCategoryId;
+              const enabled = hasAnyPackages(sub);
               return (
                 <button
                   key={sub.id}
                   type="button"
-                  onClick={() => selectCategory(sub.id)}
+                  disabled={!enabled}
+                  onClick={() => selectCategory(sub)}
+                  title={!enabled ? "No packages available yet" : undefined}
                   className={cn(
                     "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
                     isActive
                       ? "bg-brand-100 text-brand-700 border-brand-300"
-                      : "bg-white text-surface-600 border-surface-200 hover:border-brand-300 hover:text-brand-600"
+                      : enabled
+                      ? "bg-white text-surface-600 border-surface-200 hover:border-brand-300 hover:text-brand-600"
+                      : "bg-surface-50 text-surface-300 border-surface-100 cursor-not-allowed"
                   )}
                 >
                   {sub.name}
@@ -105,7 +117,7 @@ export function EventCategorySection({ form, categoryTree }: EventCategorySectio
         )}
 
         {selectedNode && (
-          <p className="text-xs text-surface-400">Selected: {selectedNode.name}</p>
+          <p className="text-xs text-surface-400">Selected: <span className="font-medium text-surface-600">{selectedNode.name}</span></p>
         )}
       </div>
     </div>

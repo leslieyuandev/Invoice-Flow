@@ -23,7 +23,7 @@ export default async function EditProposalPage({ params }: PageProps) {
     getAddOns(),
     db.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true },
+      select: { name: true, logoUrl: true },
     }),
   ]);
 
@@ -74,6 +74,7 @@ export default async function EditProposalPage({ params }: PageProps) {
         packages={packages}
         addOns={addOns}
         senderName={user?.name ?? ""}
+        senderLogoUrl={user?.logoUrl ?? null}
         mode="edit"
         initialData={initialData}
         proposalId={id}
