@@ -49,29 +49,43 @@ function CurlPackageRight({ color = GOLD }: { color?: string }) {
   );
 }
 
+function CurlPackageLeft({ color = GOLD }: { color?: string }) {
+  return (
+    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ position: "absolute", top: 0, left: 0 }}>
+      <path d="M0 0 C15 8 28 20 32 38 C36 50 34 62 40 72" stroke={color} strokeWidth="1.5" fill="none" opacity="0.6" />
+      <path d="M0 20 C10 26 18 34 22 46" stroke={color} strokeWidth="1" fill="none" opacity="0.4" />
+    </svg>
+  );
+}
+
 // ── Slide components ──────────────────────────────────────────────────────────
 
 function LogoBox({
   senderLogoUrl,
   senderName,
   small = false,
+  cover = false,
 }: {
   senderLogoUrl?: string | null;
   senderName: string;
   small?: boolean;
+  cover?: boolean;
 }) {
+  const height = cover ? 64 : small ? 22 : 32;
+  const fontSize = cover ? 18 : small ? 9 : 13;
+  const maxWidth = cover ? 200 : small ? 90 : 130;
   if (senderLogoUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={senderLogoUrl}
         alt="logo"
-        style={{ height: small ? 22 : 32, objectFit: "contain", maxWidth: small ? 90 : 130 }}
+        style={{ height, objectFit: "contain", maxWidth }}
       />
     );
   }
   return (
-    <span style={{ color: "white", fontWeight: "bold", fontSize: small ? 9 : 13 }}>
+    <span style={{ color: "white", fontWeight: "bold", fontSize }}>
       {senderName || "HALO BALLOON"}
     </span>
   );
@@ -99,18 +113,17 @@ function CoverSlide({
           height: "100%",
           backgroundColor: bg,
           overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
         }}
       >
         <CurlTopLeft />
-        {/* Logo top-left */}
-        <div style={{ position: "absolute", top: 32, left: 32 }}>
-          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} />
-          <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 8, fontStyle: "italic", marginTop: 4 }}>
-            Your Vision. Our Craft.
-          </p>
+        {/* Logo centered at top */}
+        <div style={{ position: "absolute", top: 28, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
         </div>
-        {/* Title bottom-left */}
-        <div style={{ position: "absolute", bottom: 36, left: 32, right: 20 }}>
+        {/* Title vertically centered, left-aligned */}
+        <div style={{ paddingLeft: 36, paddingRight: 24 }}>
           <h1
             style={{
               color: "white",
@@ -168,110 +181,91 @@ function PackageSlide({
   senderLogoUrl?: string | null;
 }) {
   const photoUrl = item.imageOverride || item.imageUrl;
+  const isReversed = index % 2 === 1;
+
+  const photoPanel = (
+    <div
+      style={{
+        position: "relative",
+        width: "40%",
+        height: "100%",
+        backgroundColor: "#555",
+        overflow: "hidden",
+        flexShrink: 0,
+      }}
+    >
+      {photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photoUrl}
+          alt={item.packageName}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <div style={{ position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.4 }} />
+      )}
+    </div>
+  );
+
+  const infoPanel = (
+    <div
+      style={{
+        position: "relative",
+        flex: 1,
+        height: "100%",
+        backgroundColor: bg,
+        padding: "36px 36px 36px 40px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      {isReversed ? <CurlPackageLeft /> : <CurlPackageRight />}
+      {/* Package label */}
+      <p style={{ color: GOLD, fontSize: 10, fontWeight: "bold", letterSpacing: 3, marginBottom: 8 }}>
+        PACKAGE {index + 1}
+      </p>
+      {/* Price row */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
+        <span style={{ color: GOLD, fontSize: 46, fontWeight: "bold", lineHeight: 1 }}>
+          {fmtPriceRm(item.price)}
+        </span>
+        {item.originalPrice != null && (
+          <span style={{ color: GOLD, fontSize: 18, textDecoration: "line-through", opacity: 0.8 }}>
+            {fmtPriceRm(item.originalPrice)}
+          </span>
+        )}
+      </div>
+      {/* Package name */}
+      <h2 style={{ color: "white", fontSize: 20, fontWeight: "bold", margin: 0, marginBottom: item.tagline ? 4 : 14 }}>
+        {item.packageName}
+      </h2>
+      {item.tagline && (
+        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginBottom: 14 }}>
+          {item.tagline}
+        </p>
+      )}
+      {/* Features */}
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {item.features.slice(0, 6).map((f, i) => (
+          <li key={i} style={{ display: "flex", gap: 8, marginBottom: 5, alignItems: "flex-start" }}>
+            <span style={{ color: GOLD, fontSize: 12, lineHeight: 1.2, flexShrink: 0 }}>•</span>
+            <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 10, lineHeight: 1.4 }}>{f}</span>
+          </li>
+        ))}
+      </ul>
+      {/* Logo at outer corner */}
+      <div style={{ position: "absolute", bottom: 22, ...(isReversed ? { left: 28 } : { right: 28 }) }}>
+        <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ position: "absolute", inset: 0, display: "flex" }}>
-      {/* Left photo ~40% */}
-      <div
-        style={{
-          position: "relative",
-          width: "40%",
-          height: "100%",
-          backgroundColor: "#555",
-          overflow: "hidden",
-        }}
-      >
-        {photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={photoUrl}
-            alt={item.packageName}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <div style={{ position: "absolute", inset: 0, backgroundColor: bg, opacity: 0.4 }} />
-        )}
-      </div>
-      {/* Right info panel ~60% */}
-      <div
-        style={{
-          position: "relative",
-          flex: 1,
-          height: "100%",
-          backgroundColor: bg,
-          padding: "36px 36px 36px 40px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          overflow: "hidden",
-        }}
-      >
-        <CurlPackageRight />
-        {/* Package label */}
-        <p
-          style={{
-            color: GOLD,
-            fontSize: 10,
-            fontWeight: "bold",
-            letterSpacing: 3,
-            marginBottom: 8,
-            textTransform: "uppercase",
-          }}
-        >
-          PACKAGE {index + 1}
-        </p>
-        {/* Price row */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
-          <span style={{ color: GOLD, fontSize: 46, fontWeight: "bold", lineHeight: 1 }}>
-            {fmtPriceRm(item.price)}
-          </span>
-          {item.originalPrice != null && (
-            <span
-              style={{
-                color: GOLD,
-                fontSize: 18,
-                textDecoration: "line-through",
-                opacity: 0.8,
-              }}
-            >
-              {fmtPriceRm(item.originalPrice)}
-            </span>
-          )}
-        </div>
-        {/* Package name */}
-        <h2
-          style={{
-            color: "white",
-            fontSize: 20,
-            fontWeight: "bold",
-            margin: 0,
-            marginBottom: item.tagline ? 4 : 14,
-          }}
-        >
-          {item.packageName}
-        </h2>
-        {item.tagline && (
-          <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginBottom: 14 }}>
-            {item.tagline}
-          </p>
-        )}
-        {/* Features */}
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {item.features.slice(0, 6).map((f, i) => (
-            <li key={i} style={{ display: "flex", gap: 8, marginBottom: 5, alignItems: "flex-start" }}>
-              <span style={{ color: GOLD, fontSize: 12, lineHeight: 1.2, flexShrink: 0 }}>•</span>
-              <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 10, lineHeight: 1.4 }}>{f}</span>
-            </li>
-          ))}
-        </ul>
-        {/* Logo bottom-right */}
-        <div style={{ position: "absolute", bottom: 22, right: 28, textAlign: "right" }}>
-          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
-          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 7, fontStyle: "italic", marginTop: 2 }}>
-            Your Vision. Our Craft.
-          </p>
-        </div>
-      </div>
+      {isReversed ? infoPanel : photoPanel}
+      {isReversed ? photoPanel : infoPanel}
     </div>
   );
 }
@@ -375,11 +369,8 @@ function AddOnsSlide({
         </div>
       </div>
       {/* Logo bottom-right */}
-      <div style={{ position: "absolute", bottom: 20, right: 28, textAlign: "right" }}>
+      <div style={{ position: "absolute", bottom: 20, right: 28 }}>
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
-        <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 7, fontStyle: "italic", marginTop: 2 }}>
-          Your Vision. Our Craft.
-        </p>
       </div>
     </div>
   );
@@ -440,13 +431,14 @@ function CompactPackagesSlide({
                     flex: 1,
                     display: "flex",
                     flexDirection: "row",
-                    backgroundColor: "rgba(0,0,0,0.18)",
-                    borderRadius: 4,
+                    backgroundColor: "rgba(0,0,0,0.25)",
+                    borderRadius: 6,
                     overflow: "hidden",
+                    position: "relative",
                   }}
                 >
                   {/* Thumbnail */}
-                  <div style={{ width: 56, flexShrink: 0, backgroundColor: "#555", position: "relative" }}>
+                  <div style={{ width: 68, flexShrink: 0, backgroundColor: "#555" }}>
                     {photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={photoUrl} alt={pkg.packageName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -455,18 +447,23 @@ function CompactPackagesSlide({
                     )}
                   </div>
                   {/* Info */}
-                  <div style={{ flex: 1, padding: "8px 10px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <p style={{ color: GOLD, fontSize: 13, fontWeight: "bold", lineHeight: 1, margin: 0 }}>
+                  <div style={{ flex: 1, padding: "9px 10px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 6, fontWeight: "bold", letterSpacing: 1.2, margin: 0, textTransform: "uppercase" }}>
+                      Start From
+                    </p>
+                    <p style={{ color: GOLD, fontSize: 16, fontWeight: "bold", lineHeight: 1, margin: "2px 0 3px" }}>
                       {fmtPriceRm(pkg.price)}
                     </p>
-                    <p style={{ color: "white", fontSize: 9, fontWeight: "bold", margin: "3px 0 2px", lineHeight: 1.2 }}>
+                    <p style={{ color: "white", fontSize: 8.5, fontWeight: "bold", margin: 0, lineHeight: 1.2 }}>
                       {pkg.packageName}
                     </p>
-                    {pkg.features.slice(0, 2).map((f, fi) => (
-                      <p key={fi} style={{ color: "rgba(255,255,255,0.75)", fontSize: 7.5, margin: 0, lineHeight: 1.3 }}>
-                        • {f}
-                      </p>
-                    ))}
+                    {pkg.isBestSeller && (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{ backgroundColor: GOLD, color: "white", fontSize: 6, fontWeight: "bold", padding: "2px 5px", borderRadius: 8, letterSpacing: 0.4 }}>
+                          BEST SELLER
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -524,10 +521,6 @@ function TermsSlide({
         }}
       >
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} />
-        <div style={{ width: 160, height: 1, backgroundColor: "rgba(255,255,255,0.35)", margin: "8px 0" }} />
-        <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 8, fontStyle: "italic" }}>
-          Your Vision. Our Craft.
-        </p>
       </div>
       {/* Terms content */}
       <div style={{ flex: 1, padding: "16px 36px", overflow: "hidden" }}>
