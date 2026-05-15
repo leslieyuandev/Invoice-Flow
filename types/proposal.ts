@@ -71,7 +71,7 @@ export interface ProposalFormData {
   eventTitle: string;
   eventCategoryId: string;
   bgColor: string;
-  coverTitle: string;
+  fontPair: string;
   coverImageUrl: string;
   termsText: string;
   selectedPackages: ProposalPackageFormItem[];

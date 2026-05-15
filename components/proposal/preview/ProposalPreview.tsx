@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ProposalFormData, ProposalAddOnFormItem } from "@/types/proposal";
+import { getFontPair } from "@/lib/constants/fontPairs";
 
 const BASE_W = 842;
 const BASE_H = 595;
@@ -95,51 +96,28 @@ function CoverSlide({
   data,
   senderName,
   senderLogoUrl,
+  headingFont,
 }: {
   data: Partial<ProposalFormData>;
   senderName: string;
   senderLogoUrl?: string | null;
+  headingFont: string;
 }) {
   const bg = data.bgColor || DEFAULT_BG;
-  const title = data.coverTitle || data.eventTitle || "Balloon Packages";
+  const title = data.eventTitle || "Balloon Packages";
 
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex" }}>
-      {/* Left colored panel ~58% */}
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
+      {/* Top: cover photo ~55% height */}
       <div
         style={{
+          height: "55%",
           position: "relative",
-          width: "58%",
-          height: "100%",
-          backgroundColor: bg,
+          backgroundColor: "#888",
           overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
+          flexShrink: 0,
         }}
       >
-        <CurlTopLeft />
-        {/* Logo centered at top */}
-        <div style={{ position: "absolute", top: 28, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
-          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
-        </div>
-        {/* Title vertically centered, left-aligned */}
-        <div style={{ paddingLeft: 36, paddingRight: 24 }}>
-          <h1
-            style={{
-              color: "white",
-              fontSize: 36,
-              fontWeight: "bold",
-              lineHeight: 1.15,
-              margin: 0,
-              wordBreak: "break-word",
-            }}
-          >
-            {title}
-          </h1>
-        </div>
-      </div>
-      {/* Right photo panel ~42% */}
-      <div style={{ position: "relative", flex: 1, height: "100%", backgroundColor: "#888" }}>
         {data.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -152,16 +130,61 @@ function CoverSlide({
             style={{
               position: "absolute",
               inset: 0,
-              backgroundColor: bg,
-              opacity: 0.35,
+              backgroundColor: "#666",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <span style={{ color: "white", fontSize: 11, opacity: 0.6 }}>Cover photo here</span>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Cover photo here</span>
           </div>
         )}
+      </div>
+
+      {/* Bottom: colored panel ~45% */}
+      <div
+        style={{
+          flex: 1,
+          backgroundColor: bg,
+          position: "relative",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CurlTopLeft />
+        <CurlTopRight />
+        {/* Logo centered at top of panel */}
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 0,
+            right: 0,
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
+        </div>
+        {/* Event title */}
+        <h1
+          style={{
+            color: "white",
+            fontSize: 30,
+            fontWeight: "bold",
+            lineHeight: 1.2,
+            margin: 0,
+            textAlign: "center",
+            padding: "0 48px",
+            fontFamily: headingFont,
+            wordBreak: "break-word",
+          }}
+        >
+          {title}
+        </h1>
       </div>
     </div>
   );
@@ -173,12 +196,16 @@ function PackageSlide({
   bg,
   senderName,
   senderLogoUrl,
+  headingFont,
+  bodyFont,
 }: {
   item: ProposalFormData["selectedPackages"][0];
   index: number;
   bg: string;
   senderName: string;
   senderLogoUrl?: string | null;
+  headingFont: string;
+  bodyFont: string;
 }) {
   const photoUrl = item.imageOverride || item.imageUrl;
   const isReversed = index % 2 === 1;
@@ -222,40 +249,35 @@ function PackageSlide({
       }}
     >
       {isReversed ? <CurlPackageLeft /> : <CurlPackageRight />}
-      {/* Package label */}
-      <p style={{ color: GOLD, fontSize: 10, fontWeight: "bold", letterSpacing: 3, marginBottom: 8 }}>
+      <p style={{ color: GOLD, fontSize: 10, fontWeight: "bold", letterSpacing: 3, marginBottom: 8, fontFamily: bodyFont }}>
         PACKAGE {index + 1}
       </p>
-      {/* Price row */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
-        <span style={{ color: GOLD, fontSize: 46, fontWeight: "bold", lineHeight: 1 }}>
+        <span style={{ color: GOLD, fontSize: 46, fontWeight: "bold", lineHeight: 1, fontFamily: headingFont }}>
           {fmtPriceRm(item.price)}
         </span>
         {item.originalPrice != null && (
-          <span style={{ color: GOLD, fontSize: 18, textDecoration: "line-through", opacity: 0.8 }}>
+          <span style={{ color: GOLD, fontSize: 18, textDecoration: "line-through", opacity: 0.8, fontFamily: bodyFont }}>
             {fmtPriceRm(item.originalPrice)}
           </span>
         )}
       </div>
-      {/* Package name */}
-      <h2 style={{ color: "white", fontSize: 20, fontWeight: "bold", margin: 0, marginBottom: item.tagline ? 4 : 14 }}>
+      <h2 style={{ color: "white", fontSize: 20, fontWeight: "bold", margin: 0, marginBottom: item.tagline ? 4 : 14, fontFamily: headingFont }}>
         {item.packageName}
       </h2>
       {item.tagline && (
-        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginBottom: 14 }}>
+        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginBottom: 14, fontFamily: bodyFont }}>
           {item.tagline}
         </p>
       )}
-      {/* Features */}
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {item.features.slice(0, 6).map((f, i) => (
           <li key={i} style={{ display: "flex", gap: 8, marginBottom: 5, alignItems: "flex-start" }}>
             <span style={{ color: GOLD, fontSize: 12, lineHeight: 1.2, flexShrink: 0 }}>•</span>
-            <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 10, lineHeight: 1.4 }}>{f}</span>
+            <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 10, lineHeight: 1.4, fontFamily: bodyFont }}>{f}</span>
           </li>
         ))}
       </ul>
-      {/* Logo at outer corner */}
       <div style={{ position: "absolute", bottom: 22, ...(isReversed ? { left: 28 } : { right: 28 }) }}>
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
       </div>
@@ -275,11 +297,15 @@ function AddOnsSlide({
   bg,
   senderName,
   senderLogoUrl,
+  headingFont,
+  bodyFont,
 }: {
   addOns: ProposalAddOnFormItem[];
   bg: string;
   senderName: string;
   senderLogoUrl?: string | null;
+  headingFont: string;
+  bodyFont: string;
 }) {
   return (
     <div
@@ -294,7 +320,6 @@ function AddOnsSlide({
     >
       <CurlTopLeft />
       <CurlTopRight />
-      {/* Center content vertically */}
       <div
         style={{
           flex: 1,
@@ -306,7 +331,6 @@ function AddOnsSlide({
           gap: 0,
         }}
       >
-        {/* Title */}
         <h2
           style={{
             color: GOLD,
@@ -314,11 +338,11 @@ function AddOnsSlide({
             fontWeight: "bold",
             letterSpacing: 8,
             margin: "0 0 24px 0",
+            fontFamily: headingFont,
           }}
         >
           ADD ONS
         </h2>
-        {/* Grid */}
         <div
           style={{
             display: "flex",
@@ -357,18 +381,17 @@ function AddOnsSlide({
                     <span style={{ color: GOLD, fontSize: 18 }}>✦</span>
                   </div>
                 )}
-                <p style={{ color: "white", fontWeight: "bold", fontSize: 10, textAlign: "center", marginTop: 6 }}>
+                <p style={{ color: "white", fontWeight: "bold", fontSize: 10, textAlign: "center", marginTop: 6, fontFamily: bodyFont }}>
                   {ao.addOnName}
                 </p>
                 {price && (
-                  <p style={{ color: GOLD, fontSize: 10, textAlign: "center", margin: 0 }}>{price}</p>
+                  <p style={{ color: GOLD, fontSize: 10, textAlign: "center", margin: 0, fontFamily: bodyFont }}>{price}</p>
                 )}
               </div>
             );
           })}
         </div>
       </div>
-      {/* Logo bottom-right */}
       <div style={{ position: "absolute", bottom: 20, right: 28 }}>
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
       </div>
@@ -382,12 +405,14 @@ function CompactPackagesSlide({
   bg,
   senderName,
   senderLogoUrl,
+  bodyFont,
 }: {
   packages: ProposalFormData["selectedPackages"];
   pageIndex: number;
   bg: string;
   senderName: string;
   senderLogoUrl?: string | null;
+  bodyFont: string;
 }) {
   return (
     <div
@@ -403,7 +428,6 @@ function CompactPackagesSlide({
     >
       <CurlTopLeft />
       <CurlTopRight />
-      {/* Header */}
       <p
         style={{
           color: GOLD,
@@ -412,11 +436,11 @@ function CompactPackagesSlide({
           letterSpacing: 4,
           textAlign: "center",
           marginBottom: 12,
+          fontFamily: bodyFont,
         }}
       >
         PACKAGES{pageIndex > 0 ? ` (CONT.)` : ""}
       </p>
-      {/* 2-column grid (up to 3 rows for max 6 packages) */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
         {Array.from({ length: Math.min(3, Math.ceil(packages.length / 2)) }, (_, row) => (
           <div key={row} style={{ flex: 1, display: "flex", gap: 10 }}>
@@ -450,37 +474,37 @@ function CompactPackagesSlide({
                   </div>
                   {/* Info */}
                   <div style={{ flex: 1, padding: "10px 11px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <p style={{ color: "white", fontSize: 9, fontWeight: "bold", margin: "0 0 4px", lineHeight: 1.2 }}>
+                    <p style={{ color: "white", fontSize: 9, fontWeight: "bold", margin: "0 0 4px", lineHeight: 1.2, fontFamily: bodyFont }}>
                       {pkg.packageName}
                     </p>
-                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 6.5, fontWeight: "bold", letterSpacing: 1, margin: 0, textTransform: "uppercase" }}>
+                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 6.5, fontWeight: "bold", letterSpacing: 1, margin: 0, textTransform: "uppercase", fontFamily: bodyFont }}>
                       Start From
                     </p>
                     {pkg.originalPrice != null && (
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
-                        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 9, textDecoration: "line-through" }}>
+                        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 9, textDecoration: "line-through", fontFamily: bodyFont }}>
                           {fmtPriceRm(pkg.originalPrice)}
                         </span>
                         {savings != null && (
-                          <span style={{ backgroundColor: "rgba(255,255,255,0.92)", color: GOLD, fontSize: 6.5, fontWeight: "bold", padding: "1px 4px", borderRadius: 3 }}>
+                          <span style={{ backgroundColor: "rgba(255,255,255,0.92)", color: GOLD, fontSize: 6.5, fontWeight: "bold", padding: "1px 4px", borderRadius: 3, fontFamily: bodyFont }}>
                             SAVE RM{savings}
                           </span>
                         )}
                       </div>
                     )}
-                    <p style={{ color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, margin: "2px 0 5px" }}>
+                    <p style={{ color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, margin: "2px 0 5px", fontFamily: bodyFont }}>
                       {fmtPriceRm(pkg.price)}
                     </p>
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                       {pkg.features.slice(0, 4).map((f, fi) => (
                         <li key={fi} style={{ display: "flex", gap: 4, marginBottom: 2, alignItems: "flex-start" }}>
                           <span style={{ color: GOLD, fontSize: 8, lineHeight: 1.3, flexShrink: 0 }}>•</span>
-                          <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 7, lineHeight: 1.3 }}>{f}</span>
+                          <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 7, lineHeight: 1.3, fontFamily: bodyFont }}>{f}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
-                  {/* Best seller circle badge at photo/info boundary */}
+                  {/* Best seller badge */}
                   {pkg.isBestSeller && (
                     <div style={{
                       position: "absolute",
@@ -506,7 +530,6 @@ function CompactPackagesSlide({
           </div>
         ))}
       </div>
-      {/* Logo */}
       <div style={{ position: "absolute", bottom: 14, right: 24, textAlign: "right" }}>
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} small />
       </div>
@@ -521,6 +544,7 @@ function TermsSlide({
   senderPhone,
   senderEmail,
   bg,
+  bodyFont,
 }: {
   data: Partial<ProposalFormData>;
   senderName: string;
@@ -528,8 +552,10 @@ function TermsSlide({
   senderPhone?: string | null;
   senderEmail?: string | null;
   bg: string;
+  bodyFont: string;
 }) {
   const terms = data.termsText || "";
+  const isHtml = terms.includes("</") || (terms.startsWith("<") && terms.includes(">"));
 
   return (
     <div
@@ -544,7 +570,7 @@ function TermsSlide({
     >
       <CurlTopLeft />
       <CurlTopRight />
-      {/* Header: centered logo */}
+      {/* Header: centered logo — cover size to match cover page */}
       <div
         style={{
           display: "flex",
@@ -555,24 +581,44 @@ function TermsSlide({
           borderBottom: "1px solid rgba(255,255,255,0.25)",
         }}
       >
-        <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} />
+        <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
       </div>
       {/* Terms content */}
-      <div style={{ flex: 1, padding: "16px 36px", overflow: "hidden" }}>
+      <div style={{ flex: 1, padding: "14px 36px", overflow: "hidden", fontFamily: bodyFont }}>
         {terms ? (
-          <pre
-            style={{
-              color: "rgba(255,255,255,0.9)",
-              fontSize: 9,
-              lineHeight: 1.6,
-              fontFamily: "inherit",
-              margin: 0,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {terms}
-          </pre>
+          isHtml ? (
+            <>
+              <style>{`
+                .proposal-terms-html h1 { color: rgba(255,255,255,0.97); font-size: 12px; font-weight: bold; margin: 0 0 4px; line-height: 1.3; }
+                .proposal-terms-html h2 { color: rgba(255,255,255,0.95); font-size: 10px; font-weight: bold; margin: 6px 0 3px; line-height: 1.3; }
+                .proposal-terms-html h3 { color: rgba(255,255,255,0.9); font-size: 9.5px; font-weight: bold; margin: 4px 0 2px; }
+                .proposal-terms-html p { color: rgba(255,255,255,0.85); font-size: 8.5px; margin: 2px 0; line-height: 1.5; }
+                .proposal-terms-html ul, .proposal-terms-html ol { color: rgba(255,255,255,0.85); font-size: 8.5px; padding-left: 14px; margin: 2px 0 4px; }
+                .proposal-terms-html li { margin: 1px 0; line-height: 1.5; }
+                .proposal-terms-html strong { color: rgba(255,255,255,0.97); font-weight: bold; }
+                .proposal-terms-html em { font-style: italic; }
+              `}</style>
+              <div
+                className="proposal-terms-html"
+                style={{ color: "rgba(255,255,255,0.85)", fontSize: 8.5, lineHeight: 1.5 }}
+                dangerouslySetInnerHTML={{ __html: terms }}
+              />
+            </>
+          ) : (
+            <pre
+              style={{
+                color: "rgba(255,255,255,0.9)",
+                fontSize: 9,
+                lineHeight: 1.6,
+                fontFamily: "inherit",
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {terms}
+            </pre>
+          )
         ) : (
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, fontStyle: "italic" }}>
             Terms & conditions will appear here.
@@ -594,16 +640,17 @@ function TermsSlide({
               letterSpacing: 2,
               fontWeight: "bold",
               marginBottom: 4,
+              fontFamily: bodyFont,
             }}
           >
             FOR ENQUIRY:
           </p>
-          {senderName && <p style={{ color: "white", fontSize: 9 }}>{senderName}</p>}
+          {senderName && <p style={{ color: "white", fontSize: 9, fontFamily: bodyFont }}>{senderName}</p>}
           {senderPhone && (
-            <p style={{ color: "white", fontSize: 9 }}>T: {senderPhone}</p>
+            <p style={{ color: "white", fontSize: 9, fontFamily: bodyFont }}>T: {senderPhone}</p>
           )}
           {senderEmail && (
-            <p style={{ color: "white", fontSize: 9 }}>E: {senderEmail}</p>
+            <p style={{ color: "white", fontSize: 9, fontFamily: bodyFont }}>E: {senderEmail}</p>
           )}
         </div>
       )}
@@ -633,6 +680,7 @@ export function ProposalPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
+  // Scale to fit container
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -644,12 +692,25 @@ export function ProposalPreview({
     return () => observer.disconnect();
   }, []);
 
+  // Load Google Fonts for selected font pair
+  useEffect(() => {
+    const font = getFontPair(data.fontPair);
+    if (!font.googleFontsUrl) return;
+    const linkId = `gf-proposal-${font.id}`;
+    if (document.getElementById(linkId)) return;
+    const link = document.createElement("link");
+    link.id = linkId;
+    link.rel = "stylesheet";
+    link.href = font.googleFontsUrl;
+    document.head.appendChild(link);
+  }, [data.fontPair]);
+
+  const font = getFontPair(data.fontPair);
   const bg = data.bgColor || DEFAULT_BG;
   const selectedPackages = data.selectedPackages ?? [];
   const selectedAddOns = data.selectedAddOns ?? [];
   const addOnsEnabled = data.addOnsEnabled ?? false;
 
-  // Build slides based on compact mode
   const compactPages = compact
     ? Array.from({ length: Math.ceil(selectedPackages.length / 6) }, (_, i) => i)
     : [];
@@ -700,7 +761,12 @@ export function ProposalPreview({
           }}
         >
           {effectiveSlide === "cover" && (
-            <CoverSlide data={data} senderName={senderName} senderLogoUrl={senderLogoUrl} />
+            <CoverSlide
+              data={data}
+              senderName={senderName}
+              senderLogoUrl={senderLogoUrl}
+              headingFont={font.heading}
+            />
           )}
           {compact
             ? compactPages.map((pi) =>
@@ -712,6 +778,7 @@ export function ProposalPreview({
                     bg={bg}
                     senderName={senderName}
                     senderLogoUrl={senderLogoUrl}
+                    bodyFont={font.body}
                   />
                 ) : null
               )
@@ -724,6 +791,8 @@ export function ProposalPreview({
                     bg={bg}
                     senderName={senderName}
                     senderLogoUrl={senderLogoUrl}
+                    headingFont={font.heading}
+                    bodyFont={font.body}
                   />
                 ) : null
               )}
@@ -733,6 +802,8 @@ export function ProposalPreview({
               bg={bg}
               senderName={senderName}
               senderLogoUrl={senderLogoUrl}
+              headingFont={font.heading}
+              bodyFont={font.body}
             />
           )}
           {effectiveSlide === "terms" && (
@@ -743,6 +814,7 @@ export function ProposalPreview({
               senderPhone={senderPhone}
               senderEmail={senderEmail}
               bg={bg}
+              bodyFont={font.body}
             />
           )}
         </div>

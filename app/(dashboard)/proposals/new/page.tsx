@@ -44,7 +44,7 @@ export default async function NewProposalPage() {
           eventTitle: "",
           eventCategoryId: "",
           bgColor: "#C8151B",
-          coverTitle: "",
+          fontPair: "tenor-clear",
           coverImageUrl: "",
           termsText: user?.proposalDefaultTerms ?? "",
           selectedPackages: [],

@@ -30,9 +30,9 @@ export const createProposalSchema = z.object({
   eventTitle: z.string().min(1, "Event title is required").max(300).transform((v) => v.trim()),
   eventCategoryId: z.string().min(1, "Event category is required"),
   bgColor: z.string().max(20).optional().default("#C8151B"),
-  coverTitle: z.string().max(300).optional().transform((v) => v?.trim() ?? ""),
+  fontPair: z.string().max(50).optional().default("tenor-clear"),
   coverImageUrl: z.string().max(1000).optional().or(z.literal("")),
-  termsText: z.string().max(5000).optional().transform((v) => v?.trim()),
+  termsText: z.string().max(20000).optional().transform((v) => v?.trim()),
   selectedPackages: z
     .array(proposalPackageSchema)
     .min(1, "Select at least one package"),

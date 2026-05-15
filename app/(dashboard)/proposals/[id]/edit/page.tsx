@@ -27,7 +27,7 @@ export default async function EditProposalPage({ params }: PageProps) {
     }),
   ]);
 
-  const p = proposal as typeof proposal & { bgColor?: string; coverTitle?: string; compact?: boolean };
+  const p = proposal as typeof proposal & { bgColor?: string; compact?: boolean; fontPair?: string };
 
   const initialData: ProposalFormData = {
     leadName: proposal.leadName,
@@ -37,7 +37,7 @@ export default async function EditProposalPage({ params }: PageProps) {
     eventTitle: proposal.eventTitle,
     eventCategoryId: proposal.eventCategoryId,
     bgColor: p.bgColor ?? "#C8151B",
-    coverTitle: p.coverTitle ?? "",
+    fontPair: p.fontPair ?? "tenor-clear",
     coverImageUrl: proposal.coverImageUrl ?? "",
     termsText: proposal.termsText ?? "",
     selectedPackages: proposal.items.map((item, idx) => {

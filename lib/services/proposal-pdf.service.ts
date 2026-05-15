@@ -12,30 +12,36 @@ import {
 import type { DocumentProps } from "@react-pdf/renderer";
 import React from "react";
 import type { ProposalWithItems } from "@/types/proposal";
+import { FONT_PAIRS, getFontPair } from "@/lib/constants/fontPairs";
 
 Font.registerHyphenationCallback((word) => [word]);
 
-// Register Tenor Sans for headings (Google Fonts CDN)
-try {
-  Font.register({
-    family: "Tenor Sans",
-    src: "https://fonts.gstatic.com/s/tenorsans/v19/bx6ANxqUneKx06UkIXISr3JyC22IyqI.woff2",
-  });
-  Font.register({
-    family: "Clear Sans",
-    fonts: [
-      { src: "https://fonts.gstatic.com/s/clearsans/v2/q2sTCqbg-6-m1Hm2Y3LMRQ.ttf", fontWeight: "normal" },
-      { src: "https://fonts.gstatic.com/s/clearsans/v2/q2sUCqbg-6-m1Hm2Y3LMRQ.ttf", fontWeight: "bold" },
-    ],
-  });
-} catch {
-  // Font registration failure is non-fatal; PDF falls back to Helvetica
+// Register all font pairs at module load — errors are non-fatal
+const _registeredFamilies = new Set<string>();
+function registerFontPair(pairId: string) {
+  const pair = getFontPair(pairId);
+  try {
+    if (!_registeredFamilies.has(pair.heading)) {
+      Font.register({ family: pair.heading, src: pair.pdfHeadingUrl });
+      _registeredFamilies.add(pair.heading);
+    }
+    if (!_registeredFamilies.has(pair.body)) {
+      Font.register({
+        family: pair.body,
+        fonts: [
+          { src: pair.pdfBodyUrl, fontWeight: "normal" },
+          { src: pair.pdfBodyBoldUrl, fontWeight: "bold" },
+        ],
+      });
+      _registeredFamilies.add(pair.body);
+    }
+  } catch { /* non-fatal */ }
 }
-
-const HEADING_FONT = "Tenor Sans";
-const BODY_FONT = "Clear Sans";
+// Pre-register all pairs at startup
+for (const p of FONT_PAIRS) registerFontPair(p.id);
 
 const PAGE_SIZE: [number, number] = [841.89, 595.28];
+const COVER_PHOTO_H = 330;
 const GOLD = "#D4A843";
 const DEFAULT_BG = "#C8151B";
 
@@ -46,8 +52,133 @@ function fmtRm(cents: number) {
 function getBg(proposal: ProposalWithItems) {
   return (proposal as unknown as { bgColor?: string }).bgColor || DEFAULT_BG;
 }
-function getCoverTitle(proposal: ProposalWithItems) {
-  return (proposal as unknown as { coverTitle?: string }).coverTitle || proposal.eventTitle || "Balloon Packages";
+function getProposalFont(proposal: ProposalWithItems) {
+  const pairId = (proposal as unknown as { fontPair?: string }).fontPair;
+  return getFontPair(pairId);
+}
+
+// ── Simple HTML → react-pdf parser ───────────────────────────────────────────
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+function htmlToReactPdfNodes(html: string, bodyFont: string): React.ReactElement[] {
+  if (!html?.trim() || html === "<p></p>") return [];
+
+  // If no HTML tags, treat as plain text (backward compat)
+  if (!html.includes("<")) {
+    return [React.createElement(Text, {
+      key: 0,
+      style: { color: "rgba(255,255,255,0.9)", fontSize: 9, lineHeight: 1.6 },
+    }, html)];
+  }
+
+  const nodes: React.ReactElement[] = [];
+  let remaining = html
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n/g, "");
+
+  const GOLD_COLOR = GOLD;
+  const WHITE = "rgba(255,255,255,0.9)";
+
+  while (remaining.length > 0) {
+    remaining = remaining.trimStart();
+    if (!remaining) break;
+
+    // Heading match
+    const hMatch = remaining.match(/^<(h[1-3])[^>]*>([\s\S]*?)<\/\1>/i);
+    if (hMatch) {
+      const level = hMatch[1];
+      const text = stripTags(hMatch[2]);
+      if (text) {
+        const fontSize = level === "h1" ? 18 : level === "h2" ? 14 : 11;
+        nodes.push(React.createElement(Text, {
+          key: nodes.length,
+          style: { color: GOLD_COLOR, fontSize, fontWeight: "bold", marginTop: 10, marginBottom: 5, fontFamily: bodyFont },
+        }, text));
+      }
+      remaining = remaining.slice(hMatch[0].length);
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = remaining.match(/^<ul[^>]*>([\s\S]*?)<\/ul>/i);
+    if (ulMatch) {
+      const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+      let liM;
+      while ((liM = liRegex.exec(ulMatch[1])) !== null) {
+        const text = stripTags(liM[1]);
+        if (text.trim()) {
+          nodes.push(React.createElement(View, {
+            key: nodes.length,
+            style: { flexDirection: "row", gap: 6, marginBottom: 3, alignItems: "flex-start" },
+          },
+            React.createElement(Text, { style: { color: GOLD_COLOR, fontSize: 9, lineHeight: 1.6 } }, "•"),
+            React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6, flex: 1 } }, text),
+          ));
+        }
+      }
+      remaining = remaining.slice(ulMatch[0].length);
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = remaining.match(/^<ol[^>]*>([\s\S]*?)<\/ol>/i);
+    if (olMatch) {
+      const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+      let liM;
+      let n = 1;
+      while ((liM = liRegex.exec(olMatch[1])) !== null) {
+        const text = stripTags(liM[1]);
+        if (text.trim()) {
+          nodes.push(React.createElement(View, {
+            key: nodes.length,
+            style: { flexDirection: "row", gap: 6, marginBottom: 3, alignItems: "flex-start" },
+          },
+            React.createElement(Text, { style: { color: GOLD_COLOR, fontSize: 9, lineHeight: 1.6 } }, `${n}.`),
+            React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6, flex: 1 } }, text),
+          ));
+          n++;
+        }
+      }
+      remaining = remaining.slice(olMatch[0].length);
+      continue;
+    }
+
+    // Paragraph
+    const pMatch = remaining.match(/^<p[^>]*>([\s\S]*?)<\/p>/i);
+    if (pMatch) {
+      const text = stripTags(pMatch[1]);
+      if (text.trim()) {
+        nodes.push(React.createElement(Text, {
+          key: nodes.length,
+          style: { color: WHITE, fontSize: 9, lineHeight: 1.6, marginBottom: 3 },
+        }, text));
+      }
+      remaining = remaining.slice(pMatch[0].length);
+      continue;
+    }
+
+    // Skip unknown tag
+    const tagEnd = remaining.indexOf(">", 1);
+    if (tagEnd !== -1) {
+      remaining = remaining.slice(tagEnd + 1);
+    } else {
+      break;
+    }
+  }
+
+  return nodes;
 }
 
 // ── Decorative SVG curls ──────────────────────────────────────────────────────
@@ -142,76 +273,71 @@ function logoEl(logoUrl: string | null | undefined, name: string, small = false,
 
 function CoverPage({ proposal }: { proposal: ProposalWithItems }) {
   const bg = getBg(proposal);
-  const title = getCoverTitle(proposal);
+  const title = proposal.eventTitle || "Balloon Packages";
+  const font = getProposalFont(proposal);
 
   return React.createElement(
     Page,
-    { size: PAGE_SIZE, style: { flexDirection: "row" } },
-    // Left colored panel 58%
+    { size: PAGE_SIZE, style: { flexDirection: "column" } },
+    // Top: full-width photo section
     React.createElement(
       View,
       {
         style: {
-          width: "58%",
-          height: "100%",
-          backgroundColor: bg,
+          width: "100%",
+          height: COVER_PHOTO_H,
+          backgroundColor: "#666",
+          overflow: "hidden",
           position: "relative",
-          overflow: "hidden",
-          justifyContent: "center",
-        },
-      },
-      CurlTopLeftSvg(),
-      // Logo centered at top
-      React.createElement(
-        View,
-        { style: { position: "absolute", top: 28, left: 0, right: 0, alignItems: "center" } },
-        logoEl(proposal.senderLogoUrl, proposal.senderName, false, true),
-      ),
-      // Title left-aligned, vertically centered
-      React.createElement(
-        View,
-        { style: { paddingLeft: 36, paddingRight: 24 } },
-        React.createElement(
-          Text,
-          {
-            style: {
-              color: "white",
-              fontSize: 34,
-              fontWeight: "bold",
-              lineHeight: 1.2,
-              fontFamily: HEADING_FONT,
-            },
-          },
-          title
-        ),
-      ),
-    ),
-    // Right photo 42%
-    React.createElement(
-      View,
-      {
-        style: {
-          flex: 1,
-          height: "100%",
-          backgroundColor: "#888",
-          overflow: "hidden",
         },
       },
       proposal.coverImageUrl
         ? React.createElement(Image, {
             src: proposal.coverImageUrl,
-            style: {
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              objectFit: "cover",
-            },
+            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, objectFit: "cover" },
           })
         : React.createElement(View, {
-            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.3 },
+            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.45 },
           }),
+      CurlTopLeftSvg(),
+      CurlTopRightSvg(),
+    ),
+    // Bottom: colored panel with logo + title
+    React.createElement(
+      View,
+      {
+        style: {
+          flex: 1,
+          width: "100%",
+          backgroundColor: bg,
+          position: "relative",
+          overflow: "hidden",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          paddingLeft: 48,
+          paddingRight: 48,
+        },
+      },
+      // Logo centered at top of colored section
+      React.createElement(
+        View,
+        { style: { position: "absolute", top: 18, left: 0, right: 0, alignItems: "center" } },
+        logoEl(proposal.senderLogoUrl, proposal.senderName, false, true),
+      ),
+      // Event title
+      React.createElement(
+        Text,
+        {
+          style: {
+            color: "white",
+            fontSize: 36,
+            fontWeight: "bold",
+            lineHeight: 1.2,
+            fontFamily: font.heading,
+          },
+        },
+        title
+      ),
     ),
   );
 }
@@ -276,7 +402,7 @@ function PackagePage({
           fontWeight: "bold",
           letterSpacing: 3,
           marginBottom: 8,
-          fontFamily: BODY_FONT,
+          fontFamily: getProposalFont(proposal).body,
         },
       },
       `PACKAGE ${index + 1}`
@@ -287,7 +413,7 @@ function PackagePage({
       { style: { flexDirection: "row", alignItems: "flex-end", marginBottom: 14 } },
       React.createElement(
         Text,
-        { style: { color: GOLD, fontSize: 44, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT } },
+        { style: { color: GOLD, fontSize: 44, fontWeight: "bold", lineHeight: 1, fontFamily: getProposalFont(proposal).heading } },
         fmtRm(item.price)
       ),
       item.originalPrice != null
@@ -345,6 +471,7 @@ function PackagePage({
 
 function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
   const bg = getBg(proposal);
+  const font = getProposalFont(proposal);
   const addOns = proposal.addOns;
 
   function fmtAoPrice(ao: typeof addOns[0]) {
@@ -379,7 +506,7 @@ function AddOnsPage({ proposal }: { proposal: ProposalWithItems }) {
             fontWeight: "bold",
             letterSpacing: 8,
             marginBottom: 22,
-            fontFamily: HEADING_FONT,
+            fontFamily: font.heading,
           },
         },
         "ADD ONS"
@@ -459,6 +586,7 @@ function CompactPackagePage({
   proposal: ProposalWithItems;
 }) {
   const bg = getBg(proposal);
+  const font = getProposalFont(proposal);
 
   return React.createElement(
     Page,
@@ -475,7 +603,7 @@ function CompactPackagePage({
           letterSpacing: 4,
           textAlign: "center",
           marginBottom: 10,
-          fontFamily: HEADING_FONT,
+          fontFamily: font.heading,
         },
       },
       pageIndex > 0 ? "PACKAGES (CONT.)" : "PACKAGES"
@@ -573,7 +701,7 @@ function CompactPackagePage({
                 // Current price
                 React.createElement(
                   Text,
-                  { style: { color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT, marginBottom: 5 } },
+                  { style: { color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, fontFamily: getProposalFont(proposal).heading, marginBottom: 5 } },
                   fmtRm(item.price)
                 ),
                 // Features
@@ -630,36 +758,40 @@ function CompactPackagePage({
 function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
   const bg = getBg(proposal);
   const terms = proposal.termsText || "";
+  const font = getProposalFont(proposal);
+
+  const termsNodes = htmlToReactPdfNodes(terms, font.body);
 
   return React.createElement(
     Page,
     { size: PAGE_SIZE, style: { backgroundColor: bg, position: "relative" } },
     CurlTopLeftSvg(),
     CurlTopRightSvg(),
-    // Header: centered logo
+    // Header: centered logo (same size as cover)
     React.createElement(
       View,
       {
         style: {
           alignItems: "center",
-          paddingTop: 26,
-          paddingBottom: 10,
+          paddingTop: 22,
+          paddingBottom: 14,
           borderBottomWidth: 1,
           borderBottomColor: "rgba(255,255,255,0.25)",
           marginHorizontal: 36,
         },
       },
-      logoEl(proposal.senderLogoUrl, proposal.senderName),
+      logoEl(proposal.senderLogoUrl, proposal.senderName, false, true),
     ),
-    // Terms content
+    // Terms content (rich text nodes)
     React.createElement(
       View,
-      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 14 } },
-      React.createElement(
-        Text,
-        { style: { color: "rgba(255,255,255,0.9)", fontSize: 9, lineHeight: 1.6 } },
-        terms
-      ),
+      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 12 } },
+      ...(termsNodes.length > 0
+        ? termsNodes
+        : [React.createElement(Text, {
+            key: 0,
+            style: { color: "rgba(255,255,255,0.4)", fontSize: 9, fontStyle: "italic" },
+          }, "No terms provided.")])
     ),
     // Enquiry footer
     React.createElement(
@@ -675,22 +807,10 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
       },
       React.createElement(
         Text,
-        {
-          style: {
-            color: "rgba(255,255,255,0.6)",
-            fontSize: 7,
-            letterSpacing: 2,
-            fontWeight: "bold",
-            marginBottom: 4,
-          },
-        },
+        { style: { color: "rgba(255,255,255,0.6)", fontSize: 7, letterSpacing: 2, fontWeight: "bold", marginBottom: 4 } },
         "FOR ENQUIRY:"
       ),
-      React.createElement(
-        Text,
-        { style: { color: "white", fontSize: 9 } },
-        proposal.senderName
-      ),
+      React.createElement(Text, { style: { color: "white", fontSize: 9 } }, proposal.senderName),
       proposal.senderPhone
         ? React.createElement(Text, { style: { color: "white", fontSize: 9 } }, `T: ${proposal.senderPhone}`)
         : null,

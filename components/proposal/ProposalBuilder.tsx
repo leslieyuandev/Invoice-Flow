@@ -8,8 +8,8 @@ import { Download, Send, Save, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { ImageUploadField } from "@/components/ui/ImageUploadField";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { LeadInfoSection } from "./form/LeadInfoSection";
 import { EventCategorySection } from "./form/EventCategorySection";
 import { PackageSelectionSection } from "./form/PackageSelectionSection";
@@ -19,6 +19,7 @@ import { ProposalSendDialog } from "./ProposalSendDialog";
 import { createProposalAction, updateProposalAction } from "@/actions/proposal";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { cn } from "@/lib/utils/cn";
+import { FONT_PAIRS } from "@/lib/constants/fontPairs";
 import type { ProposalFormData, CatalogCategoryTree, CatalogPackageData, CatalogAddOnData } from "@/types/proposal";
 
 interface ProposalBuilderProps {
@@ -37,9 +38,18 @@ interface ProposalBuilderProps {
 }
 
 const PRESET_COLORS = [
-  "#C8151B", "#B71C1C", "#880E4F", "#4A148C",
-  "#1A237E", "#006064", "#1B5E20", "#E65100",
-  "#212121", "#37474F",
+  // Warm reds & pinks
+  "#C8151B", "#B71C1C", "#880E4F", "#AD1457",
+  // Purples & indigos
+  "#6A1B9A", "#4A148C", "#283593", "#1A237E",
+  // Blues & teals
+  "#0277BD", "#006064", "#00695C", "#004D40",
+  // Greens
+  "#2E7D32", "#1B5E20", "#558B2F", "#33691E",
+  // Warm deep tones
+  "#E65100", "#BF360C", "#4E342E", "#3E2723",
+  // Dark neutrals
+  "#212121", "#263238", "#37474F", "#1C1C2E",
 ];
 
 export function ProposalBuilder({
@@ -71,7 +81,7 @@ export function ProposalBuilder({
       eventTitle: "",
       eventCategoryId: "",
       bgColor: "#C8151B",
-      coverTitle: "",
+      fontPair: "tenor-clear",
       coverImageUrl: "",
       termsText: "",
       selectedPackages: [],
@@ -168,49 +178,88 @@ export function ProposalBuilder({
         <div className={`overflow-y-auto ${showPreview ? "w-full md:w-1/2" : "w-full max-w-3xl mx-auto"}`}>
           <form id="proposal-form" onSubmit={form.handleSubmit(onSubmit)} noValidate className="p-4 md:p-6 space-y-6 pb-28 md:pb-10">
 
-            {/* Style — background color */}
+            {/* Style — background color + font */}
             <Card>
               <CardHeader><CardTitle>Style</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Label>Background Color</Label>
-                <p className="text-xs text-surface-400 -mt-1">Applied to all slides</p>
-                <Controller
-                  control={form.control}
-                  name="bgColor"
-                  render={({ field }) => (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={field.value || "#C8151B"}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          className="w-9 h-9 rounded cursor-pointer border border-surface-200 p-0.5"
-                        />
-                        <Input
-                          value={field.value || "#C8151B"}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          placeholder="#C8151B"
-                          className="w-32 font-mono text-sm"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {PRESET_COLORS.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => field.onChange(c)}
-                            title={c}
-                            className={cn(
-                              "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
-                              field.value === c ? "border-surface-900 scale-110" : "border-white shadow"
-                            )}
-                            style={{ backgroundColor: c }}
+              <CardContent className="space-y-5">
+                {/* Background color */}
+                <div className="space-y-2">
+                  <Label>Background Color</Label>
+                  <p className="text-xs text-surface-400 -mt-1">Applied to all slides</p>
+                  <Controller
+                    control={form.control}
+                    name="bgColor"
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={field.value || "#C8151B"}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            className="w-9 h-9 rounded cursor-pointer border border-surface-200 p-0.5"
                           />
+                          <input
+                            type="text"
+                            value={field.value || "#C8151B"}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            placeholder="#C8151B"
+                            className="w-28 font-mono text-sm border border-surface-200 rounded px-2 py-1.5 text-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-600"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {PRESET_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => field.onChange(c)}
+                              title={c}
+                              className={cn(
+                                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
+                                field.value === c ? "border-surface-900 scale-110" : "border-white shadow"
+                              )}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  />
+                </div>
+
+                {/* Font style */}
+                <div className="space-y-2">
+                  <Label>Font Style</Label>
+                  <p className="text-xs text-surface-400 -mt-1">Applied to headings and body text</p>
+                  <Controller
+                    control={form.control}
+                    name="fontPair"
+                    render={({ field }) => (
+                      <div className="grid grid-cols-1 gap-2">
+                        {FONT_PAIRS.map((fp) => (
+                          <button
+                            key={fp.id}
+                            type="button"
+                            onClick={() => field.onChange(fp.id)}
+                            className={cn(
+                              "flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-colors",
+                              field.value === fp.id
+                                ? "border-brand-500 bg-brand-50 text-brand-700"
+                                : "border-surface-200 bg-white hover:border-brand-300 text-surface-700"
+                            )}
+                          >
+                            <div>
+                              <p className="text-sm font-semibold">{fp.label}</p>
+                              <p className="text-xs text-surface-400">{fp.description}</p>
+                            </div>
+                            {field.value === fp.id && (
+                              <span className="text-xs font-medium text-brand-600">✓ Selected</span>
+                            )}
+                          </button>
                         ))}
                       </div>
-                    </div>
-                  )}
-                />
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -311,21 +360,12 @@ export function ProposalBuilder({
             <Card>
               <CardHeader><CardTitle>Cover & Contact Info</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="coverTitle">Cover Title</Label>
-                  <p className="text-xs text-surface-400">The large title shown on the cover page left panel</p>
-                  <Input
-                    id="coverTitle"
-                    {...form.register("coverTitle")}
-                    placeholder="e.g. Wedding Dinner Balloon Packages"
-                  />
-                </div>
                 <Controller
                   control={form.control}
                   name="coverImageUrl"
                   render={({ field }) => (
                     <ImageUploadField
-                      label="Cover Photo (right side)"
+                      label="Cover Photo (displays above the event title)"
                       value={field.value || null}
                       onChange={(url) => field.onChange(url ?? "")}
                       previewHeight="h-40"
@@ -334,13 +374,18 @@ export function ProposalBuilder({
                 />
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="termsText">Payment Terms & Contact Info</Label>
-                  <p className="text-xs text-surface-400">Appears on the last page — include your payment schedule, bank details, and any remarks.</p>
-                  <textarea
-                    id="termsText"
-                    {...form.register("termsText")}
-                    rows={6}
-                    placeholder={"50% booking fees upon confirmation\n\nPayment to:\nBank: Public Bank\nAcc: 1234567890\n\nRemarks: Balloons are yours to take home!"}
-                    className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                  <p className="text-xs text-surface-400">Appears on the last page — include payment schedule, bank details, and remarks. Supports headings, bullets, and colors.</p>
+                  <Controller
+                    control={form.control}
+                    name="termsText"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder={"HOW TO ORDER?\n• Choose a Package\n• Pick your Balloon Color\n• Whatsapp Us to Proceed with Booking"}
+                        minHeight="180px"
+                      />
+                    )}
                   />
                 </div>
               </CardContent>
