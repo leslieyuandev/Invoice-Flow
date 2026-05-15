@@ -416,14 +416,17 @@ function CompactPackagesSlide({
       >
         PACKAGES{pageIndex > 0 ? ` (CONT.)` : ""}
       </p>
-      {/* 3-column grid */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-        {[0, 1].map((row) => (
+      {/* 2-column grid (up to 3 rows for max 6 packages) */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+        {Array.from({ length: Math.min(3, Math.ceil(packages.length / 2)) }, (_, row) => (
           <div key={row} style={{ flex: 1, display: "flex", gap: 10 }}>
-            {[0, 1, 2].map((col) => {
-              const pkg = packages[row * 3 + col];
+            {[0, 1].map((col) => {
+              const pkg = packages[row * 2 + col];
               if (!pkg) return <div key={col} style={{ flex: 1 }} />;
               const photoUrl = pkg.imageOverride || pkg.imageUrl;
+              const savings = pkg.originalPrice != null
+                ? Math.round((pkg.originalPrice - pkg.price) / 100)
+                : null;
               return (
                 <div
                   key={col}
@@ -432,13 +435,12 @@ function CompactPackagesSlide({
                     display: "flex",
                     flexDirection: "row",
                     backgroundColor: "rgba(0,0,0,0.25)",
-                    borderRadius: 6,
-                    overflow: "hidden",
+                    borderRadius: 8,
                     position: "relative",
                   }}
                 >
-                  {/* Thumbnail */}
-                  <div style={{ width: 68, flexShrink: 0, backgroundColor: "#555" }}>
+                  {/* Photo */}
+                  <div style={{ width: "43%", flexShrink: 0, backgroundColor: "#555" }}>
                     {photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={photoUrl} alt={pkg.packageName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -447,24 +449,57 @@ function CompactPackagesSlide({
                     )}
                   </div>
                   {/* Info */}
-                  <div style={{ flex: 1, padding: "9px 10px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 6, fontWeight: "bold", letterSpacing: 1.2, margin: 0, textTransform: "uppercase" }}>
-                      Start From
-                    </p>
-                    <p style={{ color: GOLD, fontSize: 16, fontWeight: "bold", lineHeight: 1, margin: "2px 0 3px" }}>
-                      {fmtPriceRm(pkg.price)}
-                    </p>
-                    <p style={{ color: "white", fontSize: 8.5, fontWeight: "bold", margin: 0, lineHeight: 1.2 }}>
+                  <div style={{ flex: 1, padding: "10px 11px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <p style={{ color: "white", fontSize: 9, fontWeight: "bold", margin: "0 0 4px", lineHeight: 1.2 }}>
                       {pkg.packageName}
                     </p>
-                    {pkg.isBestSeller && (
-                      <div style={{ marginTop: 4 }}>
-                        <span style={{ backgroundColor: GOLD, color: "white", fontSize: 6, fontWeight: "bold", padding: "2px 5px", borderRadius: 8, letterSpacing: 0.4 }}>
-                          BEST SELLER
+                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 6.5, fontWeight: "bold", letterSpacing: 1, margin: 0, textTransform: "uppercase" }}>
+                      Start From
+                    </p>
+                    {pkg.originalPrice != null && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 9, textDecoration: "line-through" }}>
+                          {fmtPriceRm(pkg.originalPrice)}
                         </span>
+                        {savings != null && (
+                          <span style={{ backgroundColor: "rgba(255,255,255,0.92)", color: GOLD, fontSize: 6.5, fontWeight: "bold", padding: "1px 4px", borderRadius: 3 }}>
+                            SAVE RM{savings}
+                          </span>
+                        )}
                       </div>
                     )}
+                    <p style={{ color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, margin: "2px 0 5px" }}>
+                      {fmtPriceRm(pkg.price)}
+                    </p>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                      {pkg.features.slice(0, 4).map((f, fi) => (
+                        <li key={fi} style={{ display: "flex", gap: 4, marginBottom: 2, alignItems: "flex-start" }}>
+                          <span style={{ color: GOLD, fontSize: 8, lineHeight: 1.3, flexShrink: 0 }}>•</span>
+                          <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 7, lineHeight: 1.3 }}>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+                  {/* Best seller circle badge at photo/info boundary */}
+                  {pkg.isBestSeller && (
+                    <div style={{
+                      position: "absolute",
+                      top: 8,
+                      left: "40%",
+                      transform: "translateX(-50%)",
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      backgroundColor: GOLD,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      <span style={{ color: "white", fontSize: 6, fontWeight: "bold", lineHeight: 1.2 }}>BEST</span>
+                      <span style={{ color: "white", fontSize: 6, fontWeight: "bold", lineHeight: 1.2 }}>SELLER</span>
+                    </div>
+                  )}
                 </div>
               );
             })}

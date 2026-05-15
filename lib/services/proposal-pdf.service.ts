@@ -480,19 +480,23 @@ function CompactPackagePage({
       },
       pageIndex > 0 ? "PACKAGES (CONT.)" : "PACKAGES"
     ),
-    // 2-row × 3-col grid
+    // 2-col grid (up to 3 rows for max 6 packages)
     React.createElement(
       View,
-      { style: { flex: 1, flexDirection: "column", gap: 8 } },
-      ...[0, 1].map((row) =>
+      { style: { flex: 1, flexDirection: "column", gap: 10 } },
+      ...Array.from({ length: Math.min(3, Math.ceil(items.length / 2)) }, (_, row) =>
         React.createElement(
           View,
-          { key: row, style: { flex: 1, flexDirection: "row", gap: 8 } },
-          ...[0, 1, 2].map((col) => {
-            const item = items[row * 3 + col];
+          { key: row, style: { flex: 1, flexDirection: "row", gap: 10 } },
+          ...[0, 1].map((col) => {
+            const item = items[row * 2 + col];
             if (!item) return React.createElement(View, { key: col, style: { flex: 1 } });
             let features: string[] = [];
             try { features = JSON.parse(item.features) as string[]; } catch { features = []; }
+            const savings = item.originalPrice != null
+              ? Math.round((item.originalPrice - item.price) / 100)
+              : null;
+            const PHOTO_W = 148;
             return React.createElement(
               View,
               {
@@ -501,66 +505,110 @@ function CompactPackagePage({
                   flex: 1,
                   flexDirection: "row",
                   backgroundColor: "rgba(0,0,0,0.25)",
-                  borderRadius: 6,
-                  overflow: "hidden",
+                  borderRadius: 8,
                   position: "relative",
                 },
               },
-              // Thumbnail
+              // Photo (clipped separately so badge can overflow card boundary)
               React.createElement(
                 View,
-                { style: { width: 72, overflow: "hidden" } },
+                { style: { width: PHOTO_W, borderRadius: 8, overflow: "hidden" } },
                 item.imageUrl
                   ? React.createElement(Image, {
                       src: item.imageUrl,
-                      style: { width: 72, height: "100%", objectFit: "cover" },
+                      style: { width: PHOTO_W, height: "100%", objectFit: "cover" },
                     })
                   : React.createElement(View, {
-                      style: { width: 72, height: "100%", backgroundColor: "rgba(255,255,255,0.1)" },
+                      style: { width: PHOTO_W, height: "100%", backgroundColor: "rgba(255,255,255,0.1)" },
                     })
               ),
               // Info
               React.createElement(
                 View,
                 { style: { flex: 1, padding: 10, justifyContent: "center" } },
+                // Package name
                 React.createElement(
                   Text,
-                  { style: { color: "rgba(255,255,255,0.55)", fontSize: 6, letterSpacing: 1.5, fontWeight: "bold" } },
-                  "START FROM"
-                ),
-                React.createElement(
-                  Text,
-                  { style: { color: GOLD, fontSize: 18, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT, marginTop: 2 } },
-                  fmtRm(item.price)
-                ),
-                React.createElement(
-                  Text,
-                  { style: { color: "white", fontSize: 8, fontWeight: "bold", marginTop: 3, lineHeight: 1.2 } },
+                  { style: { color: "white", fontSize: 9, fontWeight: "bold", lineHeight: 1.2, marginBottom: 4 } },
                   item.packageName
                 ),
+                // START FROM
+                React.createElement(
+                  Text,
+                  { style: { color: "rgba(255,255,255,0.5)", fontSize: 6, letterSpacing: 1, fontWeight: "bold" } },
+                  "START FROM"
+                ),
+                // Strikethrough + SAVE badge row
+                item.originalPrice != null
+                  ? React.createElement(
+                      View,
+                      { style: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2, marginBottom: 1 } },
+                      React.createElement(
+                        Text,
+                        { style: { color: "rgba(255,255,255,0.45)", fontSize: 9, textDecoration: "line-through" } },
+                        fmtRm(item.originalPrice)
+                      ),
+                      savings != null
+                        ? React.createElement(
+                            View,
+                            {
+                              style: {
+                                backgroundColor: "rgba(255,255,255,0.92)",
+                                borderRadius: 4,
+                                paddingTop: 1,
+                                paddingBottom: 1,
+                                paddingLeft: 4,
+                                paddingRight: 4,
+                              },
+                            },
+                            React.createElement(
+                              Text,
+                              { style: { color: GOLD, fontSize: 6, fontWeight: "bold" } },
+                              `SAVE RM${savings}`
+                            )
+                          )
+                        : null,
+                    )
+                  : null,
+                // Current price
+                React.createElement(
+                  Text,
+                  { style: { color: GOLD, fontSize: 22, fontWeight: "bold", lineHeight: 1, fontFamily: HEADING_FONT, marginBottom: 5 } },
+                  fmtRm(item.price)
+                ),
+                // Features
+                React.createElement(
+                  View,
+                  { style: { gap: 2 } },
+                  ...features.slice(0, 4).map((f, fi) =>
+                    React.createElement(
+                      View,
+                      { key: fi, style: { flexDirection: "row", gap: 4, alignItems: "flex-start" } },
+                      React.createElement(Text, { style: { color: GOLD, fontSize: 7.5, lineHeight: 1.3 } }, "•"),
+                      React.createElement(Text, { style: { color: "rgba(255,255,255,0.85)", fontSize: 7, lineHeight: 1.3, flex: 1 } }, f),
+                    )
+                  )
+                ),
               ),
-              // Best seller badge
+              // Best seller circle badge straddling photo/info boundary
               item.isBestSeller
                 ? React.createElement(
                     View,
                     {
                       style: {
                         position: "absolute",
-                        top: 6,
-                        right: 6,
+                        top: 8,
+                        left: PHOTO_W - 22,
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
                         backgroundColor: GOLD,
-                        borderRadius: 8,
-                        paddingTop: 2,
-                        paddingBottom: 2,
-                        paddingLeft: 5,
-                        paddingRight: 5,
+                        alignItems: "center",
+                        justifyContent: "center",
                       },
                     },
-                    React.createElement(
-                      Text,
-                      { style: { color: "white", fontSize: 5.5, fontWeight: "bold", letterSpacing: 0.5 } },
-                      "BEST SELLER"
-                    )
+                    React.createElement(Text, { style: { color: "white", fontSize: 5.5, fontWeight: "bold", textAlign: "center" } }, "BEST"),
+                    React.createElement(Text, { style: { color: "white", fontSize: 5.5, fontWeight: "bold", textAlign: "center" } }, "SELLER"),
                   )
                 : null,
             );
