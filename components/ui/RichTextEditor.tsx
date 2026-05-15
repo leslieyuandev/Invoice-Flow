@@ -4,7 +4,30 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
+import { Extension } from "@tiptap/core";
 import { cn } from "@/lib/utils/cn";
+
+// Lightweight font-size extension that piggybacks on TextStyle
+const FontSize = Extension.create({
+  name: "fontSize",
+  addGlobalAttributes() {
+    return [{
+      types: ["textStyle"],
+      attributes: {
+        fontSize: {
+          default: null,
+          parseHTML: (el: HTMLElement) => el.style.fontSize || null,
+          renderHTML: (attrs: { fontSize?: string | null }) => {
+            if (!attrs.fontSize) return {};
+            return { style: `font-size: ${attrs.fontSize}` };
+          },
+        },
+      },
+    }];
+  },
+});
+
+const FONT_SIZES = ["8px", "9px", "10px", "11px", "12px", "14px", "16px", "20px"];
 
 const TOOLBAR_COLORS = [
   { label: "White", value: "#FFFFFF" },
@@ -54,7 +77,7 @@ export function RichTextEditor({
   minHeight = "160px",
 }: RichTextEditorProps) {
   const editor = useEditor({
-    extensions: [StarterKit, TextStyle, Color],
+    extensions: [StarterKit, TextStyle, Color, FontSize],
     content: value,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
@@ -162,6 +185,24 @@ export function RichTextEditor({
         >
           ✕
         </button>
+
+        <div className="w-px h-4 bg-surface-200 mx-1" />
+
+        {/* Font size */}
+        <span className="text-xs text-surface-400 mr-0.5">Size:</span>
+        <select
+          value={editor.getAttributes("textStyle").fontSize ?? ""}
+          onChange={(e) => {
+            const size = e.target.value;
+            editor.chain().focus().setMark("textStyle", { fontSize: size || null }).run();
+          }}
+          className="text-xs border border-surface-200 rounded px-1 py-0.5 text-surface-700 bg-white focus:outline-none"
+        >
+          <option value="">Default</option>
+          {FONT_SIZES.map((s) => (
+            <option key={s} value={s}>{s.replace("px", "pt")}</option>
+          ))}
+        </select>
       </div>
 
       {/* Editor content */}

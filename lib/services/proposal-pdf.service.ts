@@ -123,7 +123,7 @@ function htmlToReactPdfNodes(html: string, bodyFont: string): React.ReactElement
             key: nodes.length,
             style: { flexDirection: "row", gap: 6, marginBottom: 3, alignItems: "flex-start" },
           },
-            React.createElement(Text, { style: { color: GOLD_COLOR, fontSize: 9, lineHeight: 1.6 } }, "•"),
+            React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6 } }, "•"),
             React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6, flex: 1 } }, text),
           ));
         }
@@ -145,7 +145,7 @@ function htmlToReactPdfNodes(html: string, bodyFont: string): React.ReactElement
             key: nodes.length,
             style: { flexDirection: "row", gap: 6, marginBottom: 3, alignItems: "flex-start" },
           },
-            React.createElement(Text, { style: { color: GOLD_COLOR, fontSize: 9, lineHeight: 1.6 } }, `${n}.`),
+            React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6 } }, `${n}.`),
             React.createElement(Text, { style: { color: WHITE, fontSize: 9, lineHeight: 1.6, flex: 1 } }, text),
           ));
           n++;
@@ -278,15 +278,54 @@ function CoverPage({ proposal }: { proposal: ProposalWithItems }) {
 
   return React.createElement(
     Page,
-    { size: PAGE_SIZE, style: { flexDirection: "column" } },
-    // Top: full-width photo section
+    { size: PAGE_SIZE, style: { flexDirection: "row" } },
+    // Left: colored info panel ~58%
     React.createElement(
       View,
       {
         style: {
-          width: "100%",
-          height: COVER_PHOTO_H,
-          backgroundColor: "#666",
+          width: "58%",
+          height: "100%",
+          backgroundColor: bg,
+          position: "relative",
+          overflow: "hidden",
+          justifyContent: "center",
+        },
+      },
+      CurlTopLeftSvg(),
+      // Logo centered at top
+      React.createElement(
+        View,
+        { style: { position: "absolute", top: 24, left: 0, right: 0, alignItems: "center" } },
+        logoEl(proposal.senderLogoUrl, proposal.senderName, false, true),
+      ),
+      // Title
+      React.createElement(
+        View,
+        { style: { paddingLeft: 36, paddingRight: 24 } },
+        React.createElement(
+          Text,
+          {
+            style: {
+              color: "white",
+              fontSize: 36,
+              fontWeight: "bold",
+              lineHeight: 1.2,
+              fontFamily: font.heading,
+            },
+          },
+          title
+        ),
+      ),
+    ),
+    // Right: photo panel ~42%
+    React.createElement(
+      View,
+      {
+        style: {
+          flex: 1,
+          height: "100%",
+          backgroundColor: "#555",
           overflow: "hidden",
           position: "relative",
         },
@@ -297,47 +336,8 @@ function CoverPage({ proposal }: { proposal: ProposalWithItems }) {
             style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, objectFit: "cover" },
           })
         : React.createElement(View, {
-            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.45 },
+            style: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: bg, opacity: 0.35 },
           }),
-      CurlTopLeftSvg(),
-      CurlTopRightSvg(),
-    ),
-    // Bottom: colored panel with logo + title
-    React.createElement(
-      View,
-      {
-        style: {
-          flex: 1,
-          width: "100%",
-          backgroundColor: bg,
-          position: "relative",
-          overflow: "hidden",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          paddingLeft: 48,
-          paddingRight: 48,
-        },
-      },
-      // Logo centered at top of colored section
-      React.createElement(
-        View,
-        { style: { position: "absolute", top: 18, left: 0, right: 0, alignItems: "center" } },
-        logoEl(proposal.senderLogoUrl, proposal.senderName, false, true),
-      ),
-      // Event title
-      React.createElement(
-        Text,
-        {
-          style: {
-            color: "white",
-            fontSize: 36,
-            fontWeight: "bold",
-            lineHeight: 1.2,
-            fontFamily: font.heading,
-          },
-        },
-        title
-      ),
     ),
   );
 }
@@ -785,7 +785,7 @@ function TermsPage({ proposal }: { proposal: ProposalWithItems }) {
     // Terms content (rich text nodes)
     React.createElement(
       View,
-      { style: { flex: 1, paddingHorizontal: 36, paddingTop: 12 } },
+      { style: { flex: 1, paddingHorizontal: 50, paddingTop: 20 } },
       ...(termsNodes.length > 0
         ? termsNodes
         : [React.createElement(Text, {

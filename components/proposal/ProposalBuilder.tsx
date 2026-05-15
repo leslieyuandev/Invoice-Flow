@@ -178,9 +178,9 @@ export function ProposalBuilder({
         <div className={`overflow-y-auto ${showPreview ? "w-full md:w-1/2" : "w-full max-w-3xl mx-auto"}`}>
           <form id="proposal-form" onSubmit={form.handleSubmit(onSubmit)} noValidate className="p-4 md:p-6 space-y-6 pb-28 md:pb-10">
 
-            {/* Style — background color + font */}
+            {/* Cover — background color + font + cover photo */}
             <Card>
-              <CardHeader><CardTitle>Style</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Cover</CardTitle></CardHeader>
               <CardContent className="space-y-5">
                 {/* Background color */}
                 <div className="space-y-2">
@@ -260,6 +260,20 @@ export function ProposalBuilder({
                     )}
                   />
                 </div>
+
+                {/* Cover photo */}
+                <Controller
+                  control={form.control}
+                  name="coverImageUrl"
+                  render={({ field }) => (
+                    <ImageUploadField
+                      label="Cover Photo (shown on the right side of the cover)"
+                      value={field.value || null}
+                      onChange={(url) => field.onChange(url ?? "")}
+                      previewHeight="h-40"
+                    />
+                  )}
+                />
               </CardContent>
             </Card>
 
@@ -356,22 +370,10 @@ export function ProposalBuilder({
               )}
             </Card>
 
-            {/* Cover & Terms */}
+            {/* Payment Terms & Contact Info */}
             <Card>
-              <CardHeader><CardTitle>Cover & Contact Info</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Payment Terms & Contact Info</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Controller
-                  control={form.control}
-                  name="coverImageUrl"
-                  render={({ field }) => (
-                    <ImageUploadField
-                      label="Cover Photo (displays above the event title)"
-                      value={field.value || null}
-                      onChange={(url) => field.onChange(url ?? "")}
-                      previewHeight="h-40"
-                    />
-                  )}
-                />
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="termsText">Payment Terms & Contact Info</Label>
                   <p className="text-xs text-surface-400">Appears on the last page — include payment schedule, bank details, and remarks. Supports headings, bullets, and colors.</p>

@@ -107,17 +107,44 @@ function CoverSlide({
   const title = data.eventTitle || "Balloon Packages";
 
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
-      {/* Top: cover photo ~55% height */}
+    <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+      {/* Left: colored info panel ~58% */}
       <div
         style={{
-          height: "55%",
           position: "relative",
-          backgroundColor: "#888",
+          width: "58%",
+          height: "100%",
+          backgroundColor: bg,
           overflow: "hidden",
-          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
         }}
       >
+        <CurlTopLeft />
+        {/* Logo centered at top */}
+        <div style={{ position: "absolute", top: 28, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
+        </div>
+        {/* Title vertically centered */}
+        <div style={{ paddingLeft: 36, paddingRight: 24 }}>
+          <h1
+            style={{
+              color: "white",
+              fontSize: 36,
+              fontWeight: "bold",
+              lineHeight: 1.15,
+              margin: 0,
+              wordBreak: "break-word",
+              fontFamily: headingFont,
+            }}
+          >
+            {title}
+          </h1>
+        </div>
+      </div>
+
+      {/* Right: photo panel ~42% */}
+      <div style={{ position: "relative", flex: 1, height: "100%", backgroundColor: "#888" }}>
         {data.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -139,52 +166,6 @@ function CoverSlide({
             <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Cover photo here</span>
           </div>
         )}
-      </div>
-
-      {/* Bottom: colored panel ~45% */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: bg,
-          position: "relative",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <CurlTopLeft />
-        <CurlTopRight />
-        {/* Logo centered at top of panel */}
-        <div
-          style={{
-            position: "absolute",
-            top: 20,
-            left: 0,
-            right: 0,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
-        </div>
-        {/* Event title */}
-        <h1
-          style={{
-            color: "white",
-            fontSize: 30,
-            fontWeight: "bold",
-            lineHeight: 1.2,
-            margin: 0,
-            textAlign: "center",
-            padding: "0 48px",
-            fontFamily: headingFont,
-            wordBreak: "break-word",
-          }}
-        >
-          {title}
-        </h1>
       </div>
     </div>
   );
@@ -584,7 +565,7 @@ function TermsSlide({
         <LogoBox senderLogoUrl={senderLogoUrl} senderName={senderName} cover />
       </div>
       {/* Terms content */}
-      <div style={{ flex: 1, padding: "14px 36px", overflow: "hidden", fontFamily: bodyFont }}>
+      <div style={{ flex: 1, padding: "16px 50px", overflow: "hidden", fontFamily: bodyFont }}>
         {terms ? (
           isHtml ? (
             <>
@@ -595,6 +576,7 @@ function TermsSlide({
                 .proposal-terms-html p { color: rgba(255,255,255,0.85); font-size: 8.5px; margin: 2px 0; line-height: 1.5; }
                 .proposal-terms-html ul, .proposal-terms-html ol { color: rgba(255,255,255,0.85); font-size: 8.5px; padding-left: 14px; margin: 2px 0 4px; }
                 .proposal-terms-html li { margin: 1px 0; line-height: 1.5; }
+                .proposal-terms-html li::marker { color: inherit; }
                 .proposal-terms-html strong { color: rgba(255,255,255,0.97); font-weight: bold; }
                 .proposal-terms-html em { font-style: italic; }
               `}</style>
