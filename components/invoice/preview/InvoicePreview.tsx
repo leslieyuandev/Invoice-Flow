@@ -135,7 +135,10 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts, show
                   <div>
                     <p className="font-semibold text-surface-900">{item.description || <span className="text-surface-300 italic font-normal">—</span>}</p>
                     {item.notes && (
-                      <p className="text-xs text-surface-500 mt-0.5 whitespace-pre-line leading-relaxed">{item.notes}</p>
+                      <div
+                        className="text-xs text-surface-500 mt-0.5 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0"
+                        dangerouslySetInnerHTML={{ __html: item.notes }}
+                      />
                     )}
                   </div>
                   <span className="text-right text-surface-600 tabular-nums">{item.quantity || 0}</span>

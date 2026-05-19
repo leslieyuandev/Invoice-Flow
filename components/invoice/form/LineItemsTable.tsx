@@ -15,7 +15,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, BookOpen } from "lucide-react";
+import { Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LineItemRow } from "./LineItemRow";
 import { LineItemDialog } from "./LineItemDialog";
@@ -124,13 +124,12 @@ export function LineItemsTable({ form, lineItemAmounts, currency, templates = []
         {templates.length > 0 && (
           <Button
             type="button"
-            variant="ghost"
             size="sm"
-            className="border border-dashed border-surface-200 text-surface-500 hover:text-surface-700 hover:border-surface-300"
+            className="bg-brand-600 hover:bg-brand-700 text-white shrink-0"
             onClick={() => setPickerOpen(true)}
           >
-            <BookOpen className="w-4 h-4" />
-            {t("lineItems.useTemplate")}
+            <ChevronDown className="w-4 h-4" />
+            Select
           </Button>
         )}
       </div>

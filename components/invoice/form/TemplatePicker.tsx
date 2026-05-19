@@ -14,7 +14,7 @@ interface TemplatePickerProps {
 export function TemplatePicker({ open, onClose, templates, onSelect }: TemplatePickerProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title="Use Template">
+      <DialogContent title="Select Template">
         <div className="mt-2 space-y-1 max-h-80 overflow-y-auto">
           {templates.map((t) => (
             <button

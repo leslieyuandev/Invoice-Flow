@@ -77,9 +77,10 @@ export function LineItemRow({
             {description || <span className="text-surface-400 font-normal italic">Unnamed item</span>}
           </p>
           {notes && (
-            <p className="text-xs text-surface-500 mt-0.5 whitespace-pre-line leading-relaxed line-clamp-3">
-              {notes}
-            </p>
+            <div
+              className="text-xs text-surface-500 mt-0.5 leading-relaxed line-clamp-3 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0 [&_p]:mb-0"
+              dangerouslySetInnerHTML={{ __html: notes }}
+            />
           )}
         </div>
 

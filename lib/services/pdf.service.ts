@@ -1,3 +1,4 @@
+import { htmlToPlainText } from "@/components/ui/RichTextEditor";
 import ReactPDF, {
   Document,
   Page,
@@ -219,7 +220,7 @@ function InvoiceDocument({ invoice, showDueDate }: { invoice: InvoiceWithRelatio
             { style: styles.colDescription },
             React.createElement(Text, { style: { ...styles.descriptionText, fontFamily: "Helvetica-Bold" } }, item.description),
             item.notes
-              ? React.createElement(Text, { style: { ...styles.descriptionText, fontSize: 8, color: "#64748b", marginTop: 2 } }, item.notes)
+              ? React.createElement(Text, { style: { ...styles.descriptionText, fontSize: 8, color: "#64748b", marginTop: 2 } }, htmlToPlainText(item.notes))
               : null
           ),
           React.createElement(Text, { style: { ...styles.tableBodyText, ...styles.colQty } }, Number(item.quantity).toFixed(item.quantity.toString().includes(".") ? 2 : 0)),

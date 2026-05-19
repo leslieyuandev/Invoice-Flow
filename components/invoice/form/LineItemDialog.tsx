@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { LineItemFormData } from "@/types";
 
@@ -19,19 +20,22 @@ export function LineItemDialog({ open, onClose, onSave, initialValues }: LineIte
   const { t } = useTranslation();
   const isEdit = Boolean(initialValues?.description);
   const formRef = useRef<HTMLFormElement>(null);
+  const [notes, setNotes] = useState(initialValues?.notes ?? "");
 
   useEffect(() => {
-    if (open) formRef.current?.reset();
-  }, [open]);
+    if (open) {
+      formRef.current?.reset();
+      setNotes(initialValues?.notes ?? "");
+    }
+  }, [open, initialValues?.notes]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const description = (fd.get("description") as string).trim();
-    const notes = (fd.get("notes") as string).trim() || undefined;
     const quantity = parseFloat(fd.get("quantity") as string) || 1;
     const unitPrice = parseFloat(fd.get("unitPrice") as string) || 0;
-    onSave({ id: initialValues?.id, description, notes, quantity, unitPrice });
+    onSave({ id: initialValues?.id, description, notes: notes || undefined, quantity, unitPrice });
     onClose();
   }
 
@@ -52,14 +56,12 @@ export function LineItemDialog({ open, onClose, onSave, initialValues }: LineIte
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="li-notes">{t("lineItems.itemNotes")}</Label>
-            <textarea
-              id="li-notes"
-              name="notes"
-              rows={4}
-              defaultValue={initialValues?.notes ?? ""}
+            <Label>{t("lineItems.itemNotes")}</Label>
+            <RichTextEditor
+              value={notes}
+              onChange={setNotes}
               placeholder={t("lineItems.itemNotesPlaceholder")}
-              className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+              minHeight="100px"
             />
           </div>
 

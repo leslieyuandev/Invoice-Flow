@@ -20,9 +20,20 @@ interface SendDialogProps {
   onSent?: () => void;
 }
 
+/** Normalize a phone number to E.164 with +60 as default country code. */
+function normalizePhone(raw: string): string {
+  let digits = raw.replace(/\s+/g, "").replace(/-/g, "");
+  if (digits.startsWith("+")) return digits;
+  if (digits.startsWith("00")) return "+" + digits.slice(2);
+  // Malaysian mobile: strip leading 0 and prepend +60
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return "+60" + digits;
+}
+
 export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEmail, defaultPhone, onSent }: SendDialogProps) {
   const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState(defaultPhone ?? "");
   const { t } = useTranslation();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -37,7 +48,7 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
     if (channel === "email") {
       body.recipientEmail = fd.get("recipientEmail") as string;
     } else {
-      body.recipientPhone = fd.get("recipientPhone") as string;
+      body.recipientPhone = normalizePhone(phone);
     }
 
     try {
@@ -54,9 +65,28 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
         return;
       }
 
-      if (channel === "whatsapp" && data.data?.whatsappUrl) {
-        window.open(data.data.whatsappUrl, "_blank");
-        toast.success("WhatsApp link opened");
+      if (channel === "whatsapp") {
+        // Try Web Share API first (shares the actual PDF file on mobile)
+        const pdfUrl = `/api/invoices/${invoiceId}/pdf`;
+        try {
+          const pdfRes = await fetch(pdfUrl);
+          const blob = await pdfRes.blob();
+          const file = new File([blob], `${invoiceNumber}.pdf`, { type: "application/pdf" });
+          if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: `Invoice ${invoiceNumber}` });
+            toast.success("Invoice shared");
+            onSent?.();
+            onClose();
+            return;
+          }
+        } catch {
+          // Web Share not available or user cancelled — fall through to wa.me link
+        }
+        // Fallback: open wa.me link
+        if (data.data?.whatsappUrl) {
+          window.open(data.data.whatsappUrl, "_blank");
+          toast.success("WhatsApp opened");
+        }
       } else {
         toast.success("Invoice sent successfully");
       }
@@ -112,9 +142,11 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
                 name="recipientPhone"
                 type="tel"
                 required
-                defaultValue={defaultPhone ?? ""}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 placeholder="+60 12 345 6789"
               />
+              <p className="text-xs text-surface-400">Malaysian numbers auto-get +60. On mobile, the PDF will be shared directly.</p>
             </div>
           )}
 
