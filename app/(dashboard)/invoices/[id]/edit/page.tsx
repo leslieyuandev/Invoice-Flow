@@ -16,8 +16,8 @@ export default async function EditInvoicePage({ params }: PageProps) {
   const invoice = await getInvoiceById(id, session.user.id);
   if (!invoice) notFound();
 
-  // Only DRAFT invoices can be edited
-  if (invoice.status !== "DRAFT") redirect(`/invoices/${id}`);
+  // Cancelled invoices cannot be edited
+  if (invoice.status === "CANCELLED") redirect(`/invoices/${id}`);
 
   const [clients, templates, user, existingInvoices] = await Promise.all([
     db.client.findMany({
@@ -55,6 +55,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
     senderEmail: invoice.senderEmail ?? "",
     senderAddress: invoice.senderAddress ?? "",
     senderPhone: invoice.senderPhone ?? "",
+    senderSsmNumber: (invoice as any).senderSsmNumber ?? "",
     senderLogoUrl: invoice.senderLogoUrl ?? "",
     taxRate: Number(invoice.taxRate),
     discountType: invoice.discountType ?? undefined,
@@ -77,6 +78,7 @@ export default async function EditInvoicePage({ params }: PageProps) {
     senderEmail: invoice.senderEmail ?? "",
     senderAddress: invoice.senderAddress ?? "",
     senderPhone: invoice.senderPhone ?? "",
+    senderSsmNumber: (invoice as any).senderSsmNumber ?? "",
     senderLogoUrl: invoice.senderLogoUrl ?? "",
     defaultCurrency: invoice.currency,
     defaultPaymentTerms: user?.defaultPaymentTerms ?? 30,

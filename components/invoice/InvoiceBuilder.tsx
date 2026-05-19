@@ -29,6 +29,7 @@ export interface UserDefaults {
   senderEmail: string;
   senderAddress: string;
   senderPhone: string;
+  senderSsmNumber: string;
   senderLogoUrl: string;
   defaultCurrency: string;
   defaultPaymentTerms: number;
@@ -72,6 +73,7 @@ export function InvoiceBuilder({
     senderEmail: "",
     senderAddress: "",
     senderPhone: "",
+    senderSsmNumber: "",
     senderLogoUrl: "",
     defaultCurrency: "MYR",
     defaultPaymentTerms: 30,
@@ -95,6 +97,7 @@ export function InvoiceBuilder({
       senderEmail: defaults.senderEmail,
       senderAddress: defaults.senderAddress,
       senderPhone: defaults.senderPhone,
+      senderSsmNumber: defaults.senderSsmNumber,
       senderLogoUrl: defaults.senderLogoUrl,
       taxRate: 0,
       lineItems: [{ description: "", quantity: 1, unitPrice: 0, amount: 0 }],

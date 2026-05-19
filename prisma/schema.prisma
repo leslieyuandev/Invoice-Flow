@@ -62,6 +62,7 @@ model User {
   companyEmail    String?
   companyPhone    String?
   companyWebsite  String?
+  ssmNumber       String?
   logoUrl            String?
   proposalLogoUrl    String?
 
@@ -150,11 +151,12 @@ model Invoice {
   total          Int
 
   // Sender snapshot — copied from User at creation; historically immutable
-  senderName    String
-  senderEmail   String?
-  senderAddress String?
-  senderPhone   String?
-  senderLogoUrl String?
+  senderName       String
+  senderEmail      String?
+  senderAddress    String?
+  senderPhone      String?
+  senderSsmNumber  String?
+  senderLogoUrl    String?
 
   // Client snapshot — denormalized for fast PDF rendering
   clientName    String

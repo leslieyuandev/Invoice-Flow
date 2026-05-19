@@ -42,6 +42,7 @@ export interface InvoiceFormData {
   senderEmail: string;
   senderAddress: string;
   senderPhone: string;
+  senderSsmNumber?: string;
   senderLogoUrl?: string;
   lineItems: LineItemFormData[];
   taxRate: number;

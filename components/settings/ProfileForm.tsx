@@ -22,6 +22,7 @@ interface ProfileFormProps {
     companyEmail: string;
     companyPhone: string;
     companyAddress: string;
+    ssmNumber: string;
     defaultCurrency: string;
     defaultPaymentTerms: number;
     defaultNotes: string;
@@ -59,6 +60,7 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
       companyEmail: fd.get("companyEmail") || undefined,
       companyPhone: fd.get("companyPhone") || undefined,
       companyAddress: fd.get("companyAddress") || undefined,
+      ssmNumber: fd.get("ssmNumber") || undefined,
       defaultCurrency: fd.get("defaultCurrency"),
       defaultPaymentTerms: fd.get("defaultPaymentTerms") || undefined,
       defaultNotes: fd.get("defaultNotes") || undefined,
@@ -255,6 +257,10 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="companyPhone">Company phone</Label>
                 <Input id="companyPhone" name="companyPhone" defaultValue={user.companyPhone} placeholder="+60 12 345 6789" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ssmNumber">SSM / Company registration no.</Label>
+                <Input id="ssmNumber" name="ssmNumber" defaultValue={user.ssmNumber} placeholder="e.g. 202301012345" />
               </div>
               <div className="col-span-full flex flex-col gap-1.5">
                 <Label htmlFor="companyAddress">Company address</Label>

@@ -76,6 +76,13 @@ export function SenderSection({ form }: SenderSectionProps) {
           error={errors.senderPhone?.message}
         />
       </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>SSM / Registration No.</Label>
+        <Input
+          {...register("senderSsmNumber")}
+          placeholder="e.g. 202301012345"
+        />
+      </div>
     </div>
   );
 }

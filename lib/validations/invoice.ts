@@ -36,6 +36,7 @@ const invoiceBaseSchema = z.object({
   senderEmail: z.string().email("Invalid sender email").optional().or(z.literal("")),
   senderAddress: z.string().max(500).optional().transform((v) => v?.trim()),
   senderPhone: z.string().max(50).optional().transform((v) => v?.trim()),
+  senderSsmNumber: z.string().max(50).optional().transform((v) => v?.trim()),
   senderLogoUrl: z.string().url().optional().or(z.literal("")),
   taxRate: z.number().min(0).max(100),
   discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().or(z.literal(""))

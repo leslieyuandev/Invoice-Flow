@@ -12,6 +12,7 @@ const profileSchema = z.object({
   companyEmail: z.string().email().optional().or(z.literal("")).transform((v) => v || undefined),
   companyPhone: z.string().max(50).optional().transform((v) => v?.trim() || undefined),
   companyAddress: z.string().max(500).optional().transform((v) => v?.trim() || undefined),
+  ssmNumber: z.string().max(50).optional().transform((v) => v?.trim() || undefined),
   defaultCurrency: z.string().length(3).optional(),
   defaultPaymentTerms: z.coerce.number().int().min(1).max(365).optional(),
   defaultNotes: z.string().max(2000).optional().transform((v) => v?.trim() || undefined),

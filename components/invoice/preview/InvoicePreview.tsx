@@ -69,6 +69,7 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts, show
             {data.senderAddress && <p className="text-xs text-surface-500 mt-0.5">{data.senderAddress}</p>}
             {data.senderEmail && <p className="text-xs text-surface-500">{data.senderEmail}</p>}
             {data.senderPhone && <p className="text-xs text-surface-500">{data.senderPhone}</p>}
+            {data.senderSsmNumber && <p className="text-xs text-surface-500">SSM No: {data.senderSsmNumber}</p>}
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-brand-600 tracking-tight">INVOICE</p>

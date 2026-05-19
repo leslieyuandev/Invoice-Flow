@@ -42,6 +42,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
     senderEmail: invoice.senderEmail ?? "",
     senderAddress: invoice.senderAddress ?? "",
     senderPhone: invoice.senderPhone ?? "",
+    senderSsmNumber: (invoice as any).senderSsmNumber ?? "",
     senderLogoUrl: invoice.senderLogoUrl ?? "",
     taxRate: Number(invoice.taxRate),
     discountType: invoice.discountType ?? undefined,
@@ -85,7 +86,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {invoice.status === "DRAFT" && (
+          {invoice.status !== "CANCELLED" && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/invoices/${invoice.id}/edit`}>
                 <Pencil className="w-4 h-4" />

@@ -143,7 +143,8 @@ function InvoiceDocument({ invoice, showDueDate }: { invoice: InvoiceWithRelatio
           invoice.senderLogoUrl && React.createElement(Text, { style: { ...styles.companyName, marginTop: 4 } }, invoice.senderName),
           invoice.senderAddress && React.createElement(Text, { style: styles.companyMeta }, invoice.senderAddress),
           invoice.senderEmail && React.createElement(Text, { style: styles.companyMeta }, invoice.senderEmail),
-          invoice.senderPhone && React.createElement(Text, { style: styles.companyMeta }, invoice.senderPhone)
+          invoice.senderPhone && React.createElement(Text, { style: styles.companyMeta }, invoice.senderPhone),
+          (invoice as any).senderSsmNumber && React.createElement(Text, { style: styles.companyMeta }, `SSM No: ${(invoice as any).senderSsmNumber}`)
         ),
         React.createElement(
           View,
