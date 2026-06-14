@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUploadField } from "@/components/ui/ImageUploadField";
 import { createPackageAction, updatePackageAction, deletePackageAction } from "@/actions/catalog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Package {
   id: string;
@@ -170,9 +171,13 @@ export function PackagesManager({ packages, categories }: PackagesManagerProps) 
   const [dialog, setDialog] = useState<"create" | Package | null>(null);
   const [defaultCatId, setDefaultCatId] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dlg, setDlg] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this package?")) return;
+  function handleDelete(id: string) {
+    setDlg({ open: true, id });
+  }
+
+  async function executeDelete(id: string) {
     setDeletingId(id);
     const result = await deletePackageAction(id);
     setDeletingId(null);
@@ -298,6 +303,13 @@ export function PackagesManager({ packages, categories }: PackagesManagerProps) 
           onClose={() => setDialog(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={dlg.open}
+        message="Delete this package? This cannot be undone."
+        onConfirm={() => { setDlg((d) => ({ ...d, open: false })); executeDelete(dlg.id); }}
+        onCancel={() => setDlg((d) => ({ ...d, open: false }))}
+      />
     </div>
   );
 }

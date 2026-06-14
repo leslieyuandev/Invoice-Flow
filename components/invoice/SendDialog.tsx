@@ -18,6 +18,7 @@ interface SendDialogProps {
   defaultEmail: string;
   defaultPhone?: string;
   onSent?: () => void;
+  sendApiPath?: string;
 }
 
 /** Normalize a phone number to E.164 with +60 as default country code. */
@@ -30,7 +31,7 @@ function normalizePhone(raw: string): string {
   return "+60" + digits;
 }
 
-export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEmail, defaultPhone, onSent }: SendDialogProps) {
+export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEmail, defaultPhone, onSent, sendApiPath }: SendDialogProps) {
   const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState(defaultPhone ?? "");
@@ -52,7 +53,8 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
     }
 
     try {
-      const res = await fetch(`/api/invoices/${invoiceId}/send`, {
+      const apiPath = sendApiPath ?? `/api/invoices/${invoiceId}/send`;
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -67,7 +69,9 @@ export function SendDialog({ open, onClose, invoiceId, invoiceNumber, defaultEma
 
       if (channel === "whatsapp") {
         // Try Web Share API first (shares the actual PDF file on mobile)
-        const pdfUrl = `/api/invoices/${invoiceId}/pdf`;
+        const pdfUrl = sendApiPath
+          ? sendApiPath.replace(/\/send$/, "/pdf")
+          : `/api/invoices/${invoiceId}/pdf`;
         try {
           const pdfRes = await fetch(pdfUrl);
           const blob = await pdfRes.blob();

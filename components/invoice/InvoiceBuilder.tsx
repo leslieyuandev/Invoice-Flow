@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useForm, useWatch, type Resolver } from "react-hook-form";
+import { useForm, useWatch, Controller, type Resolver } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { toast } from "sonner";
 import { Download, Send, Save, Eye, EyeOff } from "lucide-react";
 import { addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/invoice/form/CollapsibleCard";
 import { SenderSection } from "./form/SenderSection";
 import { ClientSection } from "./form/ClientSection";
 import { MetadataSection } from "./form/MetadataSection";
@@ -16,6 +16,7 @@ import { LineItemsTable } from "./form/LineItemsTable";
 import { FinancialSummary } from "./form/FinancialSummary";
 import { InvoicePreview } from "./preview/InvoicePreview";
 import { SendDialog } from "./SendDialog";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useInvoiceCalculations } from "@/hooks/useInvoiceCalculations";
 import { createInvoiceSchema } from "@/lib/validations/invoice";
 import { createInvoiceAction, updateInvoiceAction, markAsSentAction } from "@/actions/invoice";
@@ -53,6 +54,12 @@ function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function ensureHtml(text: string | null | undefined): string {
+  if (!text) return "";
+  if (/<[a-z][\s\S]*>/i.test(text)) return text;
+  return "<p>" + text.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>") + "</p>";
+}
+
 export function InvoiceBuilder({
   clients,
   existingNumbers = [],
@@ -67,6 +74,8 @@ export function InvoiceBuilder({
   const [showPreview, setShowPreview] = useState(true);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoiceId ?? null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
 
   const defaults = userDefaults ?? {
     senderName: "",
@@ -87,7 +96,11 @@ export function InvoiceBuilder({
 
   const form = useForm<InvoiceFormData, unknown, InvoiceFormData>({
     resolver: standardSchemaResolver(createInvoiceSchema) as Resolver<InvoiceFormData, unknown, InvoiceFormData>,
-    defaultValues: initialData ?? {
+    defaultValues: initialData ? {
+      ...initialData,
+      notes: ensureHtml(initialData.notes),
+      terms: ensureHtml(initialData.terms),
+    } : {
       invoiceNumber: generateInvoiceNumber(defaults.invoiceNumberPrefix, existingNumbers),
       issueDate: toDateStr(issueDate) as unknown as Date,
       dueDate: toDateStr(addDays(issueDate, defaults.defaultPaymentTerms)) as unknown as Date,
@@ -100,9 +113,9 @@ export function InvoiceBuilder({
       senderSsmNumber: defaults.senderSsmNumber,
       senderLogoUrl: defaults.senderLogoUrl,
       taxRate: 0,
-      lineItems: [{ description: "", quantity: 1, unitPrice: 0, amount: 0 }],
-      notes: defaults.defaultNotes,
-      terms: defaults.defaultTerms,
+      lineItems: [],
+      notes: ensureHtml(defaults.defaultNotes),
+      terms: ensureHtml(defaults.defaultTerms),
     },
     mode: "onChange",
   });
@@ -127,57 +140,68 @@ export function InvoiceBuilder({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedIssueDate]);
 
-  const canSend = Boolean(
-    watchedValues.clientId &&
-    watchedValues.senderName &&
-    watchedValues.lineItems?.some(
-      (item) => item?.description && (item.quantity ?? 0) > 0 && (item.unitPrice ?? 0) > 0
-    )
-  );
 
   async function saveInvoice(data: InvoiceFormData): Promise<string | null> {
-    let result: { data?: { id: string }; error?: string } | undefined;
-    if (mode === "edit" && invoiceId) {
-      result = await updateInvoiceAction(invoiceId, data);
-    } else {
-      result = await createInvoiceAction(data);
-    }
-    if (!result || "error" in result && result.error) {
-      toast.error(result?.error ?? "Failed to save invoice");
+    try {
+      let result: { data?: { id: string }; error?: string } | undefined;
+      if (mode === "edit" && invoiceId) {
+        result = await updateInvoiceAction(invoiceId, data);
+      } else {
+        result = await createInvoiceAction(data);
+      }
+      if (!result) {
+        toast.error("No response from server — please try again.");
+        return null;
+      }
+      if ("error" in result && result.error) {
+        toast.error(result.error, { duration: 5000 });
+        return null;
+      }
+      const id = result.data!.id;
+      setSavedInvoiceId(id);
+      return id;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save invoice — please try again.", { duration: 5000 });
       return null;
     }
-    const id = result.data!.id;
-    setSavedInvoiceId(id);
-    return id;
   }
 
   async function onSubmit(data: InvoiceFormData) {
     const id = await saveInvoice(data);
-    if (id) router.push(`/invoices/${id}`);
+    if (id) {
+      toast.success(mode === "edit" ? "Invoice updated!" : "Invoice saved!", { duration: 3000 });
+      router.push(`/invoices/${id}`);
+    }
   }
 
   async function handleDownloadPdf() {
-    const valid = await form.trigger();
-    if (!valid) { toast.error("Please fix the form errors first."); return; }
-
-    const data = form.getValues();
-    const id = await saveInvoice(data);
-    if (!id) return;
-
-    window.open(`/api/invoices/${id}/pdf`, "_blank");
-    await markAsSentAction(id);
-    router.push(`/invoices/${id}`);
+    setDownloadLoading(true);
+    try {
+      const valid = await form.trigger();
+      if (!valid) { toast.error("Please fill in all required fields."); return; }
+      const data = form.getValues();
+      const id = await saveInvoice(data);
+      if (!id) return;
+      window.open(`/api/invoices/${id}/pdf`, "_blank");
+      await markAsSentAction(id);
+      router.push(`/invoices/${id}`);
+    } finally {
+      setDownloadLoading(false);
+    }
   }
 
   async function handleSend() {
-    const valid = await form.trigger();
-    if (!valid) { toast.error("Please fix the form errors first."); return; }
-
-    const data = form.getValues();
-    const id = await saveInvoice(data);
-    if (!id) return;
-
-    setSendDialogOpen(true);
+    setSendLoading(true);
+    try {
+      const valid = await form.trigger();
+      if (!valid) { toast.error("Please fill in all required fields."); return; }
+      const data = form.getValues();
+      const id = await saveInvoice(data);
+      if (!id) return;
+      setSendDialogOpen(true);
+    } finally {
+      setSendLoading(false);
+    }
   }
 
   const title = mode === "edit" ? t("builder.editInvoice") : t("builder.newInvoice");
@@ -206,8 +230,7 @@ export function InvoiceBuilder({
             variant="outline"
             size="sm"
             onClick={handleDownloadPdf}
-            loading={false}
-            disabled={!canSend}
+            loading={downloadLoading}
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">{t("builder.downloadPdf")}</span>
@@ -217,7 +240,7 @@ export function InvoiceBuilder({
             variant="outline"
             size="sm"
             onClick={handleSend}
-            disabled={!canSend}
+            loading={sendLoading}
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">{t("builder.send")}</span>
@@ -239,69 +262,69 @@ export function InvoiceBuilder({
         <div className={`overflow-y-auto ${showPreview ? "w-full md:w-1/2" : "w-full max-w-3xl mx-auto"}`}>
           <form
             id="invoice-form"
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit, () => toast.error("Please fill in all required fields."))}
             noValidate
             className="p-4 md:p-6 space-y-6 pb-28 md:pb-10"
           >
-            <Card>
-              <CardHeader><CardTitle>{t("builder.invoiceDetails")}</CardTitle></CardHeader>
-              <CardContent>
-                <MetadataSection form={form} defaultPaymentTerms={defaults.defaultPaymentTerms} showDueDate={defaults.showDueDate} />
-              </CardContent>
-            </Card>
+            <CollapsibleCard title={t("builder.invoiceDetails")} defaultOpen>
+              <MetadataSection form={form} defaultPaymentTerms={defaults.defaultPaymentTerms} showDueDate={defaults.showDueDate} />
+            </CollapsibleCard>
 
-            <Card>
-              <CardHeader><CardTitle>{t("builder.from")}</CardTitle></CardHeader>
-              <CardContent><SenderSection form={form} /></CardContent>
-            </Card>
+            <CollapsibleCard title={t("builder.from")} defaultOpen={false}>
+              <SenderSection form={form} />
+            </CollapsibleCard>
 
-            <Card>
-              <CardHeader><CardTitle>{t("builder.billTo")}</CardTitle></CardHeader>
-              <CardContent><ClientSection form={form} clients={clients} /></CardContent>
-            </Card>
+            <CollapsibleCard title={t("builder.billTo")} defaultOpen>
+              <ClientSection form={form} clients={clients} />
+            </CollapsibleCard>
 
-            <Card>
-              <CardHeader><CardTitle>{t("builder.lineItems")}</CardTitle></CardHeader>
-              <CardContent>
-                <LineItemsTable
-                  form={form}
-                  lineItemAmounts={lineItemAmounts}
-                  currency={currency}
-                  templates={templates}
-                />
-              </CardContent>
-            </Card>
+            <CollapsibleCard title={t("builder.lineItems")} defaultOpen>
+              <LineItemsTable
+                form={form}
+                lineItemAmounts={lineItemAmounts}
+                currency={currency}
+                templates={templates}
+              />
+            </CollapsibleCard>
 
-            <Card>
-              <CardHeader><CardTitle>{t("builder.totals")}</CardTitle></CardHeader>
-              <CardContent>
-                <FinancialSummary form={form} financials={financials} currency={currency} />
-              </CardContent>
-            </Card>
+            <CollapsibleCard title={t("builder.totals")} defaultOpen>
+              <FinancialSummary form={form} financials={financials} currency={currency} />
+            </CollapsibleCard>
 
-            <Card>
-              <CardHeader><CardTitle>{t("builder.notesTerms")}</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
+            <CollapsibleCard title={t("builder.notesTerms")} defaultOpen={false}>
+              <div className="space-y-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-surface-700">{t("builder.notes")}</label>
-                  <textarea
-                    {...form.register("notes")}
-                    rows={3}
-                    placeholder={t("builder.notesPlaceholder")}
-                    className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                  <Controller
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder={t("builder.notesPlaceholder")}
+                        minHeight="80px"
+                      />
+                    )}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-surface-700">{t("builder.paymentTerms")}</label>
-                  <textarea
-                    {...form.register("terms")}
-                    rows={4}
-                    placeholder={t("builder.paymentTermsPlaceholder")}
-                    className="w-full rounded-md border border-surface-200 bg-white px-3 py-2 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none"
+                  <Controller
+                    control={form.control}
+                    name="terms"
+                    render={({ field }) => (
+                      <RichTextEditor
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder={t("builder.paymentTermsPlaceholder")}
+                        minHeight="100px"
+                      />
+                    )}
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CollapsibleCard>
           </form>
         </div>
 

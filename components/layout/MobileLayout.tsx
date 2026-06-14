@@ -5,18 +5,26 @@ import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
-export function MobileLayout({ children }: { children: React.ReactNode }) {
+interface MobileLayoutProps {
+  children: React.ReactNode;
+  userName?: string | null;
+  userEmail?: string | null;
+}
+
+export function MobileLayout({ children, userName, userEmail }: MobileLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <LanguageProvider>
-    <div className="flex h-screen overflow-hidden bg-surface-50">
+    <div className="flex h-dvh overflow-hidden bg-surface-50">
       <Sidebar
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(c => !c)}
+        userName={userName}
+        userEmail={userEmail}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">

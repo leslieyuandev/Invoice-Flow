@@ -27,7 +27,11 @@ export async function getInvoiceById(
 ): Promise<InvoiceWithRelations | null> {
   return db.invoice.findFirst({
     where: { id: invoiceId, userId, deletedAt: null },
-    include: { lineItems: { orderBy: { sortOrder: "asc" } }, client: true },
+    include: {
+      lineItems: { orderBy: { sortOrder: "asc" } },
+      client: true,
+      quotation: { select: { id: true, quotationNumber: true } },
+    },
   });
 }
 
@@ -147,7 +151,7 @@ export async function updateInvoice(invoiceId: string, userId: string, input: Cr
 
 export async function softDeleteInvoice(invoiceId: string, userId: string) {
   return db.invoice.updateMany({
-    where: { id: invoiceId, userId, status: { in: ["DRAFT", "CANCELLED"] }, deletedAt: null },
+    where: { id: invoiceId, userId, deletedAt: null },
     data: { deletedAt: new Date() },
   });
 }

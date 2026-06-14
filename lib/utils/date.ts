@@ -14,9 +14,15 @@ export function isPastDue(dueDate: Date | string): boolean {
 
 export function generateInvoiceNumber(prefix = "INV", existingNumbers: string[] = []): string {
   const year = new Date().getFullYear();
-  let seq = 1;
-  while (existingNumbers.includes(`${prefix}-${year}-${String(seq).padStart(3, "0")}`)) {
-    seq++;
+  // Match any numeric suffix for this prefix+year, regardless of zero-padding width
+  const pattern = new RegExp(`^${prefix}-${year}-(\\d+)$`);
+  let maxSeq = 0;
+  for (const num of existingNumbers) {
+    const match = num.match(pattern);
+    if (match) {
+      const seq = parseInt(match[1], 10);
+      if (seq > maxSeq) maxSeq = seq;
+    }
   }
-  return `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
+  return `${prefix}-${year}-${String(maxSeq + 1).padStart(4, "0")}`;
 }

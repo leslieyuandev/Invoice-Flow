@@ -31,6 +31,7 @@ interface ProfileFormProps {
     invoiceNumberPrefix: string;
     logoUrl: string;
     proposalLogoUrl: string;
+    watermarkUrl: string;
     hasPassword: boolean;
     showDueDate: boolean;
   };
@@ -45,10 +46,13 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
   const [logoUploading, setLogoUploading] = useState(false);
   const [proposalLogoUrl, setProposalLogoUrl] = useState(user.proposalLogoUrl);
   const [proposalLogoUploading, setProposalLogoUploading] = useState(false);
+  const [watermarkUrl, setWatermarkUrl] = useState(user.watermarkUrl);
+  const [watermarkUploading, setWatermarkUploading] = useState(false);
   const [templates, setTemplates] = useState(initialTemplates);
   const [addingTemplate, setAddingTemplate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const proposalLogoInputRef = useRef<HTMLInputElement>(null);
+  const watermarkInputRef = useRef<HTMLInputElement>(null);
 
   async function handleProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -133,6 +137,26 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
     }
   }
 
+  async function handleWatermarkChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setWatermarkUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("watermark", file);
+      const res = await fetch("/api/upload/watermark", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      setWatermarkUrl(json.url);
+      toast.success("Watermark uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setWatermarkUploading(false);
+      if (watermarkInputRef.current) watermarkInputRef.current.value = "";
+    }
+  }
+
   async function handleAddTemplate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setAddingTemplate(true);
@@ -209,6 +233,41 @@ export function ProfileForm({ user, templates: initialTemplates }: ProfileFormPr
               </div>
             </div>
             <input ref={proposalLogoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleProposalLogoChange} />
+          </div>
+          {/* Watermark image */}
+          <div>
+            <p className="text-sm font-medium text-surface-800 mb-1">Watermark Image</p>
+            <p className="text-xs text-surface-400 mb-3">Used in the Watermark Generator · PNG, JPG or WebP · max 5 MB</p>
+            <div className="flex items-center gap-4">
+              {watermarkUrl ? (
+                <img src={watermarkUrl} alt="Watermark" className="h-16 w-auto max-w-[160px] object-contain rounded border border-surface-200 p-1.5 bg-surface-50" />
+              ) : (
+                <div className="flex items-center justify-center w-16 h-16 rounded border border-dashed border-surface-300 bg-surface-50">
+                  <ImageIcon className="w-6 h-6 text-surface-400" />
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={watermarkUploading} onClick={() => watermarkInputRef.current?.click()}>
+                  {watermarkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {watermarkUrl ? "Replace" : "Upload"}
+                </Button>
+                {watermarkUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-surface-400 hover:text-red-500"
+                    onClick={async () => {
+                      await fetch("/api/upload/watermark", { method: "DELETE" }).catch(() => {});
+                      setWatermarkUrl("");
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+            <input ref={watermarkInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleWatermarkChange} />
           </div>
         </CardContent>
       </Card>

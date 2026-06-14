@@ -1,4 +1,4 @@
-import type { Invoice, Client, LineItem, User, InvoiceStatus, DiscountType } from "@prisma/client";
+import type { Invoice, Client, LineItem, User, InvoiceStatus, DiscountType, Quotation, QuotationLineItem, QuotationStatus } from "@prisma/client";
 
 // ─── Re-exports for convenience ──────────────────────────────────────────────
 export type { InvoiceStatus, DiscountType };
@@ -7,6 +7,7 @@ export type { InvoiceStatus, DiscountType };
 export type InvoiceWithRelations = Invoice & {
   lineItems: LineItem[];
   client: Client;
+  quotation?: { id: string; quotationNumber: string } | null;
 };
 
 export type InvoiceListItem = Pick<
@@ -89,4 +90,44 @@ export interface SendInvoicePayload {
   recipientEmail?: string;
   recipientPhone?: string;
   message?: string;
+}
+
+// ─── Quotation types ──────────────────────────────────────────────────────────
+export type { QuotationStatus };
+
+export type QuotationWithRelations = Quotation & {
+  lineItems: QuotationLineItem[];
+  client: Client;
+};
+
+export type QuotationListItem = Pick<
+  Quotation,
+  | "id"
+  | "quotationNumber"
+  | "status"
+  | "total"
+  | "currency"
+  | "issueDate"
+  | "expiryDate"
+  | "clientName"
+  | "createdAt"
+>;
+
+export interface QuotationFormData {
+  quotationNumber: string;
+  issueDate: Date;
+  expiryDate: Date;
+  currency: string;
+  clientId: string;
+  senderName: string;
+  senderEmail: string;
+  senderAddress: string;
+  senderPhone: string;
+  senderSsmNumber?: string;
+  senderLogoUrl?: string;
+  lineItems: LineItemFormData[];
+  taxRate: number;
+  discountType?: DiscountType;
+  discountValue?: number;
+  notes?: string;
 }

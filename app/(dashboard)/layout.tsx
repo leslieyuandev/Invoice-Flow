@@ -6,5 +6,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  return <MobileLayout>{children}</MobileLayout>;
+  return (
+    <MobileLayout userName={session.user.name} userEmail={session.user.email}>
+      {children}
+    </MobileLayout>
+  );
 }

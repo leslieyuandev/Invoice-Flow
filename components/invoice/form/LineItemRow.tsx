@@ -85,16 +85,16 @@ export function LineItemRow({
         </div>
 
         {/* Qty / price / amount sub-row on mobile */}
-        <div className="grid grid-cols-3 gap-2 md:contents text-sm">
-          <div>
+        <div className="flex items-start gap-3 md:contents text-sm">
+          <div className="shrink-0">
             <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Qty</p>
             <span className="text-surface-700 tabular-nums">{quantity}</span>
           </div>
-          <div>
+          <div className="shrink-0">
             <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Unit Price</p>
             <span className="text-surface-700 tabular-nums">{formatCurrency(Math.round(unitPrice * 100), currency)}</span>
           </div>
-          <div className="flex flex-col items-end md:flex-row md:items-center md:justify-end">
+          <div className="ml-auto text-right md:flex md:flex-row md:items-center md:justify-end">
             <p className="text-[10px] text-surface-400 mb-0.5 md:hidden">Amt</p>
             <span className="font-medium tabular-nums text-surface-700">{formatCurrency(amount, currency)}</span>
           </div>

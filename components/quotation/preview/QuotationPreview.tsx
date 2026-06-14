@@ -1,0 +1,215 @@
+"use client";
+
+import { useRef, useState, useEffect } from "react";
+import { formatCurrency, centsToDollars } from "@/lib/utils/calculations";
+import { formatDate } from "@/lib/utils/date";
+import { getCurrencySymbol } from "@/lib/utils/currency";
+import type { QuotationFormData, InvoiceFinancials } from "@/types";
+import type { Client } from "@prisma/client";
+import Image from "next/image";
+
+interface QuotationPreviewProps {
+  data: Partial<QuotationFormData>;
+  financials: InvoiceFinancials;
+  client?: Client;
+  lineItemAmounts: number[];
+  showExpiryDate?: boolean;
+}
+
+export function QuotationPreview({
+  data,
+  financials,
+  client,
+  lineItemAmounts,
+  showExpiryDate = true,
+}: QuotationPreviewProps) {
+  const currency = data.currency ?? "USD";
+  const fmt = (cents: number) => formatCurrency(cents, currency);
+  const symbol = getCurrencySymbol(currency);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const available = entry.contentRect.width - 48;
+      setScale(Math.min(1, available / 794));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="preview-scroll overflow-y-auto h-full bg-surface-100 p-6 flex justify-center">
+      {/* A4 sheet */}
+      <div
+        className="bg-white shadow-preview font-invoice text-surface-800 shrink-0 w-a4 min-h-a4"
+        style={{
+          padding: "48px",
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+          marginLeft: `${(scale - 1) * 397}px`,
+          marginRight: `${(scale - 1) * 397}px`,
+          marginBottom: `${(scale - 1) * 1123}px`,
+        }}
+      >
+        {/* ── Header ───────────────────────────────────────────────── */}
+        <div className="flex justify-between items-start mb-10">
+          <div>
+            {data.senderLogoUrl ? (
+              <div className="mb-3 h-[120px] w-[240px] relative">
+                <Image
+                  src={data.senderLogoUrl}
+                  alt="Company logo"
+                  fill
+                  className="object-contain object-left"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+            <p className="text-lg font-bold text-surface-900">{data.senderName || "Your Company"}</p>
+            {data.senderAddress && <p className="text-xs text-surface-500 mt-0.5">{data.senderAddress}</p>}
+            {data.senderEmail && <p className="text-xs text-surface-500">{data.senderEmail}</p>}
+            {data.senderPhone && <p className="text-xs text-surface-500">{data.senderPhone}</p>}
+            {data.senderSsmNumber && <p className="text-xs text-surface-500">SSM No: {data.senderSsmNumber}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-bold text-teal-600 tracking-tight">QUOTATION</p>
+            <p className="text-sm text-surface-500 mt-1">{data.quotationNumber || "QT-XXXX"}</p>
+          </div>
+        </div>
+
+        {/* ── Bill To / Dates ───────────────────────────────────────── */}
+        <div className="flex justify-between mb-8">
+          <div>
+            <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-2">Bill To</p>
+            {client ? (
+              <div className="text-sm space-y-0.5">
+                <p className="font-semibold text-surface-900">{client.name}</p>
+                {client.company && <p className="text-surface-600">{client.company}</p>}
+                <p className="text-surface-500">{client.email}</p>
+                {client.addressLine1 && <p className="text-surface-500">{client.addressLine1}</p>}
+                {(client.city || client.country) && (
+                  <p className="text-surface-500">{[client.city, client.country].filter(Boolean).join(", ")}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-surface-400 italic">Select a client…</p>
+            )}
+          </div>
+          <div className="text-right space-y-3">
+            <div>
+              <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1">Issue Date</p>
+              <p className="text-sm text-surface-700">
+                {data.issueDate ? formatDate(data.issueDate) : "—"}
+              </p>
+            </div>
+            {showExpiryDate && (
+              <div>
+                <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-1">Expiry Date</p>
+                <p className="text-sm text-surface-700">
+                  {data.expiryDate ? formatDate(data.expiryDate) : "—"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Divider ───────────────────────────────────────────────── */}
+        <div className="h-px bg-surface-200 mb-4" />
+
+        {/* ── Line items table ──────────────────────────────────────── */}
+        <div>
+          <div className="grid grid-cols-[1fr_60px_80px_80px] gap-2 px-2 mb-1">
+            {["Item", "Qty", "Price", "Amount"].map((h) => (
+              <span key={h} className="text-[10px] font-bold text-surface-400 uppercase tracking-widest text-right first:text-left">
+                {h}
+              </span>
+            ))}
+          </div>
+
+          <div className="divide-y divide-surface-50">
+            {(data.lineItems ?? []).length === 0 ? (
+              <p className="text-sm text-surface-400 italic py-4 text-center">Add line items…</p>
+            ) : (
+              (data.lineItems ?? []).map((item, i) => (
+                <div key={i} className="grid grid-cols-[1fr_60px_80px_80px] gap-2 py-2.5 px-2 text-sm items-start">
+                  <div>
+                    <p className="font-semibold text-surface-900">
+                      {item.description || <span className="text-surface-300 italic font-normal">—</span>}
+                    </p>
+                    {item.notes && (
+                      <div
+                        className="text-xs text-surface-500 mt-0.5 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0"
+                        dangerouslySetInnerHTML={{ __html: item.notes }}
+                      />
+                    )}
+                  </div>
+                  <span className="text-right text-surface-600 tabular-nums">{item.quantity || 0}</span>
+                  <span className="text-right text-surface-600 tabular-nums">
+                    {symbol}{(Number(item.unitPrice) || 0).toFixed(2)}
+                  </span>
+                  <span className="text-right text-surface-800 tabular-nums font-medium">
+                    {fmt(lineItemAmounts[i] ?? 0)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ── Totals ────────────────────────────────────────────────── */}
+        <div className="flex justify-end mt-6">
+          <div className="w-52 space-y-1.5 text-sm">
+            <div className="flex justify-between text-surface-600">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{fmt(financials.subtotal)}</span>
+            </div>
+            {financials.discountAmount > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Discount</span>
+                <span className="tabular-nums">- {fmt(financials.discountAmount)}</span>
+              </div>
+            )}
+            {financials.taxAmount > 0 && (
+              <div className="flex justify-between text-surface-600">
+                <span>Tax</span>
+                <span className="tabular-nums">{fmt(financials.taxAmount)}</span>
+              </div>
+            )}
+            <div className="h-px bg-surface-200 my-2" />
+            <div className="flex justify-between font-bold text-base">
+              <span className="text-surface-900">Total</span>
+              <span className="tabular-nums text-teal-700">{fmt(financials.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Notes ─────────────────────────────────────────────────── */}
+        {data.notes && (
+          <div className="mt-8 rounded-lg bg-surface-50 border border-surface-100 p-4 space-y-3 text-xs text-surface-600">
+            <div>
+              <p className="font-bold text-surface-500 uppercase tracking-wide mb-1">Notes</p>
+              {/<[a-z][\s\S]*>/i.test(data.notes) ? (
+                <div
+                  className="leading-relaxed [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1 [&_li]:mb-0.5 [&_strong]:font-semibold [&_em]:italic [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold"
+                  dangerouslySetInnerHTML={{ __html: data.notes }}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap leading-relaxed">{data.notes}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Footer ────────────────────────────────────────────────── */}
+        <div className="mt-12 pt-4 border-t border-surface-100 flex justify-between text-[10px] text-surface-400">
+          <span>{data.senderName}</span>
+          <span>Page 1 of 1</span>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -11,6 +11,7 @@ import {
   deleteProposalAction,
 } from "@/actions/proposal";
 import { ProposalSendDialog } from "./ProposalSendDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { ProposalStatus } from "@/types/proposal";
 
@@ -35,6 +36,7 @@ export function ProposalActions({
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleAccept() {
     setAcceptLoading(true);
@@ -60,8 +62,11 @@ export function ProposalActions({
     router.refresh();
   }
 
-  async function handleDelete() {
-    if (!confirm(`Delete this proposal? This cannot be undone.`)) return;
+  function handleDelete() {
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
     setDeleteLoading(true);
     const result = await deleteProposalAction(proposalId);
     if (result && "error" in result && result.error) {
@@ -118,6 +123,13 @@ export function ProposalActions({
         defaultEmail={leadEmail}
         defaultPhone={leadPhone}
         onSent={() => router.refresh()}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        message="Delete this proposal? This cannot be undone."
+        onConfirm={() => { setConfirmOpen(false); executeDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
       />
     </>
   );

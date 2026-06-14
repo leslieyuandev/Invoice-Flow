@@ -12,6 +12,7 @@ import {
   updateEventCategoryAction,
   deleteEventCategoryAction,
 } from "@/actions/catalog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Category {
   id: string;
@@ -100,9 +101,13 @@ export function EventsManager({ categories }: EventsManagerProps) {
   const router = useRouter();
   const [dialog, setDialog] = useState<"create" | Category | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dlg, setDlg] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this category? This cannot be undone.")) return;
+  function handleDelete(id: string) {
+    setDlg({ open: true, id });
+  }
+
+  async function executeDelete(id: string) {
     setDeletingId(id);
     const result = await deleteEventCategoryAction(id);
     setDeletingId(null);
@@ -192,6 +197,13 @@ export function EventsManager({ categories }: EventsManagerProps) {
           onClose={() => setDialog(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={dlg.open}
+        message="Delete this category? This cannot be undone."
+        onConfirm={() => { setDlg((d) => ({ ...d, open: false })); executeDelete(dlg.id); }}
+        onCancel={() => setDlg((d) => ({ ...d, open: false }))}
+      />
     </div>
   );
 }

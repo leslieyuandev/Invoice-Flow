@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/lib/auth";
-import { UserMenu } from "./UserMenu";
 import { getServerT } from "@/lib/i18n/server";
 
 interface TopBarProps {
@@ -11,7 +9,6 @@ interface TopBarProps {
 }
 
 export async function TopBar({ title, subtitle }: TopBarProps) {
-  const session = await auth();
   const t = await getServerT();
 
   return (
@@ -27,7 +24,6 @@ export async function TopBar({ title, subtitle }: TopBarProps) {
             {t("topbar.newInvoice")}
           </Link>
         </Button>
-        <UserMenu name={session?.user?.name} email={session?.user?.email} />
       </div>
     </header>
   );

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUploadField } from "@/components/ui/ImageUploadField";
 import { createAddOnAction, updateAddOnAction, deleteAddOnAction } from "@/actions/catalog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface AddOn {
   id: string;
@@ -98,9 +99,13 @@ export function AddOnsManager({ addOns }: AddOnsManagerProps) {
   const router = useRouter();
   const [dialog, setDialog] = useState<"create" | AddOn | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dlg, setDlg] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this add-on?")) return;
+  function handleDelete(id: string) {
+    setDlg({ open: true, id });
+  }
+
+  async function executeDelete(id: string) {
     setDeletingId(id);
     const result = await deleteAddOnAction(id);
     setDeletingId(null);
@@ -185,6 +190,13 @@ export function AddOnsManager({ addOns }: AddOnsManagerProps) {
           onClose={() => setDialog(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={dlg.open}
+        message="Delete this add-on? This cannot be undone."
+        onConfirm={() => { setDlg((d) => ({ ...d, open: false })); executeDelete(dlg.id); }}
+        onCancel={() => setDlg((d) => ({ ...d, open: false }))}
+      />
     </div>
   );
 }

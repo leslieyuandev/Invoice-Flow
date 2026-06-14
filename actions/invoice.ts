@@ -20,10 +20,14 @@ export async function createInvoiceAction(formData: unknown) {
     return { error: "Validation failed", details: parsed.error.flatten().fieldErrors };
   }
 
-  const invoice = await createInvoice(session.user.id, parsed.data);
-  revalidatePath("/");
-  revalidatePath("/invoices");
-  return { data: { id: invoice.id } };
+  try {
+    const invoice = await createInvoice(session.user.id, parsed.data);
+    revalidatePath("/");
+    revalidatePath("/invoices");
+    return { data: { id: invoice.id } };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to create invoice" };
+  }
 }
 
 export async function updateInvoiceAction(invoiceId: string, formData: unknown) {
@@ -35,11 +39,15 @@ export async function updateInvoiceAction(invoiceId: string, formData: unknown) 
     return { error: "Validation failed", details: parsed.error.flatten().fieldErrors };
   }
 
-  await updateInvoice(invoiceId, session.user.id, parsed.data);
-  revalidatePath("/");
-  revalidatePath("/invoices");
-  revalidatePath(`/invoices/${invoiceId}`);
-  return { data: { id: invoiceId } };
+  try {
+    await updateInvoice(invoiceId, session.user.id, parsed.data);
+    revalidatePath("/");
+    revalidatePath("/invoices");
+    revalidatePath(`/invoices/${invoiceId}`);
+    return { data: { id: invoiceId } };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to update invoice" };
+  }
 }
 
 export async function markAsSentAction(invoiceId: string) {

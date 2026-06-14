@@ -6,7 +6,6 @@ import { getProposalsByUser } from "@/lib/services/proposal.service";
 import { ProposalTable } from "@/components/proposal/ProposalTable";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/layout/UserMenu";
 import { cn } from "@/lib/utils/cn";
 import { getServerT } from "@/lib/i18n/server";
 import type { TranslationKey } from "@/lib/i18n/translations";
@@ -55,7 +54,6 @@ export default async function ProposalsPage({ searchParams }: PageProps) {
               {t("proposalBuilder.newProposal")}
             </Link>
           </Button>
-          <UserMenu name={session?.user?.name} email={session?.user?.email} />
         </div>
       </header>
 

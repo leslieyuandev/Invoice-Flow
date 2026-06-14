@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import type { InvoiceWithRelations } from "@/types";
 import type { ProposalWithItems } from "@/types/proposal";
 import { formatCurrency } from "@/lib/utils/calculations";
@@ -6,11 +6,15 @@ import { formatDate } from "@/lib/utils/date";
 import { generateInvoicePDF } from "./pdf.service";
 import { generateProposalPDF } from "./proposal-pdf.service";
 
-function getResend() {
-  if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured");
-  return new Resend(process.env.RESEND_API_KEY);
+function getTransport() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD are not configured");
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
 }
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "invoices@resend.dev";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -28,36 +32,31 @@ interface SendEmailOptions {
 export async function sendInvoiceEmail(options: SendEmailOptions): Promise<void> {
   const { invoice, recipientEmail, customMessage } = options;
 
-  // Generate PDF once; retry only the email delivery
   const pdfBuffer = await generateInvoicePDF(invoice);
   const fmt = (c: number) => formatCurrency(c, invoice.currency);
-
   const html = buildEmailHtml({ invoice, customMessage, fmt });
 
   let lastError: Error | null = null;
+  const transport = getTransport();
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await getResend().emails.send({
-        from: `${invoice.senderName} <${FROM_EMAIL}>`,
-        to: [recipientEmail],
+      await transport.sendMail({
+        from: `"${invoice.senderName}" <${process.env.GMAIL_USER}>`,
+        to: recipientEmail,
         subject: `Invoice ${invoice.invoiceNumber} from ${invoice.senderName}`,
         html,
         attachments: [
           {
             filename: `Invoice-${invoice.invoiceNumber}.pdf`,
-            content: pdfBuffer.toString("base64"),
+            content: pdfBuffer,
           },
         ],
       });
-
-      if (error) throw new Error(error.message);
-      return; // success
+      return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-
       if (attempt < MAX_RETRIES) {
-        // Exponential backoff: 1s, 2s, 4s
         await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
       }
     }
@@ -90,7 +89,7 @@ function buildEmailHtml({
     .header-sub { color: #c7d2fe; font-size: 14px; margin: 4px 0 0; }
     .body { padding: 36px 40px; }
     .greeting { font-size: 15px; margin-bottom: 20px; }
-    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; }
+    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; white-space: pre-wrap; }
     .details-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
     .details-table td { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
     .details-table td:last-child { text-align: right; font-weight: 600; }
@@ -151,7 +150,7 @@ export async function sendProposalEmail(options: SendProposalEmailOptions): Prom
     .header-sub { color: #c7d2fe; font-size: 14px; margin: 4px 0 0; }
     .body { padding: 36px 40px; }
     .greeting { font-size: 15px; margin-bottom: 20px; }
-    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; }
+    .message-box { background: #f1f5f9; border-left: 3px solid #4f46e5; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px; color: #475569; white-space: pre-wrap; }
     .footer { background: #f8fafc; padding: 20px 40px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }
   </style>
 </head>
@@ -173,23 +172,22 @@ export async function sendProposalEmail(options: SendProposalEmailOptions): Prom
 </html>`;
 
   let lastError: Error | null = null;
+  const transport = getTransport();
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await getResend().emails.send({
-        from: `${proposal.senderName} <${FROM_EMAIL}>`,
-        to: [recipientEmail],
+      await transport.sendMail({
+        from: `"${proposal.senderName}" <${process.env.GMAIL_USER}>`,
+        to: recipientEmail,
         subject: `Proposal from ${proposal.senderName} — ${proposal.eventTitle}`,
         html,
         attachments: [
           {
             filename: `Proposal-${proposal.id}.pdf`,
-            content: pdfBuffer.toString("base64"),
+            content: pdfBuffer,
           },
         ],
       });
-
-      if (error) throw new Error(error.message);
       return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));

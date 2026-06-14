@@ -7,6 +7,7 @@ import { Download, Send, CheckCircle, Trash2, SendHorizonal } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { markAsSentAction, markAsPaidAction, deleteInvoiceAction } from "@/actions/invoice";
 import { SendDialog } from "./SendDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { InvoiceStatus } from "@/types";
 
@@ -25,6 +26,7 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
   const [paidLoading, setPaidLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDownload() {
     window.open(`/api/invoices/${invoiceId}/pdf`, "_blank");
@@ -67,8 +69,11 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
     router.refresh();
   }
 
-  async function handleDelete() {
-    if (!confirm(`Delete invoice ${invoiceNumber}? This cannot be undone.`)) return;
+  function handleDelete() {
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
     setDeleteLoading(true);
     const result = await deleteInvoiceAction(invoiceId);
     if (result && "error" in result && result.error) {
@@ -79,36 +84,36 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleDownload} loading={sentLoading}>
+      <Button variant="outline" size="sm" onClick={handleDownload} loading={sentLoading} title={t("actions.downloadPdf")}>
         <Download className="w-4 h-4" />
-        {t("actions.downloadPdf")}
+        <span className="hidden sm:inline">{t("actions.downloadPdf")}</span>
       </Button>
 
       {status !== "PAID" && status !== "CANCELLED" && (
-        <Button variant="outline" size="sm" onClick={() => setSendOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => setSendOpen(true)} title={t("actions.send")}>
           <Send className="w-4 h-4" />
-          {t("actions.send")}
+          <span className="hidden sm:inline">{t("actions.send")}</span>
         </Button>
       )}
 
       {status === "DRAFT" && (
-        <Button size="sm" variant="outline" onClick={handleMarkSent} loading={sentLoading}>
+        <Button size="sm" variant="outline" onClick={handleMarkSent} loading={sentLoading} title={t("actions.markAsSent")}>
           <SendHorizonal className="w-4 h-4" />
-          {t("actions.markAsSent")}
+          <span className="hidden sm:inline">{t("actions.markAsSent")}</span>
         </Button>
       )}
 
       {(status === "SENT" || status === "VIEWED" || status === "OVERDUE") && (
-        <Button size="sm" onClick={handleMarkPaid} loading={paidLoading}>
+        <Button size="sm" onClick={handleMarkPaid} loading={paidLoading} title={t("actions.markPaid")}>
           <CheckCircle className="w-4 h-4" />
-          {t("actions.markPaid")}
+          <span className="hidden sm:inline">{t("actions.markPaid")}</span>
         </Button>
       )}
 
       {(status === "DRAFT" || status === "CANCELLED") && (
-        <Button variant="destructive" size="sm" onClick={handleDelete} loading={deleteLoading}>
+        <Button variant="destructive" size="sm" onClick={handleDelete} loading={deleteLoading} title={t("actions.delete")}>
           <Trash2 className="w-4 h-4" />
-          {t("actions.delete")}
+          <span className="hidden sm:inline">{t("actions.delete")}</span>
         </Button>
       )}
 
@@ -120,6 +125,13 @@ export function InvoiceActions({ invoiceId, invoiceNumber, status, clientEmail, 
         defaultEmail={clientEmail}
         defaultPhone={clientPhone}
         onSent={() => router.refresh()}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        message={`Delete invoice ${invoiceNumber}? This cannot be undone.`}
+        onConfirm={() => { setConfirmOpen(false); executeDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
       />
     </>
   );

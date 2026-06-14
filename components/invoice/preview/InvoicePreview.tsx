@@ -187,13 +187,27 @@ export function InvoicePreview({ data, financials, client, lineItemAmounts, show
             {data.notes && (
               <div>
                 <p className="font-bold text-surface-500 uppercase tracking-wide mb-1">Notes</p>
-                <p className="whitespace-pre-wrap leading-relaxed">{data.notes}</p>
+                {/<[a-z][\s\S]*>/i.test(data.notes) ? (
+                  <div
+                    className="leading-relaxed [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1 [&_li]:mb-0.5 [&_strong]:font-semibold [&_em]:italic [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold"
+                    dangerouslySetInnerHTML={{ __html: data.notes }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-relaxed">{data.notes}</p>
+                )}
               </div>
             )}
             {data.terms && (
               <div>
                 <p className="font-bold text-surface-500 uppercase tracking-wide mb-1">Payment Terms</p>
-                <p className="whitespace-pre-wrap leading-relaxed">{data.terms}</p>
+                {/<[a-z][\s\S]*>/i.test(data.terms) ? (
+                  <div
+                    className="leading-relaxed [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1 [&_li]:mb-0.5 [&_strong]:font-semibold [&_em]:italic [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold"
+                    dangerouslySetInnerHTML={{ __html: data.terms }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-relaxed">{data.terms}</p>
+                )}
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { htmlToPlainText } from "@/components/ui/RichTextEditor";
+import { htmlToPlainText } from "@/lib/utils/htmlToText";
 import ReactPDF, {
   Document,
   Page,
@@ -86,8 +86,8 @@ const styles = StyleSheet.create({
   },
   colDescription: { flex: 4 },
   colQty: { flex: 1, textAlign: "right" },
-  colPrice: { flex: 1.5, textAlign: "right" },
-  colAmount: { flex: 1.5, textAlign: "right" },
+  colPrice: { flex: 2, textAlign: "right", paddingRight: 4 },
+  colAmount: { flex: 2, textAlign: "right", paddingLeft: 12 },
   tableHeaderText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#64748b" },
   tableBodyText: { fontSize: 9, color: "#1e293b" },
   descriptionText: { fontSize: 9, color: "#1e293b", lineHeight: 1.4 },
@@ -275,14 +275,14 @@ function InvoiceDocument({ invoice, showDueDate }: { invoice: InvoiceWithRelatio
               View,
               { style: { marginBottom: invoice.terms ? 12 : 0 } },
               React.createElement(Text, { style: styles.notesLabel }, "Notes"),
-              React.createElement(Text, { style: styles.notesText }, invoice.notes)
+              React.createElement(Text, { style: styles.notesText }, htmlToPlainText(invoice.notes))
             ),
           invoice.terms &&
             React.createElement(
               View,
               null,
               React.createElement(Text, { style: styles.notesLabel }, "Payment Terms"),
-              React.createElement(Text, { style: styles.notesText }, invoice.terms)
+              React.createElement(Text, { style: styles.notesText }, htmlToPlainText(invoice.terms))
             )
         ),
       // ── Page footer ───────────────────────────────────────────────

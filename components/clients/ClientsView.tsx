@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientDialog } from "./ClientDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { deleteClientAction } from "@/actions/client";
 import type { Client } from "@prisma/client";
 
@@ -16,6 +17,9 @@ export function ClientsView({ clients }: { clients: ClientWithCount[] }) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
+  const [dlg, setDlg] = useState<{ open: boolean; message: string; action: () => void }>({
+    open: false, message: "", action: () => {},
+  });
 
   function openCreate() {
     setEditing(null);
@@ -32,14 +36,19 @@ export function ClientsView({ clients }: { clients: ClientWithCount[] }) {
       toast.error(`Cannot delete "${client.name}" — they have ${client._count.invoices} invoice(s)`);
       return;
     }
-    if (!confirm(`Delete client "${client.name}"? This cannot be undone.`)) return;
-    const result = await deleteClientAction(client.id);
-    if ("error" in result && result.error) {
-      toast.error(String(result.error));
-      return;
-    }
-    toast.success("Client deleted");
-    router.refresh();
+    setDlg({
+      open: true,
+      message: `Delete client "${client.name}"? This cannot be undone.`,
+      action: async () => {
+        const result = await deleteClientAction(client.id);
+        if ("error" in result && result.error) {
+          toast.error(String(result.error));
+          return;
+        }
+        toast.success("Client deleted");
+        router.refresh();
+      },
+    });
   }
 
   if (clients.length === 0) {
@@ -121,6 +130,13 @@ export function ClientsView({ clients }: { clients: ClientWithCount[] }) {
         onClose={() => { setDialogOpen(false); setEditing(null); }}
         client={editing}
         onSuccess={(_client) => { setDialogOpen(false); setEditing(null); router.refresh(); }}
+      />
+
+      <ConfirmDialog
+        open={dlg.open}
+        message={dlg.message}
+        onConfirm={() => { setDlg((d) => ({ ...d, open: false })); dlg.action(); }}
+        onCancel={() => setDlg((d) => ({ ...d, open: false }))}
       />
     </>
   );

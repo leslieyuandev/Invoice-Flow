@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown, ClipboardList, Stamp, Gift, Palette, LogOut } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale } from "@/lib/i18n/translations";
@@ -13,6 +14,8 @@ interface SidebarProps {
   onClose?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  userName?: string | null;
+  userEmail?: string | null;
 }
 
 const PROPOSAL_SUB_LINKS = [
@@ -21,23 +24,38 @@ const PROPOSAL_SUB_LINKS = [
   { href: "/addons",   label: "Add-Ons",  icon: Sparkles },
 ];
 
-export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse, userName, userEmail }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale, t } = useTranslation();
 
   const isProposalArea = ["/proposals", "/events", "/packages", "/addons"].some((p) => pathname.startsWith(p));
   const [proposalOpen, setProposalOpen] = useState(isProposalArea);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
 
   const topLinks = [
-    { href: "/",         label: t("nav.dashboard"), icon: LayoutDashboard },
-    { href: "/invoices", label: t("nav.invoices"),  icon: FileText },
-    { href: "/clients",  label: t("nav.clients"),   icon: Users },
+    { href: "/",           label: t("nav.dashboard"),   icon: LayoutDashboard },
+    { href: "/invoices",   label: t("nav.invoices"),    icon: FileText },
+    { href: "/quotations", label: "Quotations",         icon: ClipboardList },
+    { href: "/clients",    label: t("nav.clients"),     icon: Users },
   ];
 
-  const bottomLinks = [
-    { href: "/settings", label: t("nav.settings"), icon: Settings },
+  const creativeLinks = [
+    { href: "/canva",          label: "Canva Project", icon: Palette },
+    { href: "/greeting-card",  label: "Greeting Card", icon: Gift },
+    { href: "/watermark",      label: "Watermark",     icon: Stamp },
   ];
+
+  const profileInitial = userName?.[0]?.toUpperCase() ?? "U";
 
   function switchLocale(l: Locale) {
     setLocale(l);
@@ -81,7 +99,7 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
 
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 flex flex-col w-60 shrink-0 border-r border-surface-200 bg-white h-screen transition-all duration-200",
+          "fixed top-0 left-0 z-50 flex flex-col w-60 shrink-0 border-r border-surface-200 bg-white h-dvh transition-all duration-200",
           "md:static md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           collapsed && "md:w-14"
@@ -201,9 +219,16 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
             )}
           </div>
 
-          {bottomLinks.map(({ href, label, icon }) => (
-            <NavLink key={href} href={href} label={label} icon={icon} />
-          ))}
+          {/* Creative group */}
+          <div className="pt-3">
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400">Creative</p>
+            )}
+            {collapsed && <div className="my-2 mx-auto w-6 border-t border-surface-200" />}
+            {creativeLinks.map(({ href, label, icon }) => (
+              <NavLink key={href} href={href} label={label} icon={icon} />
+            ))}
+          </div>
         </nav>
 
         {/* Language toggle */}
@@ -238,6 +263,48 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
                 )}
               >
                 中文
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Profile (bottom, below language switcher) */}
+        <div ref={profileRef} className="relative p-3 border-t border-surface-100">
+          <button
+            type="button"
+            onClick={() => setProfileOpen((v) => !v)}
+            title={collapsed ? (userName ?? "Profile") : undefined}
+            className={cn(
+              "flex items-center gap-2.5 w-full rounded-lg p-1.5 hover:bg-surface-100 transition-colors",
+              collapsed && "md:justify-center"
+            )}
+          >
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-brand-600 text-white text-xs font-bold shrink-0 select-none">
+              {profileInitial}
+            </span>
+            <span className={cn("flex-1 min-w-0 text-left", collapsed && "md:hidden")}>
+              <span className="block text-sm font-medium text-surface-900 truncate">{userName ?? "User"}</span>
+              {userEmail && <span className="block text-xs text-surface-500 truncate">{userEmail}</span>}
+            </span>
+          </button>
+
+          {profileOpen && (
+            <div className="absolute bottom-full left-3 right-3 mb-1 rounded-xl border border-surface-200 bg-white shadow-lg z-50 overflow-hidden p-1">
+              <Link
+                href="/settings"
+                onClick={() => { setProfileOpen(false); onClose?.(); }}
+                className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm text-surface-700 hover:bg-surface-50 transition-colors"
+              >
+                <Settings className="w-4 h-4 text-surface-400" />
+                {t("nav.settings")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign out
               </button>
             </div>
           )}

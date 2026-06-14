@@ -65,6 +65,7 @@ model User {
   ssmNumber       String?
   logoUrl            String?
   proposalLogoUrl    String?
+  watermarkUrl       String?
 
   defaultCurrency        String  @default("MYR")
   defaultTaxRate         Decimal @default(0) @db.Decimal(5, 2)
@@ -79,8 +80,11 @@ model User {
   sessions          Session[]
   clients           Client[]
   invoices          Invoice[]
+  quotations        Quotation[]
   lineItemTemplates LineItemTemplate[]
   proposals         Proposal[]
+  canvaProjects     CanvaProject[]
+  canvaAssets       CanvaAsset[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,9 +107,10 @@ model Client {
 
   deletedAt DateTime?
 
-  invoices  Invoice[]
-  proposals Proposal[]
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices   Invoice[]
+  quotations Quotation[]
+  proposals  Proposal[]
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,6 +118,14 @@ model Client {
   @@index([userId])
   @@index([userId, email])
   @@index([userId, deletedAt])
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 enum InvoiceStatus {
@@ -173,6 +186,10 @@ model Invoice {
 
   deletedAt DateTime?
 
+  // Link to quotation this invoice was converted from
+  quotationId String?    @unique
+  quotation   Quotation? @relation(fields: [quotationId], references: [id])
+
   lineItems LineItem[]
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -206,6 +223,80 @@ model LineItem {
   updatedAt DateTime @updatedAt
 
   @@index([invoiceId, sortOrder])
+}
+
+// ─── Quotation ───────────────────────────────────────────────────────────────
+
+model Quotation {
+  id      String @id @default(cuid())
+  userId  String
+  clientId String
+
+  quotationNumber String
+  status          QuotationStatus @default(DRAFT)
+  currency        String          @default("MYR")
+
+  issueDate  DateTime
+  expiryDate DateTime
+
+  subtotal       Int
+  taxRate        Decimal       @db.Decimal(5, 2)
+  taxAmount      Int
+  discountType   DiscountType?
+  discountValue  Decimal?      @db.Decimal(10, 2)
+  discountAmount Int?
+  total          Int
+
+  senderName      String
+  senderEmail     String?
+  senderAddress   String?
+  senderPhone     String?
+  senderSsmNumber String?
+  senderLogoUrl   String?
+
+  clientName    String
+  clientEmail   String?
+  clientAddress String?
+  clientCompany String?
+
+  notes String? @db.Text
+
+  sentAt    DateTime?
+  deletedAt DateTime?
+
+  lineItems QuotationLineItem[]
+  invoice   Invoice?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, quotationNumber])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, deletedAt])
+  @@index([clientId])
+}
+
+model QuotationLineItem {
+  id          String @id @default(cuid())
+  quotationId String
+
+  sortOrder   Int     @default(0)
+  description String
+  notes       String? @db.Text
+  quantity    Decimal @db.Decimal(10, 3)
+  unitPrice   Int
+  amount      Int
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quotationId, sortOrder])
 }
 
 // ─── Proposal Catalog ─────────────────────────────────────────────────────────
@@ -354,6 +445,45 @@ model ProposalAddOnItem {
   proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@index([proposalId, sortOrder])
+}
+
+// ─── Canva Project (design editor) ───────────────────────────────────────────
+
+model CanvaProject {
+  id     String @id @default(cuid())
+  userId String
+
+  title  String @default("Untitled Design")
+  format String @default("custom")
+  width  Int
+  height Int
+  pages  Json   // [{ id, background, elements: [...] }]
+
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+}
+
+model CanvaAsset {
+  id     String @id @default(cuid())
+  userId String
+
+  type   String // "image" | "font"
+  url    String
+  name   String @default("") // image: filename · font: family name
+  meta   String @default("") // font: format (woff2/ttf/otf)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
 }
 
 // ─── Invoice Templates ────────────────────────────────────────────────────────

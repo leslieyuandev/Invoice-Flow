@@ -47,7 +47,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     } else if (channel === "whatsapp") {
       await updateInvoiceStatus(id, session.user.id, "SENT");
       const phone = (parsed.data.recipientPhone ?? "").replace(/\D/g, "");
-      const text = `Hi ${invoice.clientName}, please find Invoice ${invoice.invoiceNumber} (${invoice.currency} ${(invoice.total / 100).toFixed(2)}) at: ${process.env.NEXT_PUBLIC_APP_URL}/api/invoices/${id}/pdf`;
+      const invoiceLine = `Invoice ${invoice.invoiceNumber}: ${invoice.currency} ${(invoice.total / 100).toFixed(2)}\nDownload PDF: ${process.env.NEXT_PUBLIC_APP_URL}/api/invoices/${id}/pdf`;
+      const text = customMessage
+        ? `${customMessage}\n\n${invoiceLine}`
+        : `Hi ${invoice.clientName},\n\n${invoiceLine}`;
       return NextResponse.json({
         data: { whatsappUrl: `https://wa.me/${phone}?text=${encodeURIComponent(text)}` },
         message: "WhatsApp link generated",

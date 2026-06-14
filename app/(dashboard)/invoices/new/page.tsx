@@ -13,10 +13,8 @@ export default async function NewInvoicePage() {
       orderBy: { name: "asc" },
     }),
     db.invoice.findMany({
-      where: { userId: session.user.id, deletedAt: null },
+      where: { userId: session.user.id },
       select: { invoiceNumber: true },
-      orderBy: { createdAt: "desc" },
-      take: 100,
     }),
     db.user.findUnique({
       where: { id: session.user.id },

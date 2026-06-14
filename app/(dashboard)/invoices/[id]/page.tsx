@@ -70,27 +70,36 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <header className="flex items-center justify-between h-16 px-6 border-b border-surface-200 bg-white shrink-0 gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-surface-200 bg-white shrink-0 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/invoices">
               <ArrowLeft className="w-4 h-4" />
-              {t("actions.back")}
+              <span className="hidden sm:inline">{t("actions.back")}</span>
             </Link>
           </Button>
           <div className="h-4 w-px bg-surface-200" />
-          <h1 className="text-base font-semibold text-surface-900 truncate">{invoice.invoiceNumber}</h1>
+          <h1 className="text-sm font-semibold text-surface-900 truncate">{invoice.invoiceNumber}</h1>
           <StatusBadge status={invoice.status} />
+          {invoice.quotation && (
+            <Link
+              href={`/quotations/${invoice.quotation.id}`}
+              className="hidden sm:inline text-xs text-teal-600 hover:text-teal-700 hover:underline whitespace-nowrap"
+              title="View source quotation"
+            >
+              {invoice.quotation.quotationNumber}
+            </Link>
+          )}
           <span className="text-sm text-surface-500 hidden md:block">
             {formatCurrency(invoice.total, invoice.currency)}
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 md:gap-2 shrink-0">
           {invoice.status !== "CANCELLED" && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild title={t("actions.edit")}>
               <Link href={`/invoices/${invoice.id}/edit`}>
                 <Pencil className="w-4 h-4" />
-                {t("actions.edit")}
+                <span className="hidden sm:inline">{t("actions.edit")}</span>
               </Link>
             </Button>
           )}
