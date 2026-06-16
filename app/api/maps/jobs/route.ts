@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { scrapeInputSchema } from "@/lib/validations/maps";
 import { createJob, listJobs, toJobSummary } from "@/lib/services/maps.service";
-import { runScrapeJob } from "@/lib/services/maps-runner";
 
 // Scraping spawns headless Chromium — must run on the Node.js runtime, never edge.
 export const runtime = "nodejs";
@@ -39,9 +38,12 @@ export async function POST(req: NextRequest) {
 
   const job = await createJob(session.user.id, parsed.data);
 
-  // Enqueue: the runner caps concurrency (global + per-user) and keeps executing on
-  // the persistent Node server after this response is sent. The proxy password is
-  // passed in memory only (never persisted); all other config lives on the job row.
+  // Lazy-load the Playwright-backed runner so this route never imports the browser
+  // engine on platforms that can't run it (e.g. Vercel). On the self-hosted Node
+  // server it loads once on the first scrape. The runner caps concurrency (global +
+  // per-user) and keeps executing after this response is sent; the proxy password is
+  // passed in memory only (never persisted), all other config lives on the job row.
+  const { runScrapeJob } = await import("@/lib/services/maps-runner");
   runScrapeJob(job.id, session.user.id, { proxy: parsed.data.proxy ?? null });
 
   return NextResponse.json({ data: toJobSummary(job, 0) }, { status: 202 });
