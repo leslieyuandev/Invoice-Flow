@@ -9,9 +9,11 @@ interface MobileLayoutProps {
   children: React.ReactNode;
   userName?: string | null;
   userEmail?: string | null;
+  mapsOnly?: boolean;
+  mapsExternalUrl?: string | null;
 }
 
-export function MobileLayout({ children, userName, userEmail }: MobileLayoutProps) {
+export function MobileLayout({ children, userName, userEmail, mapsOnly, mapsExternalUrl }: MobileLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -25,6 +27,8 @@ export function MobileLayout({ children, userName, userEmail }: MobileLayoutProp
         onToggleCollapse={() => setCollapsed(c => !c)}
         userName={userName}
         userEmail={userEmail}
+        mapsOnly={mapsOnly}
+        mapsExternalUrl={mapsExternalUrl}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">

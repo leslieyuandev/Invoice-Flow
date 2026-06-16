@@ -1,0 +1,7 @@
+# Caddy automatically obtains and renews a free Let's Encrypt TLS certificate for
+# $DOMAIN and reverse-proxies HTTPS traffic to the Next.js app container.
+# Requires: DOMAIN env set + the domain's DNS pointed at this server + ports 80/443 open.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

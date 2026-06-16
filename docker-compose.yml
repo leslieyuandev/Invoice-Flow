@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ── PostgreSQL (local dev database) ─────────────────────────────────────────
   db:
@@ -26,6 +24,8 @@ services:
       dockerfile: Dockerfile
       target: runner
     restart: unless-stopped
+    # Headless Chromium needs more shared memory than Docker's 64MB default.
+    shm_size: "1gb"
     ports:
       - "3000:3000"
     environment:
@@ -42,11 +42,54 @@ services:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-}
+      # This instance only exposes the Maps Extractor (full app lives on the main deployment).
+      MAPS_ONLY: ${MAPS_ONLY:-true}
+      # Maps Extractor multi-user knobs (see DEPLOY.md)
+      MAPS_MAX_CONCURRENCY: ${MAPS_MAX_CONCURRENCY:-2}
+      MAPS_MAX_PER_USER: ${MAPS_MAX_PER_USER:-1}
+      MAPS_PROXY_SERVER: ${MAPS_PROXY_SERVER:-}
+      MAPS_PROXY_USERNAME: ${MAPS_PROXY_USERNAME:-}
+      MAPS_PROXY_PASSWORD: ${MAPS_PROXY_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./public:/app/public
 
+  # ── Caddy reverse proxy: automatic HTTPS for your domain ─────────────────────
+  # Opt-in: only starts with `--profile proxy`. Requires DOMAIN to be set and the
+  # domain's DNS A record pointed at this server's public IP (ports 80 + 443 open).
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["proxy"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Required when using `--profile proxy`; set DOMAIN=app.example.com (see DEPLOY.md).
+      DOMAIN: ${DOMAIN:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  # ── Cloudflare Tunnel: serve a domain from this machine, no VPS / open ports ──
+  # Opt-in: only starts with `--profile tunnel`. Create a named tunnel in the
+  # Cloudflare Zero Trust dashboard, route your hostname to service http://app:3000,
+  # copy the token, set CLOUDFLARE_TUNNEL_TOKEN, then `docker compose --profile tunnel up -d`.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    # Required when using `--profile tunnel`; set CLOUDFLARE_TUNNEL_TOKEN (see DEPLOY.md).
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

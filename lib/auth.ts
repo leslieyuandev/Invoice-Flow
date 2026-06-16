@@ -13,6 +13,10 @@ const loginSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  // Trust the deployment's own host header when self-hosting (behind your own
+  // proxy/VPS). Vercel sets this automatically; bare Node/Docker hosts do not,
+  // which otherwise throws "UntrustedHost" on /api/auth/*.
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

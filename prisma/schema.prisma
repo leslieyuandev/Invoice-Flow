@@ -85,6 +85,8 @@ model User {
   proposals         Proposal[]
   canvaProjects     CanvaProject[]
   canvaAssets       CanvaAsset[]
+  mapsJobs          MapsScrapeJob[]
+  mapsPlaces        MapsPlace[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -501,4 +503,98 @@ model LineItemTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// ─── Google Maps Extractor ───────────────────────────────────────────────────
+
+enum MapsJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model MapsScrapeJob {
+  id     String        @id @default(cuid())
+  userId String
+  status MapsJobStatus @default(PENDING)
+
+  searchQueries Json   // string[]
+  coordinates   Json?  // { north, south, east, west } | null
+  maxResults    Int    @default(50)
+  language      String @default("en")
+  proxyConfig   Json?  // { enabled, server, username } — password is never persisted
+  config        Json?  // sanitized add-ons / filters / geolocation / start-urls / pre-opening
+
+  requestedCount Int     @default(0) // searchQueries.length * maxResults (upper bound)
+  resultCount    Int     @default(0)
+  error          String? @db.Text
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  places MapsPlace[]
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model MapsPlace {
+  id     String @id @default(cuid())
+  jobId  String
+  userId String
+
+  searchQuery String // which query produced this row
+  placeId     String // Google place_id / ftid (unique identifier)
+
+  title       String
+  category    String?
+  address     String?
+  // Parsed address components for the Apify-style table columns
+  street      String?
+  city        String?
+  state       String?
+  countryCode String?
+
+  latitude  Float?
+  longitude Float?
+
+  phone         String?
+  website       String?
+  claimedStatus String?
+
+  operatingHours Json? // string[] | { day: hours }
+
+  rating        Float?
+  reviewCount   Int?
+  openingStatus String? // "Opening Soon" / "Newly Opened" / "Open" / "Closed" / ...
+
+  // ── Add-on / detail-crawl fields (populated only when those add-ons run) ──
+  isClaimed      Boolean? // null = unknown (list-only run); false = "Claim this business" shown
+  description    String?  @db.Text
+  plusCode       String?
+  priceLevel     String?
+  imageUrls      Json?    // string[]
+  reviews        Json?    // [{ author, rating, text, date }]
+  emails         Json?    // string[] (scraped from the business website)
+  socialProfiles Json?    // { facebook, instagram, linkedin, twitter, tiktok, youtube }
+
+  // ── Pre-opening / newly-opened lead detection ──
+  isLikelyNew    Boolean @default(false)
+  newnessSignals Json?   // { zeroReviews, unclaimed, tempWords, openingSoon }
+
+  job  MapsScrapeJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, placeId]) // dedupe within a job
+  @@index([jobId])
+  @@index([userId])
+  @@index([jobId, isLikelyNew])
 }

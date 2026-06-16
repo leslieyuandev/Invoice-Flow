@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { DollarSign, Clock, AlertTriangle, FileText } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { MetricCard, MetricCardSkeleton } from "@/components/dashboard/MetricCard";
@@ -74,6 +75,9 @@ async function DashboardMetrics() {
 }
 
 export default async function DashboardPage() {
+  // On a "Maps only" self-hosted instance, the dashboard home is the Maps Extractor.
+  if (process.env.MAPS_ONLY === "true") redirect("/maps-extractor");
+
   const t = await getServerT();
 
   return (

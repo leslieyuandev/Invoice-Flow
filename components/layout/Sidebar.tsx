@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown, ClipboardList, Stamp, Gift, Palette, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown, ClipboardList, Stamp, Gift, Palette, MapPin, ExternalLink, LogOut } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
@@ -16,6 +16,10 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   userName?: string | null;
   userEmail?: string | null;
+  /** Self-hosted "Maps only" deployment: hide every other module. */
+  mapsOnly?: boolean;
+  /** When set, the Maps Extractor nav item links to this external URL (e.g. the self-hosted instance). */
+  mapsExternalUrl?: string | null;
 }
 
 const PROPOSAL_SUB_LINKS = [
@@ -24,7 +28,7 @@ const PROPOSAL_SUB_LINKS = [
   { href: "/addons",   label: "Add-Ons",  icon: Sparkles },
 ];
 
-export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse, userName, userEmail }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse, userName, userEmail, mapsOnly = false, mapsExternalUrl = null }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale, t } = useTranslation();
@@ -53,6 +57,10 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
     { href: "/canva",          label: "Canva Project", icon: Palette },
     { href: "/greeting-card",  label: "Greeting Card", icon: Gift },
     { href: "/watermark",      label: "Watermark",     icon: Stamp },
+  ];
+
+  const toolLinks = [
+    { href: "/maps-extractor", label: "Maps Extractor", icon: MapPin },
   ];
 
   const profileInitial = userName?.[0]?.toUpperCase() ?? "U";
@@ -136,10 +144,12 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {topLinks.map(({ href, label, icon }) => (
+          {!mapsOnly && topLinks.map(({ href, label, icon }) => (
             <NavLink key={href} href={href} label={label} icon={icon} />
           ))}
 
+          {!mapsOnly && (
+          <>
           {/* Proposals + collapsible submodules */}
           <div>
             <div className={cn("flex items-center rounded-lg transition-colors", proposalsActive || subActive ? "bg-brand-50" : "")}>
@@ -228,6 +238,37 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
             {creativeLinks.map(({ href, label, icon }) => (
               <NavLink key={href} href={href} label={label} icon={icon} />
             ))}
+          </div>
+          </>
+          )}
+
+          {/* Tools group (Maps Extractor) */}
+          <div className={cn(!mapsOnly && "pt-3")}>
+            {!collapsed && !mapsOnly && (
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400">Tools</p>
+            )}
+            {collapsed && !mapsOnly && <div className="my-2 mx-auto w-6 border-t border-surface-200" />}
+            {mapsExternalUrl ? (
+              <a
+                href={mapsExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                title={collapsed ? "Maps Extractor" : undefined}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-surface-600 hover:bg-surface-100 hover:text-surface-900",
+                  collapsed && "md:justify-center md:px-0"
+                )}
+              >
+                <MapPin className="w-4 h-4 shrink-0 text-surface-400" />
+                <span className={cn(collapsed && "md:hidden")}>Maps Extractor</span>
+                {!collapsed && <ExternalLink className="w-3 h-3 ml-auto text-surface-300" />}
+              </a>
+            ) : (
+              toolLinks.map(({ href, label, icon }) => (
+                <NavLink key={href} href={href} label={label} icon={icon} />
+              ))
+            )}
           </div>
         </nav>
 

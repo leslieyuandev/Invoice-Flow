@@ -1,0 +1,22 @@
+# Never copy host (Windows) build artifacts into the Linux image —
+# they contain platform-specific Prisma/Playwright binaries that would break the container.
+node_modules
+.next
+.git
+.gitignore
+
+# Local env & secrets (provide these at runtime via compose/host env)
+.env
+.env.local
+.env.*.local
+
+# Tooling / editor noise
+.vscode
+.idea
+npm-debug.log*
+*.log
+Dockerfile
+.dockerignore
+docker-compose.yml
+README.md
+.vercel
