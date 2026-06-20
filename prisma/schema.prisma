@@ -87,6 +87,8 @@ model User {
   canvaAssets       CanvaAsset[]
   mapsJobs          MapsScrapeJob[]
   mapsPlaces        MapsPlace[]
+  instagramJobs     InstagramScrapeJob[]
+  instagramPosts    InstagramPost[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -597,4 +599,106 @@ model MapsPlace {
   @@index([jobId])
   @@index([userId])
   @@index([jobId, isLikelyNew])
+}
+
+// ─── Instagram Hashtag Scraper ───────────────────────────────────────────────
+
+enum InstagramJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model InstagramScrapeJob {
+  id     String             @id @default(cuid())
+  userId String
+  status InstagramJobStatus @default(PENDING)
+
+  hashtags        Json    // string[] (hashtags, or keywords when searchByKeyword)
+  searchByKeyword Boolean @default(false)
+  resultsType     String  @default("posts") // "posts" | "reels"
+  maxResults      Int      @default(20)      // per hashtag
+  provider        String   @default("apify") // apify | brightdata | scrapingbee | crawlbase
+  config          Json?    // sanitized extra run options
+
+  requestedCount Int     @default(0) // hashtags.length * maxResults (upper bound)
+  resultCount    Int     @default(0)
+  error          String? @db.Text
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  posts InstagramPost[]
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model InstagramPost {
+  id     String @id @default(cuid())
+  jobId  String
+  userId String
+
+  hashtag   String // which input hashtag/keyword produced this row
+  shortCode String // post shortcode (unique identifier within a job)
+  provider  String // which provider produced it
+
+  postUrl       String
+  type          String? // "Image" | "Video" | "Sidecar" | "Reel"
+  caption       String? @db.Text
+  ownerFullName String?
+  ownerUsername String?
+  ownerId       String?
+
+  likesCount     Int?
+  commentsCount  Int?
+  videoViewCount Int? // plays
+  videoPlayCount Int?
+  sharesCount    Int? // shares (often unavailable from IG)
+  firstComment   String? @db.Text
+
+  locationName String?
+  locationId   String?
+
+  timestamp  DateTime? // posted on
+  displayUrl String?   // main image/thumbnail
+  images     Json?     // string[] of image urls
+  hashtags   Json?     // string[] other hashtags found in the caption
+  mentions   Json?     // string[] @mentions
+  musicInfo  Json?     // { artist, title, ... } audio metadata
+  productType String?
+  isSponsored Boolean?
+
+  job  InstagramScrapeJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, shortCode]) // dedupe within a job
+  @@index([jobId])
+  @@index([userId])
+}
+
+// Global per-provider free-credit tracking. Not user-scoped because the provider
+// API token (and therefore its free allowance) is shared across the deployment.
+// `creditsUsed` resets when the period rolls over (`now >= resetsAt`); when it
+// reaches `freeCredits` — or the provider API signals quota exhaustion — the
+// provider is marked `limited` and disabled in the UI until the next refresh.
+model ScraperProviderState {
+  provider    String   @id // apify | brightdata | scrapingbee | crawlbase
+  creditsUsed Int      @default(0)
+  freeCredits Int      @default(0)
+  unit        String   @default("results")
+  periodStart DateTime @default(now())
+  resetsAt    DateTime
+  limited     Boolean  @default(false)
+  limitReason String?
+  lastError   String?  @db.Text
+  updatedAt   DateTime @updatedAt
 }

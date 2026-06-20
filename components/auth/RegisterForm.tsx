@@ -77,7 +77,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-brand-600">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-surface-900">InvoiceFlow</h1>
+          <h1 className="text-2xl font-bold text-surface-900">HaloInvoice</h1>
           <p className="text-sm text-surface-500">Create your account — it&apos;s free</p>
         </div>
 

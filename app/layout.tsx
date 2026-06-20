@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "InvoiceFlow — Professional Invoice Management",
+  title: "HaloInvoice — Professional Invoice Management",
   description: "Create, send, and manage professional invoices in seconds.",
 };
 

@@ -3,10 +3,19 @@ import type { NextRequest } from "next/server";
 
 /**
  * On a "Maps only" self-hosted instance (`MAPS_ONLY=true`), block the other modules
- * so the deployment only exposes the Maps Extractor. The full app (invoices,
- * quotations, creative, …) lives on the main deployment, which does not set MAPS_ONLY.
+ * so the deployment only exposes the self-hosted scraper tools (Maps Extractor +
+ * Instagram Hashtag Scraper). The full app (invoices, quotations, creative, …) lives
+ * on the main deployment, which does not set MAPS_ONLY.
  */
-const ALLOWED_PREFIXES = ["/maps-extractor", "/api/maps", "/api/auth", "/login", "/register"];
+const ALLOWED_PREFIXES = [
+  "/maps-extractor",
+  "/api/maps",
+  "/instagram-extractor",
+  "/api/instagram",
+  "/api/auth",
+  "/login",
+  "/register",
+];
 
 export function proxy(request: NextRequest) {
   if (process.env.MAPS_ONLY !== "true") return NextResponse.next();
