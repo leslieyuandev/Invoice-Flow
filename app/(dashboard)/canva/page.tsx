@@ -21,6 +21,7 @@ export default async function CanvaProjectsPage() {
     height: p.height,
     pages: p.pages as unknown as CanvaPage[],
     updatedAt: p.updatedAt.toISOString(),
+    starred: p.starred,
   }));
 
   return (

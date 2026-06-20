@@ -78,6 +78,9 @@ body {
   outline-offset: 2px;
 }
 
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 /* ── Custom scrollbar for the preview pane ───────────────────────────────── */
 .preview-scroll::-webkit-scrollbar { width: 6px; }
 .preview-scroll::-webkit-scrollbar-track { background: transparent; }

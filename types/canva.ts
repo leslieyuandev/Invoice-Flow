@@ -46,7 +46,13 @@ export interface CanvaElement {
   saturate?: number;   // %
   blur?: number;       // px
   filterPreset?: string; // named filter preset id
-  crop?: { t: number; r: number; b: number; l: number }; // inset fractions 0–1
+  crop?: { t: number; r: number; b: number; l: number }; // inset fractions 0–1 (legacy)
+  // Visual crop model (takes precedence over crop t/r/b/l when cropW is set)
+  cropX?: number;        // image left offset within element frame (px, ≤ 0 for full coverage)
+  cropY?: number;        // image top offset within element frame (px, ≤ 0 for full coverage)
+  cropW?: number;        // image display width (px, ≥ element w for full coverage)
+  cropH?: number;        // image display height (px, ≥ element h for full coverage)
+  cropRotation?: number; // image rotation within frame (degrees)
   shadow?: string;      // shadow preset id
   imageEffect?: string; // image effect/style preset id
 

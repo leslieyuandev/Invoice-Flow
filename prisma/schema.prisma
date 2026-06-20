@@ -457,11 +457,12 @@ model CanvaProject {
   id     String @id @default(cuid())
   userId String
 
-  title  String @default("Untitled Design")
-  format String @default("custom")
-  width  Int
-  height Int
-  pages  Json   // [{ id, background, elements: [...] }]
+  title   String  @default("Untitled Design")
+  format  String  @default("custom")
+  width   Int
+  height  Int
+  pages   Json    // [{ id, background, elements: [...] }]
+  starred Boolean @default(false)
 
   deletedAt DateTime?
 

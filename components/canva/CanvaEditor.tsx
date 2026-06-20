@@ -11,6 +11,7 @@ import {
   Underline, Strikethrough, List, SlidersHorizontal, Scaling, Lock,
   Link2, Paintbrush, ClipboardPaste, Search, ChevronRight, Layers, AlignVerticalJustifyCenter, Accessibility,
   FlipHorizontal, FlipVertical, Crop, Sparkles, Sun, Wand2, Move, FileType, FileImage, Eraser, Group, Ungroup,
+  Play, RotateCcw, PenTool, Check, ChevronLeft,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FontBrowserPanel } from "./FontPicker";
@@ -67,6 +68,16 @@ interface CtxMenuState {
   x: number;
   y: number;
   elId: string;
+}
+
+interface CropDragState {
+  mode: "pan" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+  startX: number;
+  startY: number;
+  startCropX: number;
+  startCropY: number;
+  startCropW: number;
+  startCropH: number;
 }
 
 interface HistoryEntry {
@@ -132,6 +143,19 @@ export function CanvaEditor({
   const [customW, setCustomW] = useState(String(project.width));
   const [customH, setCustomH] = useState(String(project.height));
   const [scaleOnResize, setScaleOnResize] = useState(true);
+  // Present mode
+  const [presentMode, setPresentMode] = useState(false);
+  const [presentIdx, setPresentIdx] = useState(0);
+  // Frame Maker
+  const [showFrameMaker, setShowFrameMaker] = useState(false);
+  const [fmPts, setFmPts] = useState<{ x: number; y: number }[]>([
+    { x: 0.5, y: 0.0 }, { x: 1.0, y: 1.0 }, { x: 0.0, y: 1.0 },
+  ]);
+  const [fmGridSnap, setFmGridSnap] = useState(true);
+  const [fmGridCols, setFmGridCols] = useState(14);
+  const [fmDraggingPt, setFmDraggingPt] = useState<number | null>(null);
+  // Crop drag ref
+  const cropDragRef = useRef<CropDragState | null>(null);
 
   const pageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -197,6 +221,19 @@ export function CanvaEditor({
     if (!vp) return;
     const z = Math.min((vp.clientWidth - 120) / W, (vp.clientHeight - 120) / H, 1);
     setZoom(Math.max(0.05, Math.round(z * 100) / 100));
+  }
+
+  function setZoomCentered(newZoom: number) {
+    const vp = viewportRef.current;
+    if (vp) {
+      const prevZ = zoomRef.current;
+      const ratio = newZoom / prevZ;
+      requestAnimationFrame(() => {
+        vp.scrollLeft = (vp.scrollLeft + vp.clientWidth / 2) * ratio - vp.clientWidth / 2;
+        vp.scrollTop = (vp.scrollTop + vp.clientHeight / 2) * ratio - vp.clientHeight / 2;
+      });
+    }
+    setZoom(newZoom);
   }
 
   // ── History ─────────────────────────────────────────────────────────────────
@@ -598,6 +635,61 @@ export function CanvaEditor({
     window.addEventListener("pointerup", onDragEnd);
   }
 
+  // ── Crop drag (visual crop overlay) ─────────────────────────────────────────
+  function startCropDrag(
+    e: React.PointerEvent,
+    mode: CropDragState["mode"],
+    el: CanvaElement,
+  ) {
+    e.stopPropagation();
+    e.preventDefault();
+    const cropX = el.cropX ?? -(el.w * 0.15);
+    const cropY = el.cropY ?? -(el.h * 0.15);
+    const cropW = el.cropW ?? el.w * 1.3;
+    const cropH = el.cropH ?? el.h * 1.3;
+    pushHistory();
+    cropDragRef.current = {
+      mode, startX: e.clientX, startY: e.clientY,
+      startCropX: cropX, startCropY: cropY, startCropW: cropW, startCropH: cropH,
+    };
+    window.addEventListener("pointermove", onCropDragMove);
+    window.addEventListener("pointerup", onCropDragEnd);
+  }
+
+  function onCropDragMove(e: PointerEvent) {
+    const d = cropDragRef.current;
+    const selId = selectedIdsRef.current[0];
+    if (!d || !selId) return;
+    const sel = pagesRef.current[pageIdxRef.current].elements.find((x) => x.id === selId);
+    if (!sel) return;
+    const dx = (e.clientX - d.startX) / zoomRef.current;
+    const dy = (e.clientY - d.startY) / zoomRef.current;
+    let { startCropX: newX, startCropY: newY, startCropW: newW, startCropH: newH } = d;
+    const minW = sel.w, minH = sel.h;
+    if (d.mode === "pan") { newX += dx; newY += dy; }
+    if (d.mode === "n" || d.mode === "nw" || d.mode === "ne") {
+      newY += dy; newH -= dy;
+      if (newH < minH) { newY = d.startCropY + d.startCropH - minH; newH = minH; }
+    }
+    if (d.mode === "s" || d.mode === "sw" || d.mode === "se") {
+      newH = Math.max(minH, d.startCropH + dy);
+    }
+    if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") {
+      newX += dx; newW -= dx;
+      if (newW < minW) { newX = d.startCropX + d.startCropW - minW; newW = minW; }
+    }
+    if (d.mode === "e" || d.mode === "ne" || d.mode === "se") {
+      newW = Math.max(minW, d.startCropW + dx);
+    }
+    patchEl(selId, { cropX: newX, cropY: newY, cropW: newW, cropH: newH });
+  }
+
+  function onCropDragEnd() {
+    cropDragRef.current = null;
+    window.removeEventListener("pointermove", onCropDragMove);
+    window.removeEventListener("pointerup", onCropDragEnd);
+  }
+
   const onDragMove = useCallback(
     (e: PointerEvent) => {
       const d = dragRef.current;
@@ -793,6 +885,8 @@ export function CanvaEditor({
         void handleSave();
         return;
       }
+      if (e.key === "Escape" && presentMode) { setPresentMode(false); return; }
+      if (mod && e.altKey && e.key.toLowerCase() === "p") { e.preventDefault(); setPresentIdx(pageIdxRef.current); setPresentMode(true); return; }
       if (inField) {
         if (e.key === "Escape") (target as HTMLInputElement).blur();
         return;
@@ -833,7 +927,7 @@ export function CanvaEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, undo, redo, duplicateSelected, deleteSelected, addElement, commitPatch, copyStyle, editLink, groupSelected, ungroupSelected, pushHistory, setPageAt]);
+  }, [selectedId, undo, redo, duplicateSelected, deleteSelected, addElement, commitPatch, copyStyle, editLink, groupSelected, ungroupSelected, pushHistory, setPageAt, presentMode]);
 
   // ── Save (manual + autosave) ────────────────────────────────────────────────
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1259,27 +1353,41 @@ export function CanvaEditor({
     }
 
     if (toolPanel === "crop" && (selected.type === "image" || selected.type === "frame")) {
-      const cur = selected.crop ?? { t: 0, r: 0, b: 0, l: 0 };
+      const cropRot = selected.cropRotation ?? 0;
       return (
-        <div className="overflow-y-auto">
+        <div className="overflow-y-auto space-y-4">
           <ToolPanelHeader title="Crop" />
-          <p className="text-xs text-surface-400 mb-3">Crop in from each edge.</p>
-          <div className="space-y-4">
-            {([["Top", "t"], ["Bottom", "b"], ["Left", "l"], ["Right", "r"]] as [string, "t" | "b" | "l" | "r"][]).map(([label, key]) => (
-              <div key={key}>
-                <div className="flex justify-between text-xs text-surface-500 mb-1">
-                  <span>{label}</span>
-                  <span>{Math.round((cur[key] ?? 0) * 100)}%</span>
-                </div>
-                <input
-                  type="range" min={0} max={80} value={Math.round((cur[key] ?? 0) * 100)}
-                  onPointerDown={() => pushHistory()}
-                  onChange={(e) => patchEl(selected.id, { crop: { ...cur, [key]: Number(e.target.value) / 100 } })}
-                  className="w-full accent-brand-600"
-                />
-              </div>
-            ))}
-            <button type="button" onClick={() => commitPatch(selected.id, { crop: undefined })} className="text-xs text-brand-600 hover:underline">Reset crop</button>
+          <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it within the frame. Drag the white handles to resize the image area.</p>
+
+          {/* Rotate */}
+          <div>
+            <div className="flex justify-between text-xs text-surface-500 mb-1">
+              <span className="flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Rotate</span>
+              <span>{cropRot}°</span>
+            </div>
+            <input
+              type="range" min={-180} max={180} step={1} value={cropRot}
+              onPointerDown={() => pushHistory()}
+              onChange={(e) => patchEl(selected.id, { cropRotation: Number(e.target.value) })}
+              className="w-full accent-brand-600"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => commitPatch(selected.id, { cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined, cropRotation: undefined, crop: undefined })}
+              className="flex-1 py-1.5 rounded-lg border border-surface-200 text-xs text-surface-600 hover:bg-surface-50"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => setToolPanel(null)}
+              className="flex-1 py-1.5 rounded-lg bg-brand-600 text-white text-xs hover:bg-brand-700 flex items-center justify-center gap-1"
+            >
+              <Check className="w-3.5 h-3.5" /> Done
+            </button>
           </div>
         </div>
       );
@@ -1583,7 +1691,7 @@ export function CanvaEditor({
             max={200}
             step={5}
             value={Math.round(zoom * 100)}
-            onChange={(e) => setZoom(Number(e.target.value) / 100)}
+            onChange={(e) => setZoomCentered(Number(e.target.value) / 100)}
             className="w-24 lg:w-32 accent-brand-600"
             aria-label="Zoom"
           />
@@ -1626,6 +1734,10 @@ export function CanvaEditor({
         <Button size="sm" onClick={() => { setSelectedPages(new Set(pages.map((_, i) => i))); setDownloadOpen(true); }} disabled={exportingAs !== null} loading={exportingAs !== null}>
           <Download className="w-4 h-4" />
           <span className="hidden xl:inline">Download</span>
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => { setPresentIdx(pageIdx); setPresentMode(true); }} title="Present full screen (Ctrl+Alt+P)">
+          <Play className="w-4 h-4" />
+          <span className="hidden xl:inline">Present</span>
         </Button>
       </div>
 
@@ -2131,9 +2243,16 @@ export function CanvaEditor({
                   </>
                 )}
 
-                {elementsTab === "frames" && (
+                {elementsTab === "frames" && !showFrameMaker && (
                   <>
-                    <p className="text-[10px] text-surface-400 leading-relaxed">Add a frame, then select it and click an image to fill it · double-click a frame to open uploads</p>
+                    <p className="text-[10px] text-surface-400 leading-relaxed">Add a frame, then select it and click an image to fill it · double-click a filled frame to enter crop mode</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowFrameMaker(true)}
+                      className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-dashed border-brand-400 text-brand-600 text-xs font-medium hover:bg-brand-50 transition-colors"
+                    >
+                      <PenTool className="w-3.5 h-3.5" /> Frame Maker
+                    </button>
                     {FRAME_GROUPS.map((group) => (
                       <div key={group}>
                         <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">{group}</p>
@@ -2158,6 +2277,155 @@ export function CanvaEditor({
                   </>
                 )}
 
+                {elementsTab === "frames" && showFrameMaker && (() => {
+                  const PREVIEW = 200;
+                  const gridStep = PREVIEW / fmGridCols;
+                  function snapPt(v: number) {
+                    return fmGridSnap ? Math.round(v / gridStep) * gridStep : v;
+                  }
+                  const clipPath = `polygon(${fmPts.map((p) => `${Math.round(p.x * 100)}% ${Math.round(p.y * 100)}%`).join(", ")})`;
+                  return (
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setShowFrameMaker(false)} className="p-1 rounded text-surface-400 hover:text-surface-700">
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs font-semibold text-surface-700">Frame Maker</span>
+                      </div>
+
+                      {/* SVG Preview */}
+                      <div className="rounded-xl border border-surface-200 overflow-hidden bg-surface-50">
+                        <svg
+                          width={PREVIEW} height={PREVIEW}
+                          style={{ display: "block", cursor: "crosshair" }}
+                          onDoubleClick={(e) => {
+                            const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+                            const rawX = (e.clientX - rect.left) / PREVIEW;
+                            const rawY = (e.clientY - rect.top) / PREVIEW;
+                            const sx = snapPt(rawX * PREVIEW) / PREVIEW;
+                            const sy = snapPt(rawY * PREVIEW) / PREVIEW;
+                            setFmPts((pts) => [...pts, { x: Math.max(0, Math.min(1, sx)), y: Math.max(0, Math.min(1, sy)) }]);
+                          }}
+                        >
+                          {/* Grid */}
+                          {fmGridSnap && Array.from({ length: fmGridCols + 1 }).map((_, i) => (
+                            <g key={i}>
+                              <line x1={i * gridStep} y1={0} x2={i * gridStep} y2={PREVIEW} stroke="#e2e8f0" strokeWidth={0.5} />
+                              <line x1={0} y1={i * gridStep} x2={PREVIEW} y2={i * gridStep} stroke="#e2e8f0" strokeWidth={0.5} />
+                            </g>
+                          ))}
+                          {/* Shape preview */}
+                          <polygon
+                            points={fmPts.map((p) => `${p.x * PREVIEW},${p.y * PREVIEW}`).join(" ")}
+                            fill="#c4b5fd" stroke="#7c3aed" strokeWidth={1.5}
+                          />
+                          {/* Control points */}
+                          {fmPts.map((p, i) => (
+                            <circle
+                              key={i}
+                              cx={p.x * PREVIEW} cy={p.y * PREVIEW} r={fmDraggingPt === i ? 7 : 5}
+                              fill={fmDraggingPt === i ? "#7c3aed" : "#fff"} stroke="#7c3aed" strokeWidth={2}
+                              style={{ cursor: "grab" }}
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                setFmDraggingPt(i);
+                                (e.currentTarget as SVGCircleElement).setPointerCapture(e.pointerId);
+                                const svg = (e.currentTarget as SVGElement).closest("svg")!;
+                                const rect = svg.getBoundingClientRect();
+                                function onMove(ev: PointerEvent) {
+                                  const rx = Math.max(0, Math.min(1, (ev.clientX - rect.left) / PREVIEW));
+                                  const ry = Math.max(0, Math.min(1, (ev.clientY - rect.top) / PREVIEW));
+                                  const sx = snapPt(rx * PREVIEW) / PREVIEW;
+                                  const sy = snapPt(ry * PREVIEW) / PREVIEW;
+                                  setFmPts((pts) => pts.map((pt, j) => j === i ? { x: sx, y: sy } : pt));
+                                }
+                                function onUp() {
+                                  setFmDraggingPt(null);
+                                  window.removeEventListener("pointermove", onMove);
+                                  window.removeEventListener("pointerup", onUp);
+                                }
+                                window.addEventListener("pointermove", onMove);
+                                window.addEventListener("pointerup", onUp);
+                              }}
+                            />
+                          ))}
+                        </svg>
+                        <p className="text-[10px] text-surface-400 text-center py-1.5 border-t border-surface-200">Double click to add a point · drag to move</p>
+                      </div>
+
+                      {/* Remove last point */}
+                      <button
+                        type="button"
+                        disabled={fmPts.length <= 3}
+                        onClick={() => setFmPts((pts) => pts.slice(0, -1))}
+                        className="w-full py-1.5 rounded-lg border border-surface-200 text-xs text-surface-600 hover:bg-surface-50 disabled:opacity-40"
+                      >
+                        Remove last point
+                      </button>
+
+                      {/* Grid snapping */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-surface-600">Grid snapping</span>
+                        <button
+                          type="button"
+                          onClick={() => setFmGridSnap((v) => !v)}
+                          className={cn("w-10 h-5 rounded-full transition-colors relative", fmGridSnap ? "bg-brand-600" : "bg-surface-300")}
+                        >
+                          <span className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform", fmGridSnap ? "translate-x-5" : "translate-x-0.5")} />
+                        </button>
+                      </div>
+
+                      {/* Grid columns */}
+                      <div>
+                        <div className="flex justify-between text-xs text-surface-600 mb-1">
+                          <span>Grid columns</span>
+                          <span>{fmGridCols}</span>
+                        </div>
+                        <input
+                          type="range" min={4} max={20} step={1} value={fmGridCols}
+                          onChange={(e) => setFmGridCols(Number(e.target.value))}
+                          className="w-full accent-brand-600"
+                        />
+                      </div>
+
+                      {/* Add to canvas */}
+                      <button
+                        type="button"
+                        disabled={fmPts.length < 3}
+                        onClick={() => {
+                          const size = Math.min(W, H) * 0.4;
+                          addElement({
+                            type: "frame",
+                            x: W / 2 - size / 2, y: H / 2 - size / 2, w: size, h: size,
+                            rotation: 0, opacity: 1, clipPath,
+                          });
+                          setShowFrameMaker(false);
+                        }}
+                        className="w-full py-2 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 disabled:opacity-40"
+                      >
+                        Add to Canvas
+                      </button>
+
+                      {/* Preset shapes */}
+                      <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide">Shapes</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {FRAMES.filter((f) => f.clipPath).slice(0, 8).map((frame) => (
+                          <button
+                            key={frame.id}
+                            type="button"
+                            onClick={() => insertFrame(frame)}
+                            title={frame.label}
+                            className="aspect-square rounded-lg border border-surface-200 flex items-center justify-center hover:border-brand-400 p-2 bg-surface-50"
+                          >
+                            <span className="w-7 h-7 bg-surface-400" style={{ clipPath: frame.clipPath || undefined, display: "block" }} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {elementsTab === "graphics" && (
                   <>
                     <div className="relative">
@@ -2172,18 +2440,18 @@ export function CanvaEditor({
 
                     {/* Category chips — hidden during search */}
                     {!graphicsSearch && (
-                      <div className="flex gap-1 flex-wrap">
+                      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide" style={{ flexWrap: "nowrap" }}>
                         <button
                           type="button"
                           onClick={() => setGraphicsCat("")}
-                          className={cn("text-[10px] px-1.5 py-1 rounded-full border", graphicsCat === "" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
+                          className={cn("flex-shrink-0 text-[10px] px-1.5 py-1 rounded-full border whitespace-nowrap", graphicsCat === "" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
                         >
                           All
                         </button>
                         <button
                           type="button"
                           onClick={() => setGraphicsCat("balloons")}
-                          className={cn("text-[10px] px-1.5 py-1 rounded-full border", graphicsCat === "balloons" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
+                          className={cn("flex-shrink-0 text-[10px] px-1.5 py-1 rounded-full border whitespace-nowrap", graphicsCat === "balloons" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
                         >
                           🎈 Balloons
                         </button>
@@ -2192,7 +2460,7 @@ export function CanvaEditor({
                             key={c.id}
                             type="button"
                             onClick={() => setGraphicsCat(c.id)}
-                            className={cn("text-[10px] px-1.5 py-1 rounded-full border", graphicsCat === c.id ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
+                            className={cn("flex-shrink-0 text-[10px] px-1.5 py-1 rounded-full border whitespace-nowrap", graphicsCat === c.id ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
                           >
                             {c.label}
                           </button>
@@ -2200,7 +2468,7 @@ export function CanvaEditor({
                         <button
                           type="button"
                           onClick={() => setGraphicsCat("decor")}
-                          className={cn("text-[10px] px-1.5 py-1 rounded-full border", graphicsCat === "decor" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
+                          className={cn("flex-shrink-0 text-[10px] px-1.5 py-1 rounded-full border whitespace-nowrap", graphicsCat === "decor" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
                         >
                           Decorative
                         </button>
@@ -2412,7 +2680,7 @@ export function CanvaEditor({
         >
           <div className="min-w-fit min-h-full flex items-center justify-center p-12">
             <div style={{ width: W * zoom, height: H * zoom, flexShrink: 0 }}>
-              <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+              <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left", position: "relative" }}>
                 {/* The page */}
                 <div
                   ref={pageRef}
@@ -2428,8 +2696,21 @@ export function CanvaEditor({
                       onPointerLeave={() => setHoveredId((h) => (h === el.id ? null : h))}
                       onDoubleClick={() => {
                         if (el.type === "text" && !el.locked) { setEditingId(el.id); setSelectedId(el.id); }
-                        else if (el.type === "image") { setSelectedId(el.id); setToolPanel("crop"); }
-                        else if (el.type === "frame") { setSelectedId(el.id); setPanel("uploads"); }
+                        else if (el.type === "image") {
+                          setSelectedId(el.id);
+                          // Initialize visual crop defaults if not already set
+                          if (el.cropW === undefined) patchEl(el.id, { cropX: -(el.w * 0.15), cropY: -(el.h * 0.15), cropW: el.w * 1.3, cropH: el.h * 1.3 });
+                          setToolPanel("crop");
+                        }
+                        else if (el.type === "frame") {
+                          setSelectedId(el.id);
+                          if (el.src) {
+                            if (el.cropW === undefined) patchEl(el.id, { cropX: -(el.w * 0.15), cropY: -(el.h * 0.15), cropW: el.w * 1.3, cropH: el.h * 1.3 });
+                            setToolPanel("crop");
+                          } else {
+                            setPanel("uploads");
+                          }
+                        }
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -2527,9 +2808,114 @@ export function CanvaEditor({
                     />
                   )}
 
+                  {/* Crop dark-mask SVG — dims everything outside the selected element */}
+                  {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (
+                    <svg
+                      style={{ position: "absolute", left: 0, top: 0, width: W, height: H, zIndex: 1098, pointerEvents: "none" }}
+                      viewBox={`0 0 ${W} ${H}`}
+                    >
+                      <defs>
+                        <mask id={`cm-${selected.id}`}>
+                          <rect width={W} height={H} fill="white" />
+                          <rect
+                            x={selected.x} y={selected.y} width={selected.w} height={selected.h}
+                            fill="black"
+                            rx={selected.radius ?? 0}
+                            transform={`rotate(${selected.rotation} ${selected.x + selected.w / 2} ${selected.y + selected.h / 2})`}
+                          />
+                        </mask>
+                      </defs>
+                      <rect width={W} height={H} fill="rgba(0,0,0,0.52)" mask={`url(#cm-${selected.id})`} />
+                    </svg>
+                  )}
+
+                  {/* Frame border highlight in crop mode */}
+                  {toolPanel === "crop" && selected && (
+                    <div style={{
+                      position: "absolute", left: selected.x, top: selected.y, width: selected.w, height: selected.h,
+                      transform: `rotate(${selected.rotation}deg)`,
+                      border: `${2 / zoom}px solid white`, zIndex: 1099, pointerEvents: "none",
+                      borderRadius: selected.radius,
+                    }} />
+                  )}
+
                   {/* Selection chrome */}
                   {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && renderSelectionChrome(selected)}
                 </div>
+
+                {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
+                {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
+                  const cropX = selected.cropX ?? -(selected.w * 0.15);
+                  const cropY = selected.cropY ?? -(selected.h * 0.15);
+                  const cropW = selected.cropW ?? selected.w * 1.3;
+                  const cropH = selected.cropH ?? selected.h * 1.3;
+                  const eRot = selected.rotation;
+                  const eCx = selected.x + selected.w / 2;
+                  const eCy = selected.y + selected.h / 2;
+                  const HANDLE_SIZE = Math.max(8, 10 / zoom);
+                  const handles: { id: CropDragState["mode"]; cx: number; cy: number; cursor: string }[] = [
+                    { id: "nw", cx: 0,   cy: 0,   cursor: "nw-resize" },
+                    { id: "n",  cx: 0.5, cy: 0,   cursor: "n-resize"  },
+                    { id: "ne", cx: 1,   cy: 0,   cursor: "ne-resize" },
+                    { id: "w",  cx: 0,   cy: 0.5, cursor: "w-resize"  },
+                    { id: "e",  cx: 1,   cy: 0.5, cursor: "e-resize"  },
+                    { id: "sw", cx: 0,   cy: 1,   cursor: "sw-resize" },
+                    { id: "s",  cx: 0.5, cy: 1,   cursor: "s-resize"  },
+                    { id: "se", cx: 1,   cy: 1,   cursor: "se-resize" },
+                  ];
+                  return (
+                    <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, overflow: "visible", zIndex: 1097 }}>
+                      {/* Draggable image */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: selected.x + cropX,
+                          top: selected.y + cropY,
+                          width: cropW,
+                          height: cropH,
+                          transform: `rotate(${eRot}deg)`,
+                          transformOrigin: `${eCx - (selected.x + cropX)}px ${eCy - (selected.y + cropY)}px`,
+                          border: `${1.5 / zoom}px dashed rgba(255,255,255,0.7)`,
+                          cursor: "move",
+                          touchAction: "none",
+                        }}
+                        onPointerDown={(e) => startCropDrag(e, "pan", selected)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selected.src}
+                          alt=""
+                          draggable={false}
+                          style={{
+                            width: "100%", height: "100%", objectFit: "fill", display: "block",
+                            transform: selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : undefined,
+                            transformOrigin: "50% 50%",
+                            userSelect: "none", pointerEvents: "none",
+                          }}
+                        />
+                        {/* Resize handles */}
+                        {handles.map((h) => (
+                          <div
+                            key={h.id}
+                            onPointerDown={(e) => startCropDrag(e, h.id, selected)}
+                            style={{
+                              position: "absolute",
+                              left: `calc(${h.cx * 100}% - ${HANDLE_SIZE / 2}px)`,
+                              top: `calc(${h.cy * 100}% - ${HANDLE_SIZE / 2}px)`,
+                              width: HANDLE_SIZE, height: HANDLE_SIZE,
+                              background: "white",
+                              border: `${1.5 / zoom}px solid #7c3aed`,
+                              borderRadius: "50%",
+                              cursor: h.cursor,
+                              touchAction: "none",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
           </div>
@@ -2873,6 +3259,70 @@ export function CanvaEditor({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Present Mode (fullscreen slideshow) ── */}
+      {presentMode && (() => {
+        const pg = pages[Math.min(presentIdx, pages.length - 1)];
+        const ratio = pg ? Math.min(window.innerWidth / W, window.innerHeight / H) : 1;
+        return (
+          <div
+            className="fixed inset-0 z-[9000] bg-black flex flex-col items-center justify-center select-none"
+            onClick={() => { if (pages.length > 1) setPresentIdx((i) => (i + 1) % pages.length); }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setPresentMode(false); return; }
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") setPresentIdx((i) => Math.min(pages.length - 1, i + 1));
+              if (e.key === "ArrowLeft" || e.key === "ArrowUp") setPresentIdx((i) => Math.max(0, i - 1));
+            }}
+            tabIndex={0}
+            ref={(el) => { if (el) el.focus(); }}
+          >
+            {/* Slide */}
+            <div
+              style={{ width: W * ratio, height: H * ratio, flexShrink: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ transform: `scale(${ratio})`, transformOrigin: "top left" }}>
+                <div style={{ width: W, height: H, background: pg.background, overflow: "hidden" }}>
+                  {pg.elements.map((el) => <ElementView key={el.id} el={el} />)}
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-6 py-4 bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setPresentIdx((i) => Math.max(0, i - 1)); }}
+                disabled={presentIdx === 0}
+                className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 transition-colors"
+                aria-label="Previous"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-white/70 text-sm font-medium">{presentIdx + 1} / {pages.length}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setPresentIdx((i) => Math.min(pages.length - 1, i + 1)); }}
+                disabled={presentIdx === pages.length - 1}
+                className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 transition-colors"
+                aria-label="Next"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Exit button */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPresentMode(false); }}
+              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors"
+              aria-label="Exit presentation"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

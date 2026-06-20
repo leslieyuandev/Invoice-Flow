@@ -110,3 +110,14 @@ export async function duplicateCanvaProjectAction(projectId: string) {
   revalidatePath("/canva");
   return { data: { id: copy.id } };
 }
+
+export async function toggleCanvaProjectStarAction(projectId: string, starred: boolean) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  await db.canvaProject.updateMany({
+    where: { id: projectId, userId: session.user.id },
+    data: { starred },
+  });
+  revalidatePath("/canva");
+  return { data: null };
+}

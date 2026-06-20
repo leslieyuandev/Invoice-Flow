@@ -104,11 +104,26 @@ export function ElementView({ el }: { el: CanvaElement }) {
       const colorFilter = imageColorFilter(el);
       const shadowFilter = imageShadowFilter(el);
       const flip = imageFlipTransform(el);
-      // Inner image geometry — when cropped, scale the full image so the kept region fills the box
-      const fullW = crop ? `${100 / Math.max(0.02, 1 - crop.l - crop.r)}%` : "100%";
-      const fullH = crop ? `${100 / Math.max(0.02, 1 - crop.t - crop.b)}%` : "100%";
-      const imgLeft = crop ? `${(-crop.l * 100) / Math.max(0.02, 1 - crop.l - crop.r)}%` : "0";
-      const imgTop = crop ? `${(-crop.t * 100) / Math.max(0.02, 1 - crop.t - crop.b)}%` : "0";
+
+      // Visual crop model (new) takes precedence over legacy t/r/b/l fractions
+      let imgLeft: string, imgTop: string, fullW: string, fullH: string, imgTransform: string, imgOrigin: string;
+      if (el.cropW !== undefined) {
+        imgLeft = `${el.cropX ?? 0}px`;
+        imgTop = `${el.cropY ?? 0}px`;
+        fullW = `${el.cropW}px`;
+        fullH = `${el.cropH ?? el.h}px`;
+        imgTransform = el.cropRotation ? `${flip ?? ""} rotate(${el.cropRotation}deg)` : (flip ?? "none");
+        imgOrigin = "50% 50%";
+      } else {
+        // Legacy t/r/b/l inset fractions
+        fullW = crop ? `${100 / Math.max(0.02, 1 - crop.l - crop.r)}%` : "100%";
+        fullH = crop ? `${100 / Math.max(0.02, 1 - crop.t - crop.b)}%` : "100%";
+        imgLeft = crop ? `${(-crop.l * 100) / Math.max(0.02, 1 - crop.l - crop.r)}%` : "0";
+        imgTop = crop ? `${(-crop.t * 100) / Math.max(0.02, 1 - crop.t - crop.b)}%` : "0";
+        imgTransform = flip ?? "none";
+        imgOrigin = "center";
+      }
+
       return (
         // Wrapper clips to rounded corners (export-safe) and carries the shadow/effect filter
         <div
@@ -130,10 +145,10 @@ export function ElementView({ el }: { el: CanvaElement }) {
               top: imgTop,
               width: fullW,
               height: fullH,
-              objectFit: "cover",
+              objectFit: el.cropW !== undefined ? "fill" : "cover",
               filter: colorFilter,
-              transform: flip,
-              transformOrigin: "center",
+              transform: imgTransform,
+              transformOrigin: imgOrigin,
             }}
           />
         </div>
@@ -163,24 +178,31 @@ export function ElementView({ el }: { el: CanvaElement }) {
         );
       }
       const colorFilter = imageColorFilter(el);
+      // Visual crop model for frames
+      const fImgStyle: React.CSSProperties = el.cropW !== undefined ? {
+        position: "absolute",
+        left: `${el.cropX ?? 0}px`,
+        top: `${el.cropY ?? 0}px`,
+        width: `${el.cropW}px`,
+        height: `${el.cropH ?? el.h}px`,
+        objectFit: "fill",
+        filter: colorFilter || undefined,
+        transform: el.cropRotation ? `${imageFlipTransform(el)} rotate(${el.cropRotation}deg)` : imageFlipTransform(el),
+        transformOrigin: "50% 50%",
+      } : {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        filter: colorFilter || undefined,
+        transform: imageFlipTransform(el),
+        transformOrigin: "center",
+      };
       return (
         <div style={{ ...box, overflow: "hidden", clipPath: frameClip }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={el.src}
-            alt={el.altText ?? ""}
-            draggable={false}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              filter: colorFilter || undefined,
-              transform: imageFlipTransform(el),
-              transformOrigin: "center",
-            }}
-          />
+          <img src={el.src} alt={el.altText ?? ""} draggable={false} style={fImgStyle} />
         </div>
       );
     }

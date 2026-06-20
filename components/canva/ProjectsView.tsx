@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Copy, Trash2, Palette } from "lucide-react";
+import { Plus, Copy, Trash2, Palette, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -14,6 +14,7 @@ import {
   createCanvaProjectAction,
   deleteCanvaProjectAction,
   duplicateCanvaProjectAction,
+  toggleCanvaProjectStarAction,
 } from "@/actions/canva";
 import { cn } from "@/lib/utils/cn";
 
@@ -25,6 +26,7 @@ export interface ProjectListItem {
   height: number;
   pages: CanvaPage[];
   updatedAt: string;
+  starred: boolean;
 }
 
 const GOOGLE_FONTS_URL =
@@ -38,6 +40,11 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
   const [tab, setTab] = useState<"templates" | "blank">("templates");
   const [customW, setCustomW] = useState("1080");
   const [customH, setCustomH] = useState("1080");
+  const [viewFilter, setViewFilter] = useState<"all" | "starred">("all");
+  // Optimistic starred state: map of projectId → starred bool
+  const [starredMap, setStarredMap] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(projects.map((p) => [p.id, p.starred]))
+  );
 
   const templatesByCategory = useMemo(() => {
     const map = new Map<string, CanvaTemplate[]>();
@@ -122,11 +129,26 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
     }
   }
 
+  async function handleToggleStar(e: React.MouseEvent, p: ProjectListItem) {
+    e.stopPropagation();
+    const next = !starredMap[p.id];
+    setStarredMap((m) => ({ ...m, [p.id]: next }));
+    const res = await toggleCanvaProjectStarAction(p.id, next);
+    if ("error" in res && res.error) {
+      setStarredMap((m) => ({ ...m, [p.id]: !next }));
+      toast.error(res.error as string);
+    }
+  }
+
+  const visibleProjects = viewFilter === "starred"
+    ? projects.filter((p) => starredMap[p.id])
+    : projects;
+
   return (
     <div className="p-4 md:p-6">
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} precedence="default" />
 
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-lg font-semibold text-surface-900">Canva Project</h1>
           <p className="text-xs text-surface-500">Design social posts, presentations, docs, whiteboards, and more</p>
@@ -136,6 +158,33 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
           Create Design
         </Button>
       </div>
+
+      {/* Filter tabs */}
+      {projects.length > 0 && (
+        <div className="flex gap-1 mb-4">
+          {(["all", "starred"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setViewFilter(f)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                viewFilter === f
+                  ? "bg-brand-50 text-brand-700 border border-brand-200"
+                  : "text-surface-500 hover:bg-surface-100 border border-transparent"
+              )}
+            >
+              {f === "starred" && <Star className="w-3.5 h-3.5" />}
+              {f === "all" ? "All designs" : "Starred"}
+              {f === "starred" && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 ml-0.5">
+                  {Object.values(starredMap).filter(Boolean).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="flex flex-col items-center gap-3 text-center py-24 border-2 border-dashed border-surface-200 rounded-2xl">
@@ -149,15 +198,22 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
             Create your first design
           </Button>
         </div>
+      ) : visibleProjects.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 text-center py-16 border-2 border-dashed border-surface-200 rounded-2xl">
+          <Star className="w-8 h-8 text-surface-300" />
+          <p className="text-sm font-medium text-surface-600">No starred designs</p>
+          <p className="text-xs text-surface-400">Click the star on any design card to favourite it</p>
+        </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <div
               key={p.id}
               className="group rounded-xl border border-surface-200 bg-white overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => router.push(`/canva/${p.id}`)}
             >
-              <div className="bg-surface-100 flex items-center justify-center overflow-hidden" style={{ height: 160 }}>
+              {/* Thumbnail */}
+              <div className="relative bg-surface-100 flex items-center justify-center overflow-hidden" style={{ height: 160 }}>
                 {p.pages[0] ? (
                   <PageRenderer
                     page={p.pages[0]}
@@ -169,7 +225,22 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
                 ) : (
                   <Palette className="w-8 h-8 text-surface-300" />
                 )}
+                {/* Star overlay — always visible when starred, hover-visible otherwise */}
+                <button
+                  type="button"
+                  title={starredMap[p.id] ? "Remove from starred" : "Add to starred"}
+                  onClick={(e) => handleToggleStar(e, p)}
+                  className={cn(
+                    "absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-sm transition-all",
+                    starredMap[p.id]
+                      ? "bg-amber-400/90 text-white opacity-100"
+                      : "bg-white/80 text-surface-400 opacity-0 group-hover:opacity-100 hover:text-amber-500"
+                  )}
+                >
+                  <Star className={cn("w-3.5 h-3.5", starredMap[p.id] && "fill-current")} />
+                </button>
               </div>
+
               <div className="p-3">
                 <p className="text-sm font-medium text-surface-900 truncate">{p.title}</p>
                 <div className="flex items-center justify-between mt-1">
