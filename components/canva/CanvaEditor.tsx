@@ -1012,26 +1012,42 @@ export function CanvaEditor({
     });
   }
 
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
-    const frameTargetId = selectedIdsRef.current.length === 1 && page.elements.find((e2) => e2.id === selectedIdsRef.current[0])?.type === "frame" ? selectedIdsRef.current[0] : null;
+    if (!files.length) return;
+
+    const MAX_FILES = 10;
+    const batch = files.slice(0, MAX_FILES);
+    if (files.length > MAX_FILES) toast.warning(`Only the first ${MAX_FILES} images were uploaded (limit per batch).`);
+
+    const frameTargetId = selectedIdsRef.current.length === 1 && page.elements.find((el2) => el2.id === selectedIdsRef.current[0])?.type === "frame" ? selectedIdsRef.current[0] : null;
     setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("type", "image");
-      const res = await fetch("/api/canva/assets", { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error ?? "Upload failed");
-      setImgAssets((a) => [j.asset, ...a]);
-      if (frameTargetId) { commitPatch(frameTargetId, { src: j.asset.url }); } else { insertImage(j.asset.url); }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
+    let succeeded = 0;
+    for (let i = 0; i < batch.length; i++) {
+      const file = batch[i];
+      if (batch.length > 1) setUploadProgress(`${i + 1} / ${batch.length}`);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("type", "image");
+        const res = await fetch("/api/canva/assets", { method: "POST", body: fd });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error ?? "Upload failed");
+        setImgAssets((a) => [j.asset, ...a]);
+        // First file fills the frame (if selected), rest are inserted as canvas elements
+        if (i === 0 && frameTargetId) { commitPatch(frameTargetId, { src: j.asset.url }); }
+        else { insertImage(j.asset.url); }
+        succeeded++;
+      } catch (err) {
+        toast.error(`${file.name}: ${err instanceof Error ? err.message : "Upload failed"}`);
+      }
     }
+    setUploading(false);
+    setUploadProgress(null);
+    if (succeeded > 1) toast.success(`${succeeded} images uploaded`);
   }
 
   async function handleFontUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -2691,9 +2707,10 @@ export function CanvaEditor({
               <>
                 <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} loading={uploading}>
                   <ImagePlus className="w-4 h-4" />
-                  Upload Image
+                  {uploading && uploadProgress ? `Uploading ${uploadProgress}…` : "Upload Images"}
                 </Button>
-                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleUpload} />
+                <p className="text-[10px] text-surface-400 -mt-1">Select up to 10 images at once · PNG, JPG, WebP, SVG</p>
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple className="hidden" onChange={handleUpload} />
                 {imgAssets.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {imgAssets.map((a) => (

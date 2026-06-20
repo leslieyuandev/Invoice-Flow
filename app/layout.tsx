@@ -12,6 +12,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "HaloInvoice — Professional Invoice Management",
   description: "Create, send, and manage professional invoices in seconds.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
