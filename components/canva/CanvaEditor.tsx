@@ -24,6 +24,7 @@ import { injectCustomFont, ensureGoogleFont, familyFromCss } from "./fonts";
 import type { CanvaAsset } from "@/types/canva";
 import { deleteCanvaAssetAction } from "@/actions/canva";
 import { MagicEraserModal } from "./MagicEraserModal";
+import { MagicLayersModal } from "./MagicLayersModal";
 
 // Rounded-corner indicator icon
 function CornerRadiusIcon({ className }: { className?: string }) {
@@ -159,6 +160,8 @@ export function CanvaEditor({
   const cropDragRef = useRef<CropDragState | null>(null);
   // Magic eraser
   const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
+  // Magic layers
+  const [magicLayersEl, setMagicLayersEl] = useState<CanvaElement | null>(null);
   // Frame drag-and-drop
   const [frameDragOver, setFrameDragOver] = useState<string | null>(null);
 
@@ -1084,6 +1087,42 @@ export function CanvaEditor({
     } finally {
       setBgRemoving(null);
     }
+  }
+
+  function handleApplyMagicLayers(fgUrl: string) {
+    if (!magicLayersEl) return;
+    const elId = magicLayersEl.id;
+    const pg = pagesRef.current[pageIdxRef.current];
+    const idx = pg.elements.findIndex((e) => e.id === elId);
+    if (idx === -1) return;
+    const origEl = pg.elements[idx];
+    const fgEl: CanvaElement = {
+      ...origEl,
+      id: uid(),
+      src: fgUrl,
+      crop: undefined,
+      cropX: undefined,
+      cropY: undefined,
+      cropW: undefined,
+      cropH: undefined,
+      cropRotation: undefined,
+      filterPreset: undefined,
+      brightness: undefined,
+      contrast: undefined,
+      saturate: undefined,
+      blur: undefined,
+    };
+    pushHistory();
+    setPageAt(pageIdxRef.current, (p) => ({
+      ...p,
+      elements: [
+        ...p.elements.slice(0, idx + 1),
+        fgEl,
+        ...p.elements.slice(idx + 1),
+      ],
+    }));
+    setSaveState("dirty");
+    setMagicLayersEl(null);
   }
 
   function insertImage(src: string) {
@@ -2081,6 +2120,15 @@ export function CanvaEditor({
               >
                 <PenTool className="w-4 h-4" />
                 <span className="hidden lg:inline">Eraser</span>
+              </button>
+              <button
+                type="button"
+                title="Magic Layers — split image into background + foreground layers"
+                onClick={() => selected.src ? setMagicLayersEl(selected) : toast.error("No image to process")}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-surface-500 hover:bg-surface-100"
+              >
+                <Layers className="w-4 h-4" />
+                <span className="hidden lg:inline">Magic Layers</span>
               </button>
               <label className="flex items-center gap-1.5 text-xs text-surface-500" title="Corner radius">
                 <CornerRadiusIcon className="w-4 h-4 text-surface-500" />
@@ -3377,6 +3425,15 @@ export function CanvaEditor({
             commitPatch(eraserEl.id, { src: url, crop: undefined, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined });
             setEraserEl(null);
           }}
+        />
+      )}
+
+      {/* Magic Layers modal */}
+      {magicLayersEl && (
+        <MagicLayersModal
+          el={magicLayersEl}
+          onClose={() => setMagicLayersEl(null)}
+          onApplyLayers={handleApplyMagicLayers}
         />
       )}
     </div>

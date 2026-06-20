@@ -90,21 +90,40 @@ export function MagicEraserModal({ el, onClose, onApply }: Props) {
   }
 
   async function handleApply() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const source = canvasRef.current;
+    if (!source) return;
     setApplying(true);
     try {
+      // Downscale if the original image is very large (keeps upload under size limit)
+      const MAX = 2048;
+      let exportCanvas: HTMLCanvasElement = source;
+      if (source.width > MAX || source.height > MAX) {
+        const scale = MAX / Math.max(source.width, source.height);
+        const sc = document.createElement("canvas");
+        sc.width = Math.round(source.width * scale);
+        sc.height = Math.round(source.height * scale);
+        sc.getContext("2d")!.drawImage(source, 0, 0, sc.width, sc.height);
+        exportCanvas = sc;
+      }
+
       const blob = await new Promise<Blob>((res, rej) =>
-        canvas.toBlob((b) => (b ? res(b) : rej(new Error("Canvas export failed"))), "image/png")
+        exportCanvas.toBlob((b) => (b ? res(b) : rej(new Error("Canvas export failed"))), "image/png")
       );
       const fd = new FormData();
       fd.append("file", new File([blob], "erased.png", { type: "image/png" }));
       fd.append("type", "image");
       const r = await fetch("/api/canva/assets", { method: "POST", body: fd });
-      const j = await r.json();
+
+      // Safely parse JSON — a non-JSON response (e.g. 413 Entity Too Large) gives a clear message
+      let j: { error?: string; asset?: { url: string } };
+      try {
+        j = await r.json();
+      } catch {
+        throw new Error(`Upload failed (HTTP ${r.status}). The exported image may still be too large — try a lower-resolution source image.`);
+      }
       if (!r.ok) throw new Error(j.error ?? "Upload failed");
       toast.success("Eraser applied");
-      onApply(j.asset.url);
+      onApply(j.asset!.url);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to apply");
       setApplying(false);
