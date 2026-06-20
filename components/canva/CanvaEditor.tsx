@@ -23,6 +23,7 @@ import { BALLOON_PRESETS, BALLOON_TEMPLATES, applyBalloonColors } from "./balloo
 import { injectCustomFont, ensureGoogleFont, familyFromCss } from "./fonts";
 import type { CanvaAsset } from "@/types/canva";
 import { deleteCanvaAssetAction } from "@/actions/canva";
+import { MagicEraserModal } from "./MagicEraserModal";
 
 // Rounded-corner indicator icon
 function CornerRadiusIcon({ className }: { className?: string }) {
@@ -156,6 +157,10 @@ export function CanvaEditor({
   const [fmDraggingPt, setFmDraggingPt] = useState<number | null>(null);
   // Crop drag ref
   const cropDragRef = useRef<CropDragState | null>(null);
+  // Magic eraser
+  const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
+  // Frame drag-and-drop
+  const [frameDragOver, setFrameDragOver] = useState<string | null>(null);
 
   const pageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -2068,6 +2073,15 @@ export function CanvaEditor({
                 {bgRemoving === selected.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
                 <span className="hidden lg:inline">Remove BG</span>
               </button>
+              <button
+                type="button"
+                title="Magic Eraser — paint to erase areas"
+                onClick={() => selected.src ? setEraserEl(selected) : toast.error("No image to erase")}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-surface-500 hover:bg-surface-100"
+              >
+                <PenTool className="w-4 h-4" />
+                <span className="hidden lg:inline">Eraser</span>
+              </button>
               <label className="flex items-center gap-1.5 text-xs text-surface-500" title="Corner radius">
                 <CornerRadiusIcon className="w-4 h-4 text-surface-500" />
                 <input
@@ -2640,6 +2654,8 @@ export function CanvaEditor({
                         <img
                           src={a.url}
                           alt={a.name}
+                          draggable
+                          onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.url); e.dataTransfer.effectAllowed = "copy"; }}
                           onClick={() => { if (selected?.type === "frame") { commitPatch(selected.id, { src: a.url }); } else { insertImage(a.url); } }}
                           className="rounded-lg border border-surface-200 cursor-pointer hover:border-brand-400 object-cover aspect-square w-full"
                         />
@@ -2738,7 +2754,16 @@ export function CanvaEditor({
                         setEditingId(null);
                         setCtxMenu({ x: e.clientX, y: e.clientY, elId: el.id });
                       }}
-                      style={{ cursor: el.locked ? "default" : editingId === el.id ? "text" : "move", touchAction: "none" }}
+                      {...(el.type === "frame" ? {
+                        onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setFrameDragOver(el.id); },
+                        onDragLeave: () => setFrameDragOver(null),
+                        onDrop: (e: React.DragEvent) => {
+                          e.preventDefault(); e.stopPropagation(); setFrameDragOver(null);
+                          const url = e.dataTransfer.getData("text/plain");
+                          if (url) { pushHistory(); commitPatch(el.id, { src: url }); setSelectedId(el.id); }
+                        },
+                      } : {})}
+                      style={{ cursor: el.locked ? "default" : editingId === el.id ? "text" : "move", touchAction: "none", outline: frameDragOver === el.id ? "3px solid #7c3aed" : undefined, outlineOffset: frameDragOver === el.id ? "2px" : undefined }}
                     >
                       {editingId === el.id && el.type === "text" ? (
                         <textarea
@@ -3342,6 +3367,18 @@ export function CanvaEditor({
           </div>
         );
       })()}
+
+      {/* Magic Eraser modal */}
+      {eraserEl && (
+        <MagicEraserModal
+          el={eraserEl}
+          onClose={() => setEraserEl(null)}
+          onApply={(url) => {
+            commitPatch(eraserEl.id, { src: url, crop: undefined, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined });
+            setEraserEl(null);
+          }}
+        />
+      )}
     </div>
   );
 }

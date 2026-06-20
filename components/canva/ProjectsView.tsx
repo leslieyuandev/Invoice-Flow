@@ -234,7 +234,7 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
                     "absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-sm transition-all",
                     starredMap[p.id]
                       ? "bg-amber-400/90 text-white opacity-100"
-                      : "bg-white/80 text-surface-400 opacity-0 group-hover:opacity-100 hover:text-amber-500"
+                      : "bg-white/70 text-surface-400 opacity-60 hover:opacity-100 hover:text-amber-500"
                   )}
                 >
                   <Star className={cn("w-3.5 h-3.5", starredMap[p.id] && "fill-current")} />
