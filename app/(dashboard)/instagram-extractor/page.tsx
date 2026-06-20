@@ -10,6 +10,13 @@ import { InstagramExtractorView } from "@/components/instagram/InstagramExtracto
 export const runtime = "nodejs";
 
 export default async function InstagramExtractorPage() {
+  // The Instagram Scraper runs on the self-hosted instance only (MAPS_ONLY=true).
+  // On the main app (e.g. Vercel) it isn't a hosted module — bounce to the external
+  // self-hosted URL if one is configured, otherwise to the dashboard.
+  if (process.env.MAPS_ONLY !== "true") {
+    redirect(process.env.INSTAGRAM_EXTRACTOR_URL || "/");
+  }
+
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 

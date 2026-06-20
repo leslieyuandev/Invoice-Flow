@@ -11,9 +11,10 @@ interface MobileLayoutProps {
   userEmail?: string | null;
   mapsOnly?: boolean;
   mapsExternalUrl?: string | null;
+  instagramExternalUrl?: string | null;
 }
 
-export function MobileLayout({ children, userName, userEmail, mapsOnly, mapsExternalUrl }: MobileLayoutProps) {
+export function MobileLayout({ children, userName, userEmail, mapsOnly, mapsExternalUrl, instagramExternalUrl }: MobileLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -29,6 +30,7 @@ export function MobileLayout({ children, userName, userEmail, mapsOnly, mapsExte
         userEmail={userEmail}
         mapsOnly={mapsOnly}
         mapsExternalUrl={mapsExternalUrl}
+        instagramExternalUrl={instagramExternalUrl}
       />
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">

@@ -20,6 +20,9 @@ interface SidebarProps {
   mapsOnly?: boolean;
   /** When set, the Maps Extractor nav item links to this external URL (e.g. the self-hosted instance). */
   mapsExternalUrl?: string | null;
+  /** When set, the Instagram Scraper links to this external URL on the main app. When null on the
+   *  main app, the Instagram item is hidden (it lives on the self-hosted instance). */
+  instagramExternalUrl?: string | null;
 }
 
 const PROPOSAL_SUB_LINKS = [
@@ -28,7 +31,7 @@ const PROPOSAL_SUB_LINKS = [
   { href: "/addons",   label: "Add-Ons",  icon: Sparkles },
 ];
 
-export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse, userName, userEmail, mapsOnly = false, mapsExternalUrl = null }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onToggleCollapse, userName, userEmail, mapsOnly = false, mapsExternalUrl = null, instagramExternalUrl = null }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { locale, setLocale, t } = useTranslation();
@@ -244,8 +247,7 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
               <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400">Tools</p>
             )}
             {collapsed && !mapsOnly && <div className="my-2 mx-auto w-6 border-t border-surface-200" />}
-            {/* Maps Extractor links externally on the main app (self-hosted instance);
-                in-app everywhere else. Other tools (Instagram) always run in-app. */}
+            {/* Maps Extractor: external link on the main app (→ self-hosted instance); in-app otherwise. */}
             {mapsExternalUrl && (
               <a
                 href={mapsExternalUrl}
@@ -263,13 +265,30 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
                 {!collapsed && <ExternalLink className="w-3 h-3 ml-auto text-surface-300" />}
               </a>
             )}
-            {(mapsExternalUrl
-              ? [{ href: "/instagram-extractor", label: "Instagram Scraper", icon: Camera }]
-              : [
-                  { href: "/maps-extractor", label: "Scraper Tools", icon: MapPin },
-                  { href: "/instagram-extractor", label: "Instagram Scraper", icon: Camera },
-                ]
-            ).map(({ href, label, icon }) => (
+            {/* Instagram Scraper: it lives on the self-hosted box, so on the main app show it only as an
+                external link when INSTAGRAM_EXTRACTOR_URL is set (otherwise it's hidden here). */}
+            {!mapsOnly && instagramExternalUrl && (
+              <a
+                href={instagramExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
+                title={collapsed ? "Instagram Scraper" : undefined}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-surface-600 hover:bg-surface-100 hover:text-surface-900",
+                  collapsed && "md:justify-center md:px-0"
+                )}
+              >
+                <Camera className="w-4 h-4 shrink-0 text-surface-400" />
+                <span className={cn(collapsed && "md:hidden")}>Instagram Scraper</span>
+                {!collapsed && <ExternalLink className="w-3 h-3 ml-auto text-surface-300" />}
+              </a>
+            )}
+            {/* In-app tool links: Maps unless it's externalised; Instagram only on the self-hosted (mapsOnly) box. */}
+            {[
+              ...(!mapsExternalUrl ? [{ href: "/maps-extractor", label: "Scraper Tools", icon: MapPin }] : []),
+              ...(mapsOnly ? [{ href: "/instagram-extractor", label: "Instagram Scraper", icon: Camera }] : []),
+            ].map(({ href, label, icon }) => (
               <NavLink key={href} href={href} label={label} icon={icon} />
             ))}
           </div>
