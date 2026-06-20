@@ -864,6 +864,7 @@ export function CanvaEditor({
 
   const onCanvasBackgroundPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return; // an element handled it
+    e.preventDefault(); // prevent browser text/image drag-select (the blue highlight)
     e.stopPropagation();
     setEditingId(null);
     setCtxMenu(null);
@@ -2776,6 +2777,7 @@ export function CanvaEditor({
         <div
           ref={viewportRef}
           className="flex-1 overflow-auto"
+          style={{ userSelect: "none" }}
           onPointerDown={() => { setSelectedId(null); setEditingId(null); if (toolPanel !== "fonts") setToolPanel(null); }}
         >
           <div className="min-w-fit min-h-full flex items-center justify-center p-12">
@@ -2785,7 +2787,7 @@ export function CanvaEditor({
                 <div
                   ref={pageRef}
                   className="relative shadow-xl"
-                  style={{ width: W, height: H, background: page.background, overflow: "hidden", touchAction: "none" }}
+                  style={{ width: W, height: H, background: page.background, overflow: "hidden", touchAction: "none", userSelect: "none" }}
                   onPointerDown={onCanvasBackgroundPointerDown}
                 >
                   {page.elements.map((el) => (
@@ -2948,7 +2950,10 @@ export function CanvaEditor({
                     }} />
                   )}
 
-                  {/* Selection chrome */}
+                </div>
+
+                {/* ── Selection chrome overlay — outside overflow:hidden page so handles extend beyond edge ── */}
+                <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, overflow: "visible", zIndex: 1000 }}>
                   {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && renderSelectionChrome(selected)}
                 </div>
 
