@@ -11,11 +11,26 @@ export interface FrameDef {
 
 export const FRAME_GROUPS: FrameDef["group"][] = ["Party Arch", "Basic", "Shapes", "Stars", "Special"];
 
+// Generate a smooth arch polygon using many small steps so the curve is
+// visually round rather than having visible straight-line segments.
+// rx/ry are percentage radii; cy is the y-position of the arch base (% from top).
+function smoothArch(ry: number, rx = 50, cy = ry, steps = 72): string {
+  const pts: string[] = ["0% 100%"];
+  for (let i = 0; i <= steps; i++) {
+    const theta = Math.PI * (1 - i / steps); // 180° → 0°
+    const x = 50 + rx * Math.cos(theta);
+    const y = cy - ry * Math.sin(theta);
+    pts.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
+  }
+  pts.push("100% 100%");
+  return `polygon(${pts.join(", ")})`;
+}
+
 export const FRAMES: FrameDef[] = [
-  // Party Arch — KT board arch shapes (parametric elliptical arch + flat bottom)
-  { id: "arch",      label: "Standard Arch", group: "Party Arch", clipPath: "polygon(0% 100%, 0% 60%, 3.8% 37.1%, 14.6% 17.6%, 30.9% 4.6%, 50% 0%, 69.1% 4.6%, 85.4% 17.6%, 96.2% 37.1%, 100% 60%, 100% 100%)" },
-  { id: "arch-tall", label: "Tall Arch",     group: "Party Arch", clipPath: "polygon(0% 100%, 0% 70%, 3.8% 43.3%, 14.6% 20.5%, 30.9% 5.4%, 50% 0%, 69.1% 5.4%, 85.4% 20.5%, 96.2% 43.3%, 100% 70%, 100% 100%)" },
-  { id: "arch-wide", label: "Wide Arch",     group: "Party Arch", clipPath: "polygon(0% 100%, 0% 50%, 3.8% 30.9%, 14.6% 14.6%, 30.9% 3.8%, 50% 0%, 69.1% 3.8%, 85.4% 14.6%, 96.2% 30.9%, 100% 50%, 100% 100%)" },
+  // Party Arch — smooth elliptical arches (parametric, 72 steps = 2.5° per segment)
+  { id: "arch",      label: "Standard Arch", group: "Party Arch", clipPath: smoothArch(60) },
+  { id: "arch-tall", label: "Tall Arch",     group: "Party Arch", clipPath: smoothArch(70) },
+  { id: "arch-wide", label: "Wide Arch",     group: "Party Arch", clipPath: smoothArch(50) },
   { id: "arch-oval", label: "Oval Arch",     group: "Party Arch", clipPath: "ellipse(50% 55% at 50% 55%)" },
 
   // Basic

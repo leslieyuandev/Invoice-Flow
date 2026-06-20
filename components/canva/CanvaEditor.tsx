@@ -1683,7 +1683,8 @@ export function CanvaEditor({
           <Redo2 className="w-4 h-4" />
         </button>
 
-        <div className="hidden xl:flex items-center gap-1.5 border border-surface-200 rounded-md px-2 py-1">
+        {/* Zoom slider — visible on lg+ (iPad landscape and desktop) */}
+        <div className="hidden lg:flex items-center gap-1.5 border border-surface-200 rounded-md px-2 py-1">
           <ZoomOut className="w-3.5 h-3.5 text-surface-400 shrink-0" />
           <input
             type="range"
@@ -1692,11 +1693,11 @@ export function CanvaEditor({
             step={5}
             value={Math.round(zoom * 100)}
             onChange={(e) => setZoomCentered(Number(e.target.value) / 100)}
-            className="w-24 lg:w-32 accent-brand-600"
+            className="w-16 xl:w-28 accent-brand-600"
             aria-label="Zoom"
           />
           <ZoomIn className="w-3.5 h-3.5 text-surface-400 shrink-0" />
-          <div className="flex items-center w-12">
+          <div className="flex items-center w-11">
             <input
               key={zoomPct}
               type="text"
@@ -1711,6 +1712,24 @@ export function CanvaEditor({
             <span className="text-xs text-surface-500">%</span>
           </div>
           <button type="button" onClick={fitZoom} title="Fit to screen" className="p-0.5 text-surface-500 hover:text-surface-900 shrink-0"><Maximize className="w-3.5 h-3.5" /></button>
+        </div>
+
+        {/* Compact zoom controls for mobile (below lg) */}
+        <div className="flex lg:hidden items-center gap-0.5 border border-surface-200 rounded-md px-1 py-1">
+          <button type="button" title="Zoom out" onClick={() => setZoomCentered(Math.max(0.1, zoom - 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={fitZoom}
+            title="Fit to screen"
+            className="text-xs text-surface-700 px-1 min-w-[2.5rem] text-center hover:bg-surface-100 rounded"
+          >
+            {zoomPct}%
+          </button>
+          <button type="button" title="Zoom in" onClick={() => setZoomCentered(Math.min(2, zoom + 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <button
