@@ -249,7 +249,7 @@ export function MagicEraserModal({ el, onClose, onApply }: Props) {
       const filled = inpaintBFS(origData.data, maskGray, iw, ih);
 
       // Write filled result back
-      const filledImg = new ImageData(filled, iw, ih);
+      const filledImg = new ImageData(new Uint8ClampedArray(filled), iw, ih);
       tmpOrig.getContext("2d")!.putImageData(filledImg, 0, 0);
 
       // Export at up to EXPORT_MAX
