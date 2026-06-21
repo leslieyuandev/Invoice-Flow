@@ -174,8 +174,10 @@ export function CanvaEditor({
   const [eraserDropOpen, setEraserDropOpen] = useState(false);
   // Magic layers
   const [magicLayersEl, setMagicLayersEl] = useState<CanvaElement | null>(null);
-  // Frame drag-and-drop
+  // Frame drag-and-drop (HTML5 drops from panels + pointer-dragged canvas elements)
   const [frameDragOver, setFrameDragOver] = useState<string | null>(null);
+  // Frame hovered while pointer-dragging an image element across the canvas
+  const frameHoverRef = useRef<string | null>(null);
 
   const pageRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -758,6 +760,25 @@ export function CanvaEditor({
         } else {
           patchEl(d.id, { x: Math.round(nx), y: Math.round(ny) });
         }
+
+        // Dragging a single image over a frame → highlight it as a drop target
+        if (!d.group && el.type === "image" && el.src) {
+          const pr = pageRef.current?.getBoundingClientRect();
+          let hit: string | null = null;
+          if (pr) {
+            const px = (e.clientX - pr.left) / z;
+            const py = (e.clientY - pr.top) / z;
+            const frame = pagesRef.current[pageIdxRef.current].elements.find(
+              (f) => f.type === "frame" && f.id !== d.id && !f.locked &&
+                px >= f.x && px <= f.x + f.w && py >= f.y && py <= f.y + f.h
+            );
+            hit = frame?.id ?? null;
+          }
+          if (hit !== frameHoverRef.current) {
+            frameHoverRef.current = hit;
+            setFrameDragOver(hit);
+          }
+        }
       } else if (d.mode === "group-resize" && d.groupResize) {
         const { bbox, els: origEls } = d.groupResize;
         const [hx, hy] = d.handle;
@@ -841,11 +862,26 @@ export function CanvaEditor({
   );
 
   const onDragEnd = useCallback(() => {
+    const d = dragRef.current;
+    const frameId = frameHoverRef.current;
+    // Dropped a dragged image onto a frame → fill the frame, consume the image
+    if (d && d.mode === "move" && d.orig.type === "image" && d.orig.src && frameId) {
+      const src = d.orig.src;
+      setPageAt(pageIdxRef.current, (p) => ({
+        ...p,
+        elements: p.elements
+          .filter((e) => e.id !== d.id)
+          .map((e) => (e.id === frameId ? { ...e, src, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined } : e)),
+      }));
+      setSelectedIds([frameId]);
+    }
+    frameHoverRef.current = null;
+    setFrameDragOver(null);
     dragRef.current = null;
     setGuides({ v: null, h: null });
     window.removeEventListener("pointermove", onDragMove);
     window.removeEventListener("pointerup", onDragEnd);
-  }, [onDragMove]);
+  }, [onDragMove, setPageAt]);
 
   // ── Marquee (rubber-band) selection on empty canvas ──────────────────────────
   const onMarqueeMove = useCallback((e: PointerEvent) => {
@@ -2937,8 +2973,15 @@ export function CanvaEditor({
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setSelectedId(el.id);
                         setEditingId(null);
+                        // Keep an existing multi-selection if right-clicking inside it
+                        // (so Group/align/etc. act on the whole selection); otherwise
+                        // select this element (or all its group mates).
+                        if (!selectedIdsRef.current.includes(el.id)) {
+                          const els = pagesRef.current[pageIdxRef.current].elements;
+                          const mates = el.groupId ? els.filter((x) => x.groupId === el.groupId).map((x) => x.id) : [el.id];
+                          setSelectedIds(mates);
+                        }
                         setCtxMenu({ x: e.clientX, y: e.clientY, elId: el.id });
                       }}
                       {...(el.type === "frame" ? {
@@ -3278,6 +3321,16 @@ export function CanvaEditor({
               {item("Paste style", <Paintbrush className="w-3.5 h-3.5" />, pasteStyle, { disabled: !styleClipboard.current })}
               {item("Duplicate", <Copy className="w-3.5 h-3.5" />, duplicateSelected, { shortcut: "Ctrl+D" })}
               {item("Delete", <Trash2 className="w-3.5 h-3.5" />, deleteSelected, { shortcut: "DELETE", danger: true })}
+
+              {(selectedIds.length >= 2 || selectedEls.some((x) => x.groupId)) && (
+                <>
+                  <div className="h-px bg-surface-100 my-1" />
+                  {selectedIds.length >= 2 &&
+                    item("Group", <Group className="w-3.5 h-3.5" />, groupSelected, { shortcut: "Ctrl+G" })}
+                  {selectedEls.some((x) => x.groupId) &&
+                    item("Ungroup", <Ungroup className="w-3.5 h-3.5" />, ungroupSelected, { shortcut: "Ctrl+Shift+G" })}
+                </>
+              )}
 
               <div className="h-px bg-surface-100 my-1" />
 
