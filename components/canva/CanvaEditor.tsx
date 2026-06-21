@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useReducer } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -126,6 +127,8 @@ export function CanvaEditor({
   const [driveUploading, setDriveUploading] = useState(false);
   const [driveProgress, setDriveProgress] = useState<string | null>(null);
   const openGoogleDrivePicker = useGoogleDrivePicker();
+  // Triggers re-render (updating portal chrome position) when viewport is scrolled
+  const [, vpScrollTick] = useReducer((n: number) => n + 1, 0);
   const [bgRemoving, setBgRemoving] = useState<string | null>(null);
   // Tool panel rendered in the LEFT sidebar (replaces the icon-rail panel while set)
   const [toolPanel, setToolPanel] = useState<"fonts" | "adjust" | "filters" | "crop" | "effects" | "position" | null>(null);
@@ -981,6 +984,19 @@ export function CanvaEditor({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [saveState]);
 
+  // Repaint portal chrome when the canvas viewport is scrolled/resized
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    vp.addEventListener("scroll", vpScrollTick, { passive: true });
+    window.addEventListener("resize", vpScrollTick, { passive: true });
+    return () => {
+      vp.removeEventListener("scroll", vpScrollTick);
+      window.removeEventListener("resize", vpScrollTick);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Insert helpers ──────────────────────────────────────────────────────────
   function insertText(kind: "heading" | "subheading" | "body") {
     const base = { heading: { fontSize: Math.round(W / 12), fontWeight: 700, text: "Add a heading" },
@@ -1608,22 +1624,39 @@ export function CanvaEditor({
   function renderMultiSelectionChrome() {
     const bbox = selectionBBox;
     if (!bbox) return null;
-    const hs = 13 / zoom;
-    return (
+    const pageNode = pageRef.current;
+    if (!pageNode) return null;
+    const rect = pageNode.getBoundingClientRect();
+    const hs = 13; // fixed screen-px so handles are same size at all zoom levels
+
+    const bx = rect.left + bbox.x * zoom;
+    const by = rect.top + bbox.y * zoom;
+    const bw = bbox.w * zoom;
+    const bh = bbox.h * zoom;
+
+    return createPortal(
       <>
         {/* per-element outlines */}
         {selectedEls.map((el) => (
           <div
             key={`sel-${el.id}`}
             style={{
-              position: "absolute", left: el.x, top: el.y, width: el.w, height: el.h,
-              transform: `rotate(${el.rotation}deg)`, border: `${1 / zoom}px solid #a78bfa`, pointerEvents: "none", zIndex: 999,
+              position: "fixed",
+              left: rect.left + el.x * zoom,
+              top: rect.top + el.y * zoom,
+              width: el.w * zoom,
+              height: el.h * zoom,
+              transform: `rotate(${el.rotation}deg)`,
+              transformOrigin: "center",
+              border: "1px solid #a78bfa",
+              pointerEvents: "none",
+              zIndex: 9500,
             }}
           />
         ))}
         {/* group bounding box + resize handles */}
-        <div style={{ position: "absolute", left: bbox.x, top: bbox.y, width: bbox.w, height: bbox.h, pointerEvents: "none", zIndex: 1000 }}>
-          <div style={{ position: "absolute", inset: 0, border: `${1.5 / zoom}px solid #7c3aed` }} />
+        <div style={{ position: "fixed", left: bx, top: by, width: bw, height: bh, pointerEvents: "none", zIndex: 9500 }}>
+          <div style={{ position: "absolute", inset: 0, border: "1.5px solid #7c3aed" }} />
           {HANDLES.map(([hx, hy]) => (
             <div
               key={`${hx},${hy}`}
@@ -1634,64 +1667,56 @@ export function CanvaEditor({
                 right: hx === 1 ? -hs / 2 : undefined,
                 top: hy === -1 ? -hs / 2 : hy === 0 ? `calc(50% - ${hs / 2}px)` : undefined,
                 bottom: hy === 1 ? -hs / 2 : undefined,
-                width: hs, height: hs, background: "#fff", border: `${1.5 / zoom}px solid #7c3aed`,
+                width: hs, height: hs, background: "#fff", border: "1.5px solid #7c3aed",
                 borderRadius: hx === 0 || hy === 0 ? hs / 4 : "50%", pointerEvents: "auto", touchAction: "none",
                 cursor: hx !== 0 && hy !== 0 ? (hx === hy ? "nwse-resize" : "nesw-resize") : hx === 0 ? "ns-resize" : "ew-resize",
               }}
             />
           ))}
         </div>
-      </>
+      </>,
+      document.body
     );
   }
 
   function renderSelectionChrome(el: CanvaElement) {
-    const hs = 13 / zoom;
+    const pageNode = pageRef.current;
+    if (!pageNode || typeof document === "undefined") return null;
+    const rect = pageNode.getBoundingClientRect();
+    const hs = 13; // fixed screen-px
+
+    const sx = rect.left + el.x * zoom;
+    const sy = rect.top + el.y * zoom;
+    const sw = el.w * zoom;
+    const sh = el.h * zoom;
+
     if (el.locked) {
-      return (
+      return createPortal(
         <div
           style={{
-            position: "absolute",
-            left: el.x,
-            top: el.y,
-            width: el.w,
-            height: el.h,
-            transform: `rotate(${el.rotation}deg)`,
-            pointerEvents: "none",
-            zIndex: 1000,
+            position: "fixed", left: sx, top: sy, width: sw, height: sh,
+            transform: `rotate(${el.rotation}deg)`, transformOrigin: "center",
+            pointerEvents: "none", zIndex: 9500,
           }}
         >
-          <div style={{ position: "absolute", inset: 0, border: `${1.5 / zoom}px dashed #94a3b8` }} />
-          <div
-            style={{
-              position: "absolute",
-              top: -hs * 2.5,
-              left: `calc(50% - ${hs}px)`,
-              background: "#475569",
-              borderRadius: hs / 3,
-              padding: hs / 3,
-              display: "flex",
-            }}
-          >
+          <div style={{ position: "absolute", inset: 0, border: "1.5px dashed #94a3b8" }} />
+          <div style={{ position: "absolute", top: -hs * 2.5, left: `calc(50% - ${hs}px)`, background: "#475569", borderRadius: hs / 3, padding: hs / 3, display: "flex" }}>
             <Lock style={{ width: hs * 1.4, height: hs * 1.4, color: "#fff" }} />
           </div>
-        </div>
+        </div>,
+        document.body
       );
     }
-    return (
+
+    return createPortal(
       <div
         style={{
-          position: "absolute",
-          left: el.x,
-          top: el.y,
-          width: el.w,
-          height: el.h,
-          transform: `rotate(${el.rotation}deg)`,
-          pointerEvents: "none",
-          zIndex: 1000,
+          position: "fixed", left: sx, top: sy, width: sw, height: sh,
+          transform: `rotate(${el.rotation}deg)`, transformOrigin: "center",
+          pointerEvents: "none", zIndex: 9500,
         }}
       >
-        <div style={{ position: "absolute", inset: 0, border: `${1.5 / zoom}px solid #7c3aed` }} />
+        <div style={{ position: "absolute", inset: 0, border: "1.5px solid #7c3aed" }} />
         {HANDLES.map(([hx, hy]) => (
           <div
             key={`${hx},${hy}`}
@@ -1702,17 +1727,11 @@ export function CanvaEditor({
               right: hx === 1 ? -hs / 2 : undefined,
               top: hy === -1 ? -hs / 2 : hy === 0 ? `calc(50% - ${hs / 2}px)` : undefined,
               bottom: hy === 1 ? -hs / 2 : undefined,
-              width: hs,
-              height: hs,
-              background: "#ffffff",
-              border: `${1.5 / zoom}px solid #7c3aed`,
+              width: hs, height: hs,
+              background: "#ffffff", border: "1.5px solid #7c3aed",
               borderRadius: hx === 0 || hy === 0 ? hs / 4 : "50%",
-              pointerEvents: "auto",
-              touchAction: "none",
-              cursor:
-                hx !== 0 && hy !== 0
-                  ? (hx === hy ? "nwse-resize" : "nesw-resize")
-                  : hx === 0 ? "ns-resize" : "ew-resize",
+              pointerEvents: "auto", touchAction: "none",
+              cursor: hx !== 0 && hy !== 0 ? (hx === hy ? "nwse-resize" : "nesw-resize") : hx === 0 ? "ns-resize" : "ew-resize",
             }}
           />
         ))}
@@ -1723,16 +1742,13 @@ export function CanvaEditor({
             position: "absolute",
             left: `calc(50% - ${hs / 2}px)`,
             top: -hs * 3,
-            width: hs,
-            height: hs,
-            background: "#7c3aed",
-            borderRadius: "50%",
-            pointerEvents: "auto",
-            touchAction: "none",
-            cursor: "grab",
+            width: hs, height: hs,
+            background: "#7c3aed", borderRadius: "50%",
+            pointerEvents: "auto", touchAction: "none", cursor: "grab",
           }}
         />
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -3008,10 +3024,8 @@ export function CanvaEditor({
 
                 </div>
 
-                {/* ── Selection chrome overlay — outside overflow:hidden page so handles extend beyond edge ── */}
-                <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, overflow: "visible", zIndex: 1000 }}>
-                  {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && renderSelectionChrome(selected)}
-                </div>
+                {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ── */}
+                {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && renderSelectionChrome(selected)}
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
