@@ -1,10 +1,41 @@
 "use client";
 
-import type { CanvaElement, CanvaPage } from "@/types/canva";
+import type { CanvaElement, CanvaPage, ElementAnimation } from "@/types/canva";
 import type { CSSProperties } from "react";
 import { imageColorFilter, imageShadowFilter, imageFlipTransform } from "./imagePresets";
 
-export function elementBoxStyle(el: CanvaElement): CSSProperties {
+export function getAnimKeyframeName(anim: ElementAnimation): string {
+  if (anim.type === "pan") {
+    return `canva-pan-${anim.direction ?? "left"}`;
+  }
+  const map: Record<string, string> = {
+    fade: "canva-fade", rise: "canva-rise", pop: "canva-pop",
+    blur: "canva-blur", wipe: "canva-wipe", drift: "canva-drift",
+    breathe: "canva-breathe", succession: "canva-fade", baseline: "canva-baseline",
+    tectonic: "canva-tectonic", tumble: "canva-tumble", neon: "canva-neon",
+    scrapbook: "canva-scrapbook", stomp: "canva-stomp",
+    "photo-flow": "canva-photo-flow", "photo-rise": "canva-photo-rise", "photo-zoom": "canva-photo-zoom",
+    rotate: "canva-rotate-in", flicker: "canva-flicker", pulse: "canva-pulse", wiggle: "canva-wiggle",
+  };
+  return map[anim.type] ?? "canva-fade";
+}
+
+export function getAnimDuration(speed: number): number {
+  return 0.3 + speed * 1.7;
+}
+
+export function elementBoxStyle(el: CanvaElement, asChild?: boolean): CSSProperties {
+  if (asChild) {
+    return {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      width: "100%",
+      height: "100%",
+      transform: `rotate(${el.rotation}deg)`,
+      opacity: el.opacity,
+    };
+  }
   return {
     position: "absolute",
     left: el.x,
@@ -17,8 +48,8 @@ export function elementBoxStyle(el: CanvaElement): CSSProperties {
 }
 
 // Static render of one element — used by the editor canvas, page thumbnails, and project cards
-export function ElementView({ el }: { el: CanvaElement }) {
-  const box = elementBoxStyle(el);
+export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boolean }) {
+  const box = elementBoxStyle(el, asChild);
 
   switch (el.type) {
     case "text": {

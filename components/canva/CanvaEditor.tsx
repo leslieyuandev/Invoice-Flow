@@ -26,6 +26,8 @@ import type { CanvaAsset } from "@/types/canva";
 import { deleteCanvaAssetAction } from "@/actions/canva";
 import { MagicEraserModal } from "./MagicEraserModal";
 import { MagicLayersModal } from "./MagicLayersModal";
+import { PixelEraserModal } from "./PixelEraserModal";
+import { AnimationPanel } from "./AnimationPanel";
 import { useGoogleDrivePicker } from "@/lib/hooks/useGoogleDrivePicker";
 
 // Rounded-corner indicator icon
@@ -39,9 +41,9 @@ function CornerRadiusIcon({ className }: { className?: string }) {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { saveCanvaProjectAction } from "@/actions/canva";
-import { ElementView, PageRenderer } from "./PageRenderer";
+import { ElementView, PageRenderer, getAnimKeyframeName, getAnimDuration } from "./PageRenderer";
 import { CANVA_TEMPLATES, instantiateTemplate } from "./templates";
-import { uid, newPage, CANVA_FORMATS, type CanvaElement, type CanvaPage, type CanvaProjectData } from "@/types/canva";
+import { uid, newPage, CANVA_FORMATS, type CanvaElement, type CanvaPage, type CanvaProjectData, type ElementAnimation } from "@/types/canva";
 
 const GOOGLE_FONTS_URL =
   "https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Poppins:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Dancing+Script:wght@600&family=Bebas+Neue&display=swap";
@@ -131,7 +133,7 @@ export function CanvaEditor({
   const [, vpScrollTick] = useReducer((n: number) => n + 1, 0);
   const [bgRemoving, setBgRemoving] = useState<string | null>(null);
   // Tool panel rendered in the LEFT sidebar (replaces the icon-rail panel while set)
-  const [toolPanel, setToolPanel] = useState<"fonts" | "adjust" | "filters" | "crop" | "effects" | "position" | null>(null);
+  const [toolPanel, setToolPanel] = useState<"fonts" | "adjust" | "filters" | "crop" | "effects" | "position" | "animate" | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"pdf" | "png" | "jpg">("pdf");
@@ -167,6 +169,9 @@ export function CanvaEditor({
   const cropDragRef = useRef<CropDragState | null>(null);
   // Magic eraser
   const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
+  // Pixel eraser
+  const [pixelEraserEl, setPixelEraserEl] = useState<CanvaElement | null>(null);
+  const [eraserDropOpen, setEraserDropOpen] = useState(false);
   // Magic layers
   const [magicLayersEl, setMagicLayersEl] = useState<CanvaElement | null>(null);
   // Frame drag-and-drop
@@ -1573,6 +1578,15 @@ export function CanvaEditor({
       );
     }
 
+    if (toolPanel === "animate") {
+      return (
+        <AnimationPanel
+          el={selected ?? null}
+          onPatch={(patch) => { if (selected) { pushHistory(); commitPatch(selected.id, patch); } }}
+        />
+      );
+    }
+
     return null;
   }
 
@@ -2177,15 +2191,41 @@ export function CanvaEditor({
                 {bgRemoving === selected.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
                 <span className="hidden lg:inline">Remove BG</span>
               </button>
-              <button
-                type="button"
-                title="Magic Eraser — paint to erase areas"
-                onClick={() => selected.src ? setEraserEl(selected) : toast.error("No image to erase")}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-surface-500 hover:bg-surface-100"
-              >
-                <PenTool className="w-4 h-4" />
-                <span className="hidden lg:inline">Eraser</span>
-              </button>
+              <div className="relative flex items-center rounded-md border border-surface-200 overflow-visible">
+                <button
+                  type="button"
+                  title="Eraser options"
+                  onClick={() => setEraserDropOpen((v) => !v)}
+                  className="flex items-center gap-1 px-2 py-1.5 text-xs text-surface-500 hover:bg-surface-100"
+                >
+                  <PenTool className="w-4 h-4" />
+                  <span className="hidden lg:inline">Eraser</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {eraserDropOpen && (
+                  <div
+                    className="absolute top-full left-0 mt-1 z-[200] bg-white rounded-xl shadow-xl border border-surface-200 py-1 w-44"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
+                      onClick={() => { setEraserDropOpen(false); selected?.src ? setEraserEl(selected) : toast.error("No image"); }}
+                    >
+                      <PenTool className="w-4 h-4 text-surface-500 shrink-0" />
+                      Magic Eraser
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
+                      onClick={() => { setEraserDropOpen(false); selected?.src ? setPixelEraserEl(selected) : toast.error("No image"); }}
+                    >
+                      <Eraser className="w-4 h-4 text-surface-500 shrink-0" />
+                      Pixel Eraser
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 title="Magic Layers — split image into background + foreground layers"
@@ -2254,6 +2294,14 @@ export function CanvaEditor({
             className={cn("flex items-center gap-1 px-2 py-1.5 rounded-md text-xs", toolPanel === "position" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
           >
             <Move className="w-4 h-4" /> Position
+          </button>
+          <button
+            type="button"
+            onClick={() => setToolPanel((p) => (p === "animate" ? null : "animate"))}
+            className={cn("flex items-center gap-1 px-2 py-1.5 rounded-md text-xs hover:bg-surface-100", toolPanel === "animate" ? "text-brand-600 bg-brand-50" : "text-surface-500")}
+          >
+            <Play className="w-4 h-4" />
+            <span className="hidden lg:inline">Animate</span>
           </button>
           <button type="button" title="Bring forward" onClick={() => moveLayer(1)} className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"><ChevronUp className="w-4 h-4" /></button>
           <button type="button" title="Send backward" onClick={() => moveLayer(-1)} className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"><ChevronDown className="w-4 h-4" /></button>
@@ -2850,7 +2898,7 @@ export function CanvaEditor({
           ref={viewportRef}
           className="flex-1 overflow-auto"
           style={{ userSelect: "none" }}
-          onPointerDown={() => { setSelectedId(null); setEditingId(null); if (toolPanel !== "fonts") setToolPanel(null); }}
+          onPointerDown={() => { setSelectedId(null); setEditingId(null); if (toolPanel !== "fonts") setToolPanel(null); setEraserDropOpen(false); }}
         >
           <div className="min-w-fit min-h-full flex items-center justify-center p-12">
             <div style={{ width: W * zoom, height: H * zoom, flexShrink: 0 }}>
@@ -3466,8 +3514,31 @@ export function CanvaEditor({
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ transform: `scale(${ratio})`, transformOrigin: "top left" }}>
-                <div style={{ width: W, height: H, background: pg.background, overflow: "hidden" }}>
-                  {pg.elements.map((el) => <ElementView key={el.id} el={el} />)}
+                <div style={{ width: W, height: H, background: pg.background, overflow: "hidden", position: "relative" }}>
+                  {pg.elements.map((el, idx) => {
+                    const anim = el.animation;
+                    if (!anim || anim.trigger === "exit") {
+                      return <ElementView key={el.id} el={el} />;
+                    }
+                    const keyframeName = getAnimKeyframeName(anim);
+                    const duration = getAnimDuration(anim.speed ?? 0.5);
+                    const delay = anim.type === "succession" ? idx * 0.15 : 0;
+                    return (
+                      <div
+                        key={`${presentIdx}-${el.id}`}
+                        style={{
+                          position: "absolute",
+                          left: el.x,
+                          top: el.y,
+                          width: el.w,
+                          height: el.h,
+                          animation: `${keyframeName} ${duration}s ease both ${delay}s`,
+                        }}
+                      >
+                        <ElementView el={el} asChild />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -3516,6 +3587,18 @@ export function CanvaEditor({
           onApply={(url) => {
             commitPatch(eraserEl.id, { src: url, crop: undefined, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined });
             setEraserEl(null);
+          }}
+        />
+      )}
+
+      {/* Pixel Eraser modal */}
+      {pixelEraserEl && (
+        <PixelEraserModal
+          el={pixelEraserEl}
+          onClose={() => setPixelEraserEl(null)}
+          onApply={(url) => {
+            commitPatch(pixelEraserEl.id, { src: url, crop: undefined, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined });
+            setPixelEraserEl(null);
           }}
         />
       )}

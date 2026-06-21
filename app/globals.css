@@ -88,3 +88,29 @@ body {
   background: var(--color-surface-300);
   border-radius: 3px;
 }
+
+/* ── Canva Animation Keyframes ─────────────────────────── */
+@keyframes canva-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes canva-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes canva-pop { 0% { opacity: 0; transform: scale(0.5); } 70% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes canva-blur { from { opacity: 0; filter: blur(14px); } to { opacity: 1; filter: blur(0); } }
+@keyframes canva-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0% 0 0); } }
+@keyframes canva-pan-left  { from { opacity: 0; transform: translateX(-80px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes canva-pan-right { from { opacity: 0; transform: translateX(80px); }  to { opacity: 1; transform: translateX(0); } }
+@keyframes canva-pan-up    { from { opacity: 0; transform: translateY(-80px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes canva-pan-down  { from { opacity: 0; transform: translateY(80px); }  to { opacity: 1; transform: translateY(0); } }
+@keyframes canva-drift { from { opacity: 0; transform: translate(-30px, 15px); } to { opacity: 1; transform: translate(0, 0); } }
+@keyframes canva-breathe { 0% { opacity: 0.6; transform: scale(0.94); } 50% { transform: scale(1.03); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes canva-baseline { from { opacity: 0; transform: translateY(60px) scaleY(0.8); } to { opacity: 1; transform: translateY(0) scaleY(1); } }
+@keyframes canva-tectonic { 0% { transform: translateX(-10px) rotate(-2deg); } 25% { transform: translateX(10px) rotate(2deg); } 50% { transform: translateX(-6px) rotate(-1deg); } 75% { transform: translateX(6px) rotate(1deg); } 100% { transform: translateX(0) rotate(0); } }
+@keyframes canva-tumble { from { opacity: 0; transform: rotate(-180deg) translateY(50px); } to { opacity: 1; transform: rotate(0) translateY(0); } }
+@keyframes canva-neon { 0% { opacity: 0; filter: brightness(3) drop-shadow(0 0 24px #a78bfa); } 50% { opacity: 1; filter: brightness(1.4) drop-shadow(0 0 10px #7c3aed); } 100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 0px transparent); } }
+@keyframes canva-scrapbook { from { opacity: 0; transform: rotate(-10deg) translateY(24px); } to { opacity: 1; transform: rotate(0) translateY(0); } }
+@keyframes canva-stomp { 0% { opacity: 0; transform: scale(1.6); } 55% { transform: scale(0.94); } 80% { transform: scale(1.03); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes canva-photo-flow { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: scale(1); } }
+@keyframes canva-photo-rise { from { opacity: 0; transform: translateY(80px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes canva-photo-zoom { from { opacity: 0; transform: scale(1.35); } to { opacity: 1; transform: scale(1); } }
+@keyframes canva-rotate-in { from { opacity: 0; transform: rotate(-360deg); } to { opacity: 1; transform: rotate(0); } }
+@keyframes canva-flicker { 0%,100% { opacity: 1; } 10% { opacity: 0.1; } 20% { opacity: 0.9; } 35% { opacity: 0.2; } 50% { opacity: 1; } 65% { opacity: 0.3; } 80% { opacity: 0.85; } }
+@keyframes canva-pulse { 0% { opacity: 0; transform: scale(0.75); } 45% { opacity: 1; transform: scale(1.1); } 72% { transform: scale(0.96); } 100% { transform: scale(1); } }
+@keyframes canva-wiggle { 0% { opacity: 0; transform: rotate(0); } 20% { opacity: 1; transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-6deg); } 80% { transform: rotate(4deg); } 100% { transform: rotate(0); } }

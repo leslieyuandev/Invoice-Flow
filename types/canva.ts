@@ -60,6 +60,24 @@ export interface CanvaElement {
   locked?: boolean;
   link?: string;
   groupId?: string;
+
+  // animation
+  animation?: ElementAnimation;
+}
+
+export type AnimationType =
+  | "fade" | "rise" | "pop" | "blur" | "wipe" | "pan"
+  | "drift" | "breathe" | "succession" | "baseline"
+  | "tectonic" | "tumble" | "neon" | "scrapbook" | "stomp"
+  | "photo-flow" | "photo-rise" | "photo-zoom"
+  | "rotate" | "flicker" | "pulse" | "wiggle";
+
+export interface ElementAnimation {
+  type: AnimationType;
+  trigger: "both" | "enter" | "exit";
+  speed: number;
+  direction?: "up" | "down" | "left" | "right";
+  reverseExit?: boolean;
 }
 
 export interface CanvaPage {
