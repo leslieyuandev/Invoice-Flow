@@ -3305,7 +3305,7 @@ export function CanvaEditor({
                 </div>
 
                 {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ── */}
-                {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && renderSelectionChrome(selected)}
+                {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && toolPanel !== "crop" && renderSelectionChrome(selected)}
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
