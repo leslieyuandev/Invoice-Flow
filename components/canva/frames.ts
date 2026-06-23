@@ -26,12 +26,31 @@ function smoothArch(ry: number, rx = 50, cy = ry, steps = 72): string {
   return `polygon(${pts.join(", ")})`;
 }
 
+// A "long body" arch: a semicircular dome on top with straight vertical sides
+// running down to the base. `domeH` is the dome height in % of total height; the
+// rest is the straight body. Larger body = smaller domeH.
+function archWithBody(domeH: number, rx = 50, steps = 72): string {
+  const pts: string[] = ["0% 100%", `0% ${domeH.toFixed(2)}%`];
+  for (let i = 0; i <= steps; i++) {
+    const theta = Math.PI * (1 - i / steps); // 180° (left) → 0° (right)
+    const x = 50 + rx * Math.cos(theta);
+    const y = domeH - domeH * Math.sin(theta); // apex at y=0, sides meet body at y=domeH
+    pts.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
+  }
+  pts.push(`100% ${domeH.toFixed(2)}%`, "100% 100%");
+  return `polygon(${pts.join(", ")})`;
+}
+
 export const FRAMES: FrameDef[] = [
   // Party Arch — smooth elliptical arches (parametric, 72 steps = 2.5° per segment)
-  { id: "arch",      label: "Standard Arch", group: "Party Arch", clipPath: smoothArch(60) },
-  { id: "arch-tall", label: "Tall Arch",     group: "Party Arch", clipPath: smoothArch(70) },
-  { id: "arch-wide", label: "Wide Arch",     group: "Party Arch", clipPath: smoothArch(50) },
-  { id: "arch-oval", label: "Oval Arch",     group: "Party Arch", clipPath: "ellipse(50% 55% at 50% 55%)" },
+  { id: "arch",       label: "Standard Arch", group: "Party Arch", clipPath: smoothArch(60) },
+  { id: "arch-tall",  label: "Tall Arch",     group: "Party Arch", clipPath: smoothArch(70) },
+  { id: "arch-wide",  label: "Wide Arch",     group: "Party Arch", clipPath: smoothArch(50) },
+  { id: "arch-oval",  label: "Oval Arch",     group: "Party Arch", clipPath: "ellipse(50% 55% at 50% 55%)" },
+  // Long-body arches — rounded dome on top, straight vertical sides for the body
+  { id: "arch-long",  label: "Long Arch",     group: "Party Arch", clipPath: archWithBody(45) },
+  { id: "arch-xlong", label: "Extra Long Arch", group: "Party Arch", clipPath: archWithBody(32) },
+  { id: "arch-pillar", label: "Pillar Arch",  group: "Party Arch", clipPath: archWithBody(24) },
 
   // Basic
   { id: "rect",      label: "Rectangle",  group: "Basic",   clipPath: "" },

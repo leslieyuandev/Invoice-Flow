@@ -167,6 +167,9 @@ export function CanvaEditor({
   const [fmDraggingPt, setFmDraggingPt] = useState<number | null>(null);
   // Crop drag ref
   const cropDragRef = useRef<CropDragState | null>(null);
+  // Natural aspect ratio (naturalW/naturalH) of the image currently being cropped,
+  // so the crop image rect is always kept undistorted.
+  const cropNaturalRef = useRef<{ id: string; ratio: number } | null>(null);
   // Magic eraser
   const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
   // Pixel eraser
@@ -223,6 +226,23 @@ export function CanvaEditor({
     fitZoom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Crop: capture the image's natural aspect ratio and cover-fit on entry ────
+  useEffect(() => {
+    if (toolPanel !== "crop" || !selected || !selected.src) return;
+    const id = selected.id;
+    const img = new window.Image();
+    img.onload = () => {
+      const ratio = img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
+      cropNaturalRef.current = { id, ratio };
+      const cur = pagesRef.current[pageIdxRef.current].elements.find((x) => x.id === id);
+      if (cur && cur.cropW === undefined) {
+        patchEl(id, coverRect(cur.w, cur.h, ratio));
+      }
+    };
+    img.src = selected.src;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolPanel, selected?.id, selected?.src]);
 
   // Register uploaded custom fonts so they render and export
   useEffect(() => {
@@ -662,6 +682,22 @@ export function CanvaEditor({
   }
 
   // ── Crop drag (visual crop overlay) ─────────────────────────────────────────
+  // Compute an image rect (cropX/Y/W/H) that COVERS a frame of fw×fh while keeping
+  // the image's natural aspect ratio (ratio = naturalW/naturalH), centred.
+  function coverRect(fw: number, fh: number, ratio: number) {
+    const frameRatio = fw / fh;
+    let cw: number, ch: number;
+    if (ratio > frameRatio) { ch = fh; cw = fh * ratio; }
+    else { cw = fw; ch = fw / ratio; }
+    return { cropX: (fw - cw) / 2, cropY: (fh - ch) / 2, cropW: cw, cropH: ch };
+  }
+
+  function cropRatioFor(el: CanvaElement): number {
+    if (cropNaturalRef.current?.id === el.id) return cropNaturalRef.current.ratio;
+    if (el.cropW && el.cropH) return el.cropW / el.cropH;
+    return el.w / el.h;
+  }
+
   function startCropDrag(
     e: React.PointerEvent,
     mode: CropDragState["mode"],
@@ -669,10 +705,11 @@ export function CanvaEditor({
   ) {
     e.stopPropagation();
     e.preventDefault();
+    const ratio = cropRatioFor(el);
     const cropX = el.cropX ?? 0;
     const cropY = el.cropY ?? 0;
     const cropW = el.cropW ?? el.w;
-    const cropH = el.cropH ?? el.h;
+    const cropH = el.cropH ?? el.w / ratio;
     pushHistory();
     cropDragRef.current = {
       mode, startX: e.clientX, startY: e.clientY,
@@ -690,23 +727,41 @@ export function CanvaEditor({
     if (!sel) return;
     const dx = (e.clientX - d.startX) / zoomRef.current;
     const dy = (e.clientY - d.startY) / zoomRef.current;
-    let { startCropX: newX, startCropY: newY, startCropW: newW, startCropH: newH } = d;
-    const minW = sel.w, minH = sel.h;
-    if (d.mode === "pan") { newX += dx; newY += dy; }
-    if (d.mode === "n" || d.mode === "nw" || d.mode === "ne") {
-      newY += dy; newH -= dy;
-      if (newH < minH) { newY = d.startCropY + d.startCropH - minH; newH = minH; }
+    const ratio = d.startCropW / d.startCropH; // locked image ratio (never distort)
+
+    if (d.mode === "pan") {
+      // Pan only — keep the image covering the frame (no empty gaps).
+      let newX = d.startCropX + dx;
+      let newY = d.startCropY + dy;
+      newX = Math.min(0, Math.max(sel.w - d.startCropW, newX));
+      newY = Math.min(0, Math.max(sel.h - d.startCropH, newY));
+      patchEl(selId, { cropX: newX, cropY: newY });
+      return;
     }
-    if (d.mode === "s" || d.mode === "sw" || d.mode === "se") {
-      newH = Math.max(minH, d.startCropH + dy);
-    }
-    if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") {
-      newX += dx; newW -= dx;
-      if (newW < minW) { newX = d.startCropX + d.startCropW - minW; newW = minW; }
-    }
-    if (d.mode === "e" || d.mode === "ne" || d.mode === "se") {
-      newW = Math.max(minW, d.startCropW + dx);
-    }
+
+    // Resize — scale the image uniformly (ratio-locked) so it never stretches.
+    let newW = d.startCropW;
+    if (d.mode === "e" || d.mode === "ne" || d.mode === "se") newW = d.startCropW + dx;
+    else if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newW = d.startCropW - dx;
+    else if (d.mode === "s") newW = (d.startCropH + dy) * ratio;
+    else if (d.mode === "n") newW = (d.startCropH - dy) * ratio;
+
+    // Never shrink below the size needed to cover the frame.
+    const minW = Math.max(sel.w, sel.h * ratio);
+    newW = Math.max(minW, newW);
+    const newH = newW / ratio;
+
+    // Anchor the side/corner opposite the handle so resize feels natural.
+    let newX = d.startCropX;
+    let newY = d.startCropY;
+    if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newX = d.startCropX + (d.startCropW - newW);
+    else if (d.mode === "n" || d.mode === "s") newX = d.startCropX + (d.startCropW - newW) / 2;
+    if (d.mode === "n" || d.mode === "ne" || d.mode === "nw") newY = d.startCropY + (d.startCropH - newH);
+    else if (d.mode === "e" || d.mode === "w") newY = d.startCropY + (d.startCropH - newH) / 2;
+
+    // Clamp so the frame stays fully covered.
+    newX = Math.min(0, Math.max(sel.w - newW, newX));
+    newY = Math.min(0, Math.max(sel.h - newH, newY));
     patchEl(selId, { cropX: newX, cropY: newY, cropW: newW, cropH: newH });
   }
 
@@ -1508,26 +1563,49 @@ export function CanvaEditor({
 
     if (toolPanel === "crop" && (selected.type === "image" || selected.type === "frame")) {
       const cropRot = selected.cropRotation ?? 0;
-      const cropW = selected.cropW ?? selected.w;
-      const cropH = selected.cropH ?? selected.h;
+      const natRatio = cropRatioFor(selected);
+      const frameRatio = selected.h > 0 ? selected.w / selected.h : 1;
       const ASPECT_PRESETS = [
         { label: "Freeform", value: null },
-        { label: "Original", value: cropW / cropH },
+        { label: "Original", value: natRatio },
         { label: "1:1", value: 1 },
         { label: "16:9", value: 16 / 9 },
         { label: "4:3", value: 4 / 3 },
         { label: "3:2", value: 3 / 2 },
       ];
+      // Change the crop FRAME's aspect ratio (the element box), keeping its centre
+      // fixed, then re-fit the image to cover — never distorts the image.
       function applyAspectRatio(ratio: number | null) {
         if (ratio === null) return;
-        const w = cropW;
-        const newH = w / ratio;
-        patchEl(selected!.id, { cropH: newH });
+        const el = selected!;
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        // Keep the larger dimension and derive the other so the frame fits on-page.
+        let nw = el.w;
+        let nh = nw / ratio;
+        if (nh > H) { nh = H; nw = nh * ratio; }
+        if (nw > W) { nw = W; nh = nw / ratio; }
+        const nx = cx - nw / 2;
+        const ny = cy - nh / 2;
+        commitPatch(el.id, { x: nx, y: ny, w: nw, h: nh, ...coverRect(nw, nh, cropRatioFor(el)) });
       }
-      const currentRatio = cropH > 0 ? cropW / cropH : 1;
       function matchesPreset(ratio: number | null) {
-        if (ratio === null) return true;
-        return Math.abs(currentRatio - ratio) < 0.01;
+        if (ratio === null) return false;
+        return Math.abs(frameRatio - ratio) < 0.01;
+      }
+      // Expand the crop FRAME to a target size, re-fitting the image to cover it.
+      function expandFrame(target: "page" | "square" | "wider" | "taller") {
+        const el = selected!;
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        let nw = el.w, nh = el.h;
+        if (target === "page") { nw = W; nh = H; }
+        else if (target === "square") { const s = Math.min(Math.max(el.w, el.h), Math.min(W, H)); nw = s; nh = s; }
+        else if (target === "wider") { nw = Math.min(W, el.w * 1.4); }
+        else if (target === "taller") { nh = Math.min(H, el.h * 1.4); }
+        const nx = Math.max(0, Math.min(W - nw, cx - nw / 2));
+        const ny = Math.max(0, Math.min(H - nh, cy - nh / 2));
+        commitPatch(el.id, { x: nx, y: ny, w: nw, h: nh, ...coverRect(nw, nh, cropRatioFor(el)) });
       }
 
       return (
@@ -1548,15 +1626,15 @@ export function CanvaEditor({
               onClick={() => setCropTab("expand")}
               className={cn("flex-1 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1", cropTab === "expand" ? "bg-brand-600 text-white" : "text-surface-500 hover:bg-surface-50")}
             >
-              Expand ✨
+              Expand
             </button>
           </div>
 
           {cropTab === "crop" && (
             <>
-              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it. Drag handles to resize the image area.</p>
+              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it within the frame. Drag the white handles to scale it. Pick a ratio to reshape the crop frame.</p>
 
-              {/* Aspect ratio */}
+              {/* Aspect ratio (reshapes the crop frame) */}
               <div>
                 <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Aspect ratio</p>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -1594,54 +1672,39 @@ export function CanvaEditor({
 
           {cropTab === "expand" && (
             <>
-              <p className="text-xs text-surface-400 leading-relaxed">Expand your image using AI to fill a larger area.</p>
+              <p className="text-xs text-surface-400 leading-relaxed">Enlarge the crop frame — the image re-fits to fill the larger area.</p>
 
               {/* Expand size presets */}
               <div>
                 <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Select a size</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { label: "Freeform", icon: "⤢" },
-                    { label: "Whole Page", icon: "▣" },
-                    { label: "1:1", icon: "□" },
-                  ].map((opt) => (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    { label: "Whole Page", icon: "▣", target: "page" as const },
+                    { label: "Square", icon: "□", target: "square" as const },
+                    { label: "Wider", icon: "⇆", target: "wider" as const },
+                    { label: "Taller", icon: "⇅", target: "taller" as const },
+                  ]).map((opt) => (
                     <button
                       key={opt.label}
                       type="button"
-                      onClick={() => {
-                        if (opt.label === "Whole Page") {
-                          const scale = Math.min(W / cropW, H / cropH);
-                          patchEl(selected.id, { cropW: cropW * scale, cropH: cropH * scale });
-                        } else if (opt.label === "1:1") {
-                          const s = Math.max(cropW, cropH);
-                          patchEl(selected.id, { cropW: s, cropH: s });
-                        }
-                      }}
+                      onClick={() => expandFrame(opt.target)}
                       className="py-2 rounded-lg border border-surface-200 text-[10px] font-medium text-surface-500 hover:bg-surface-50 flex flex-col items-center gap-1"
                     >
-                      <span className="text-base">{opt.icon}</span>
+                      <span className="text-base leading-none">{opt.icon}</span>
                       {opt.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <p className="text-[10px] text-surface-400">Images with faces, hands, or transparent backgrounds may not work well when expanding.</p>
-
-              <button
-                type="button"
-                className="w-full py-2 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 flex items-center justify-center gap-1.5"
-                onClick={() => toast.info("AI expand coming soon — set up an image expansion API to enable this feature.")}
-              >
-                ✨ Generate expansion
-              </button>
+              <p className="text-[10px] text-surface-400">Tip: after expanding, switch to Crop and drag the image to reposition it within the new frame.</p>
             </>
           )}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={() => { commitPatch(selected.id, { cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined, cropRotation: undefined, crop: undefined }); }}
+              onClick={() => { commitPatch(selected.id, { cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined, cropRotation: undefined, crop: undefined }); cropNaturalRef.current = null; }}
               className="flex-1 py-1.5 rounded-lg border border-surface-200 text-xs text-surface-600 hover:bg-surface-50"
             >
               Reset
@@ -3070,14 +3133,12 @@ export function CanvaEditor({
                         if (el.type === "text" && !el.locked) { setEditingId(el.id); setSelectedId(el.id); }
                         else if (el.type === "image") {
                           setSelectedId(el.id);
-                          // Initialize visual crop defaults if not already set
-                          if (el.cropW === undefined) patchEl(el.id, { cropX: 0, cropY: 0, cropW: el.w, cropH: el.h });
+                          // Cover-fit (natural ratio) handled by the crop entry effect
                           setToolPanel("crop");
                         }
                         else if (el.type === "frame") {
                           setSelectedId(el.id);
                           if (el.src) {
-                            if (el.cropW === undefined) patchEl(el.id, { cropX: 0, cropY: 0, cropW: el.w, cropH: el.h });
                             setToolPanel("crop");
                           } else {
                             setPanel("uploads");
@@ -3248,10 +3309,11 @@ export function CanvaEditor({
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
-                  const cropX = selected.cropX ?? 0;
-                  const cropY = selected.cropY ?? 0;
-                  const cropW = selected.cropW ?? selected.w;
-                  const cropH = selected.cropH ?? selected.h;
+                  const _cover = coverRect(selected.w, selected.h, cropRatioFor(selected));
+                  const cropX = selected.cropX ?? _cover.cropX;
+                  const cropY = selected.cropY ?? _cover.cropY;
+                  const cropW = selected.cropW ?? _cover.cropW;
+                  const cropH = selected.cropH ?? _cover.cropH;
                   const eRot = selected.rotation;
                   const eCx = selected.x + selected.w / 2;
                   const eCy = selected.y + selected.h / 2;
