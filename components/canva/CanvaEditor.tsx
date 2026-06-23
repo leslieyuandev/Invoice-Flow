@@ -172,6 +172,10 @@ export function CanvaEditor({
   // Pixel eraser
   const [pixelEraserEl, setPixelEraserEl] = useState<CanvaElement | null>(null);
   const [eraserDropOpen, setEraserDropOpen] = useState(false);
+  const eraserBtnRef = useRef<HTMLButtonElement>(null);
+  const [eraserDropPos, setEraserDropPos] = useState<{ top: number; left: number } | null>(null);
+  const [cropTab, setCropTab] = useState<"crop" | "expand">("crop");
+  const [animPreviewVersion, setAnimPreviewVersion] = useState<Record<string, number>>({});
   // Magic layers
   const [magicLayersEl, setMagicLayersEl] = useState<CanvaElement | null>(null);
   // Frame drag-and-drop (HTML5 drops from panels + pointer-dragged canvas elements)
@@ -665,10 +669,10 @@ export function CanvaEditor({
   ) {
     e.stopPropagation();
     e.preventDefault();
-    const cropX = el.cropX ?? -(el.w * 0.15);
-    const cropY = el.cropY ?? -(el.h * 0.15);
-    const cropW = el.cropW ?? el.w * 1.3;
-    const cropH = el.cropH ?? el.h * 1.3;
+    const cropX = el.cropX ?? 0;
+    const cropY = el.cropY ?? 0;
+    const cropW = el.cropW ?? el.w;
+    const cropH = el.cropH ?? el.h;
     pushHistory();
     cropDragRef.current = {
       mode, startX: e.clientX, startY: e.clientY,
@@ -1504,29 +1508,140 @@ export function CanvaEditor({
 
     if (toolPanel === "crop" && (selected.type === "image" || selected.type === "frame")) {
       const cropRot = selected.cropRotation ?? 0;
+      const cropW = selected.cropW ?? selected.w;
+      const cropH = selected.cropH ?? selected.h;
+      const ASPECT_PRESETS = [
+        { label: "Freeform", value: null },
+        { label: "Original", value: cropW / cropH },
+        { label: "1:1", value: 1 },
+        { label: "16:9", value: 16 / 9 },
+        { label: "4:3", value: 4 / 3 },
+        { label: "3:2", value: 3 / 2 },
+      ];
+      function applyAspectRatio(ratio: number | null) {
+        if (ratio === null) return;
+        const w = cropW;
+        const newH = w / ratio;
+        patchEl(selected!.id, { cropH: newH });
+      }
+      const currentRatio = cropH > 0 ? cropW / cropH : 1;
+      function matchesPreset(ratio: number | null) {
+        if (ratio === null) return true;
+        return Math.abs(currentRatio - ratio) < 0.01;
+      }
+
       return (
-        <div className="overflow-y-auto space-y-4">
+        <div className="overflow-y-auto space-y-3">
           <ToolPanelHeader title="Crop" />
-          <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it within the frame. Drag the white handles to resize the image area.</p>
 
-          {/* Rotate */}
-          <div>
-            <div className="flex justify-between text-xs text-surface-500 mb-1">
-              <span className="flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Rotate</span>
-              <span>{cropRot}°</span>
-            </div>
-            <input
-              type="range" min={-180} max={180} step={1} value={cropRot}
-              onPointerDown={() => pushHistory()}
-              onChange={(e) => patchEl(selected.id, { cropRotation: Number(e.target.value) })}
-              className="w-full accent-brand-600"
-            />
-          </div>
-
-          <div className="flex gap-2">
+          {/* Crop / Expand tabs */}
+          <div className="flex rounded-lg border border-surface-200 overflow-hidden">
             <button
               type="button"
-              onClick={() => commitPatch(selected.id, { cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined, cropRotation: undefined, crop: undefined })}
+              onClick={() => setCropTab("crop")}
+              className={cn("flex-1 py-1.5 text-xs font-medium transition-colors", cropTab === "crop" ? "bg-brand-600 text-white" : "text-surface-500 hover:bg-surface-50")}
+            >
+              Crop
+            </button>
+            <button
+              type="button"
+              onClick={() => setCropTab("expand")}
+              className={cn("flex-1 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1", cropTab === "expand" ? "bg-brand-600 text-white" : "text-surface-500 hover:bg-surface-50")}
+            >
+              Expand ✨
+            </button>
+          </div>
+
+          {cropTab === "crop" && (
+            <>
+              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it. Drag handles to resize the image area.</p>
+
+              {/* Aspect ratio */}
+              <div>
+                <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Aspect ratio</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {ASPECT_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => applyAspectRatio(p.value)}
+                      className={cn(
+                        "py-1.5 rounded-lg border text-[10px] font-medium transition-colors",
+                        matchesPreset(p.value) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50"
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rotate */}
+              <div>
+                <div className="flex justify-between text-xs text-surface-500 mb-1">
+                  <span className="flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Rotate</span>
+                  <span>{cropRot}°</span>
+                </div>
+                <input
+                  type="range" min={-180} max={180} step={1} value={cropRot}
+                  onPointerDown={() => pushHistory()}
+                  onChange={(e) => patchEl(selected.id, { cropRotation: Number(e.target.value) })}
+                  className="w-full accent-brand-600"
+                />
+              </div>
+            </>
+          )}
+
+          {cropTab === "expand" && (
+            <>
+              <p className="text-xs text-surface-400 leading-relaxed">Expand your image using AI to fill a larger area.</p>
+
+              {/* Expand size presets */}
+              <div>
+                <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Select a size</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: "Freeform", icon: "⤢" },
+                    { label: "Whole Page", icon: "▣" },
+                    { label: "1:1", icon: "□" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => {
+                        if (opt.label === "Whole Page") {
+                          const scale = Math.min(W / cropW, H / cropH);
+                          patchEl(selected.id, { cropW: cropW * scale, cropH: cropH * scale });
+                        } else if (opt.label === "1:1") {
+                          const s = Math.max(cropW, cropH);
+                          patchEl(selected.id, { cropW: s, cropH: s });
+                        }
+                      }}
+                      className="py-2 rounded-lg border border-surface-200 text-[10px] font-medium text-surface-500 hover:bg-surface-50 flex flex-col items-center gap-1"
+                    >
+                      <span className="text-base">{opt.icon}</span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-surface-400">Images with faces, hands, or transparent backgrounds may not work well when expanding.</p>
+
+              <button
+                type="button"
+                className="w-full py-2 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 flex items-center justify-center gap-1.5"
+                onClick={() => toast.info("AI expand coming soon — set up an image expansion API to enable this feature.")}
+              >
+                ✨ Generate expansion
+              </button>
+            </>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { commitPatch(selected.id, { cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined, cropRotation: undefined, crop: undefined }); }}
               className="flex-1 py-1.5 rounded-lg border border-surface-200 text-xs text-surface-600 hover:bg-surface-50"
             >
               Reset
@@ -1618,7 +1733,15 @@ export function CanvaEditor({
       return (
         <AnimationPanel
           el={selected ?? null}
-          onPatch={(patch) => { if (selected) { pushHistory(); commitPatch(selected.id, patch); } }}
+          onPatch={(patch) => {
+            if (selected) {
+              pushHistory();
+              commitPatch(selected.id, patch);
+              if ("animation" in patch) {
+                setAnimPreviewVersion((prev) => ({ ...prev, [selected.id]: (prev[selected.id] ?? 0) + 1 }));
+              }
+            }
+          }}
         />
       );
     }
@@ -1808,7 +1931,7 @@ export function CanvaEditor({
   function applyZoomText(raw: string) {
     const n = parseInt(raw.replace(/[^\d]/g, ""), 10);
     if (Number.isNaN(n)) return;
-    setZoom(Math.max(0.05, Math.min(2, n / 100)));
+    setZoom(Math.max(0.05, Math.min(1.5, n / 100)));
   }
 
 
@@ -1848,11 +1971,11 @@ export function CanvaEditor({
           <input
             type="range"
             min={10}
-            max={200}
+            max={150}
             step={5}
             value={Math.round(zoom * 100)}
             onChange={(e) => setZoomCentered(Number(e.target.value) / 100)}
-            className="w-16 xl:w-28 accent-brand-600"
+            className="w-28 xl:w-44 accent-brand-600"
             aria-label="Zoom"
           />
           <ZoomIn className="w-3.5 h-3.5 text-surface-400 shrink-0" />
@@ -1886,7 +2009,7 @@ export function CanvaEditor({
           >
             {zoomPct}%
           </button>
-          <button type="button" title="Zoom in" onClick={() => setZoomCentered(Math.min(2, zoom + 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <button type="button" title="Zoom in" onClick={() => setZoomCentered(Math.min(1.5, zoom + 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -2227,40 +2350,24 @@ export function CanvaEditor({
                 {bgRemoving === selected.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
                 <span className="hidden lg:inline">Remove BG</span>
               </button>
-              <div className="relative flex items-center rounded-md border border-surface-200 overflow-visible">
+              <div className="relative flex items-center rounded-md border border-surface-200">
                 <button
+                  ref={eraserBtnRef}
                   type="button"
                   title="Eraser options"
-                  onClick={() => setEraserDropOpen((v) => !v)}
+                  onClick={() => {
+                    if (!eraserDropOpen && eraserBtnRef.current) {
+                      const rect = eraserBtnRef.current.getBoundingClientRect();
+                      setEraserDropPos({ top: rect.bottom + 4, left: rect.left });
+                    }
+                    setEraserDropOpen((v) => !v);
+                  }}
                   className="flex items-center gap-1 px-2 py-1.5 text-xs text-surface-500 hover:bg-surface-100"
                 >
                   <PenTool className="w-4 h-4" />
                   <span className="hidden lg:inline">Eraser</span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
-                {eraserDropOpen && (
-                  <div
-                    className="absolute top-full left-0 mt-1 z-[200] bg-white rounded-xl shadow-xl border border-surface-200 py-1 w-44"
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
-                      onClick={() => { setEraserDropOpen(false); selected?.src ? setEraserEl(selected) : toast.error("No image"); }}
-                    >
-                      <PenTool className="w-4 h-4 text-surface-500 shrink-0" />
-                      Magic Eraser
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
-                      onClick={() => { setEraserDropOpen(false); selected?.src ? setPixelEraserEl(selected) : toast.error("No image"); }}
-                    >
-                      <Eraser className="w-4 h-4 text-surface-500 shrink-0" />
-                      Pixel Eraser
-                    </button>
-                  </div>
-                )}
               </div>
               <button
                 type="button"
@@ -2945,6 +3052,13 @@ export function CanvaEditor({
                   className="relative shadow-xl"
                   style={{ width: W, height: H, background: page.background, overflow: "hidden", touchAction: "none", userSelect: "none" }}
                   onPointerDown={onCanvasBackgroundPointerDown}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const url = e.dataTransfer.getData("text/plain");
+                    if (!url) return;
+                    insertImage(url);
+                  }}
                 >
                   {page.elements.map((el) => (
                     <div
@@ -2957,13 +3071,13 @@ export function CanvaEditor({
                         else if (el.type === "image") {
                           setSelectedId(el.id);
                           // Initialize visual crop defaults if not already set
-                          if (el.cropW === undefined) patchEl(el.id, { cropX: -(el.w * 0.15), cropY: -(el.h * 0.15), cropW: el.w * 1.3, cropH: el.h * 1.3 });
+                          if (el.cropW === undefined) patchEl(el.id, { cropX: 0, cropY: 0, cropW: el.w, cropH: el.h });
                           setToolPanel("crop");
                         }
                         else if (el.type === "frame") {
                           setSelectedId(el.id);
                           if (el.src) {
-                            if (el.cropW === undefined) patchEl(el.id, { cropX: -(el.w * 0.15), cropY: -(el.h * 0.15), cropW: el.w * 1.3, cropH: el.h * 1.3 });
+                            if (el.cropW === undefined) patchEl(el.id, { cropX: 0, cropY: 0, cropW: el.w, cropH: el.h });
                             setToolPanel("crop");
                           } else {
                             setPanel("uploads");
@@ -3026,6 +3140,20 @@ export function CanvaEditor({
                             zIndex: 1001,
                           }}
                         />
+                      ) : (animPreviewVersion[el.id] ?? 0) > 0 && el.animation && el.animation.trigger !== "exit" ? (
+                        <div
+                          key={`anim-${el.id}-${animPreviewVersion[el.id]}`}
+                          style={{
+                            position: "absolute",
+                            left: el.x,
+                            top: el.y,
+                            width: el.w,
+                            height: el.h,
+                            animation: `${getAnimKeyframeName(el.animation)} ${getAnimDuration(el.animation.speed ?? 0.5)}s ease both`,
+                          }}
+                        >
+                          <ElementView el={el} asChild />
+                        </div>
                       ) : (
                         <ElementView el={el} />
                       )}
@@ -3120,10 +3248,10 @@ export function CanvaEditor({
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
-                  const cropX = selected.cropX ?? -(selected.w * 0.15);
-                  const cropY = selected.cropY ?? -(selected.h * 0.15);
-                  const cropW = selected.cropW ?? selected.w * 1.3;
-                  const cropH = selected.cropH ?? selected.h * 1.3;
+                  const cropX = selected.cropX ?? 0;
+                  const cropY = selected.cropY ?? 0;
+                  const cropW = selected.cropW ?? selected.w;
+                  const cropH = selected.cropH ?? selected.h;
                   const eRot = selected.rotation;
                   const eCx = selected.x + selected.w / 2;
                   const eCy = selected.y + selected.h / 2;
@@ -3198,7 +3326,7 @@ export function CanvaEditor({
       </div>
 
       {/* ── Pages strip (drag thumbnails to reorder) ── */}
-      <div className="flex border-t border-surface-200 bg-white shrink-0">
+      <div className="flex border-t border-surface-200 bg-white shrink-0" onDragOver={(e) => e.stopPropagation()} onDrop={(e) => e.stopPropagation()}>
         {/* Scrollable thumbnails — kept separate from action buttons so the dropdown isn't clipped */}
         <div className="flex items-center gap-1.5 pl-3 py-2 overflow-x-auto flex-1 min-w-0">
           {pages.map((p, i) => (
@@ -3663,6 +3791,36 @@ export function CanvaEditor({
           onClose={() => setMagicLayersEl(null)}
           onApplyLayers={handleApplyMagicLayers}
         />
+      )}
+
+      {/* Eraser dropdown portal — rendered outside the overflow-x-auto toolbar */}
+      {eraserDropOpen && eraserDropPos && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onPointerDown={() => setEraserDropOpen(false)} />
+          <div
+            style={{ position: "fixed", top: eraserDropPos.top, left: eraserDropPos.left, zIndex: 9999 }}
+            className="bg-white rounded-xl shadow-xl border border-surface-200 py-1 w-44"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
+              onClick={() => { setEraserDropOpen(false); selected?.src ? setEraserEl(selected) : toast.error("No image"); }}
+            >
+              <PenTool className="w-4 h-4 text-surface-500 shrink-0" />
+              Magic Eraser
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50"
+              onClick={() => { setEraserDropOpen(false); selected?.src ? setPixelEraserEl(selected) : toast.error("No image"); }}
+            >
+              <Eraser className="w-4 h-4 text-surface-500 shrink-0" />
+              Pixel Eraser
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );
