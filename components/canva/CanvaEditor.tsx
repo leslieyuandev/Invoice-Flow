@@ -41,7 +41,7 @@ function CornerRadiusIcon({ className }: { className?: string }) {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { saveCanvaProjectAction } from "@/actions/canva";
-import { ElementView, PageRenderer, getAnimKeyframeName, getAnimDuration } from "./PageRenderer";
+import { ElementView, PageRenderer, getAnimKeyframeName, getAnimDuration, coverCropBox } from "./PageRenderer";
 import { CANVA_TEMPLATES, instantiateTemplate } from "./templates";
 import { uid, newPage, CANVA_FORMATS, type CanvaElement, type CanvaPage, type CanvaProjectData, type ElementAnimation } from "@/types/canva";
 
@@ -954,6 +954,17 @@ export function CanvaEditor({
         const gy = dcxL * sin + dcyL * cos;
         const cx0 = el.x + el.w / 2;
         const cy0 = el.y + el.h / 2;
+
+        // Scale the crop box with the element so a cropped image keeps covering
+        // the frame (no gaps) and never stretches when the element is resized.
+        if (el.cropW !== undefined) {
+          const sw = newW / el.w;
+          const sh = newH / el.h;
+          patch.cropX = (el.cropX ?? 0) * sw;
+          patch.cropY = (el.cropY ?? 0) * sh;
+          patch.cropW = el.cropW * sw;
+          patch.cropH = (el.cropH ?? el.h) * sh;
+        }
 
         patchEl(d.id, {
           ...patch,
@@ -3357,11 +3368,14 @@ export function CanvaEditor({
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
-                  const _cover = coverRect(selected.w, selected.h, cropRatioFor(selected));
-                  const cropX = selected.cropX ?? _cover.cropX;
-                  const cropY = selected.cropY ?? _cover.cropY;
-                  const cropW = selected.cropW ?? _cover.cropW;
-                  const cropH = selected.cropH ?? _cover.cropH;
+                  // Match the renderer exactly: guarantee the box covers the frame.
+                  const _cb = selected.cropW !== undefined
+                    ? coverCropBox(selected)
+                    : (() => { const c = coverRect(selected.w, selected.h, cropRatioFor(selected)); return { left: c.cropX, top: c.cropY, width: c.cropW, height: c.cropH }; })();
+                  const cropX = _cb.left;
+                  const cropY = _cb.top;
+                  const cropW = _cb.width;
+                  const cropH = _cb.height;
                   const eRot = selected.rotation;
                   const eCx = selected.x + selected.w / 2;
                   const eCy = selected.y + selected.h / 2;
