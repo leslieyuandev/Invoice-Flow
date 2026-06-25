@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FontBrowserPanel } from "./FontPicker";
-import { FILTER_PRESETS, SHADOW_PRESETS, IMAGE_EFFECTS } from "./imagePresets";
+import { FILTER_PRESETS, SHADOW_PRESETS, IMAGE_EFFECTS, imageFlipTransform } from "./imagePresets";
 import { SHAPES, SHAPE_GROUPS, shapeElement } from "./shapes";
 import { EMOJI_GRAPHICS, SVG_GRAPHICS, type SvgGraphic } from "./graphics";
 import { FRAMES, FRAME_GROUPS, type FrameDef } from "./frames";
@@ -184,6 +184,9 @@ export function CanvaEditor({
   const [eraserDropPos, setEraserDropPos] = useState<{ top: number; left: number } | null>(null);
   const [cropTab, setCropTab] = useState<"crop" | "expand">("crop");
   const [animPreviewVersion, setAnimPreviewVersion] = useState<Record<string, number>>({});
+  // While an animation preview plays, hide the selection chrome (id of the element).
+  const [animPlayingId, setAnimPlayingId] = useState<string | null>(null);
+  const animPlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Magic layers
   const [magicLayersEl, setMagicLayersEl] = useState<CanvaElement | null>(null);
   // Frame drag-and-drop (HTML5 drops from panels + pointer-dragged canvas elements)
@@ -1866,6 +1869,18 @@ export function CanvaEditor({
               commitPatch(selected.id, patch);
               if ("animation" in patch) {
                 setAnimPreviewVersion((prev) => ({ ...prev, [selected.id]: (prev[selected.id] ?? 0) + 1 }));
+                if (animPlayTimer.current) clearTimeout(animPlayTimer.current);
+                if (patch.animation && patch.animation.trigger !== "exit") {
+                  // Hide the selection chrome until the preview animation finishes.
+                  setAnimPlayingId(selected.id);
+                  const durMs = getAnimDuration(patch.animation.speed ?? 0.5) * 1000 + 80;
+                  animPlayTimer.current = setTimeout(
+                    () => setAnimPlayingId((cur) => (cur === selected.id ? null : cur)),
+                    durMs
+                  );
+                } else {
+                  setAnimPlayingId(null);
+                }
               }
             }
           }}
@@ -3345,8 +3360,14 @@ export function CanvaEditor({
 
                 </div>
 
-                {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ── */}
-                {selectedIds.length > 1 ? renderMultiSelectionChrome() : selected && editingId !== selected.id && toolPanel !== "crop" && renderSelectionChrome(selected)}
+                {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ──
+                    Hidden while a modal is open (Magic Eraser / Pixel Eraser / Magic Layers) so it doesn't
+                    sit on top of them or swallow their pointer events, and while an animation preview plays. */}
+                {(eraserEl || pixelEraserEl || magicLayersEl)
+                  ? null
+                  : selectedIds.length > 1
+                    ? renderMultiSelectionChrome()
+                    : selected && editingId !== selected.id && toolPanel !== "crop" && animPlayingId !== selected.id && renderSelectionChrome(selected)}
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
@@ -3397,7 +3418,9 @@ export function CanvaEditor({
                           draggable={false}
                           style={{
                             width: "100%", height: "100%", objectFit: "cover", display: "block",
-                            transform: selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : undefined,
+                            // Must match the renderer's transform (incl. flip) so the crop overlay
+                            // is WYSIWYG — otherwise a flipped image inverts left/right vs the result.
+                            transform: `${imageFlipTransform(selected) ?? ""} ${selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : ""}`.trim() || undefined,
                             transformOrigin: "50% 50%",
                             userSelect: "none", pointerEvents: "none",
                           }}
