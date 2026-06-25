@@ -3343,37 +3343,6 @@ export function CanvaEditor({
                     />
                   )}
 
-                  {/* Crop dark-mask SVG — dims everything outside the selected element */}
-                  {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (
-                    <svg
-                      style={{ position: "absolute", left: 0, top: 0, width: W, height: H, zIndex: 1098, pointerEvents: "none" }}
-                      viewBox={`0 0 ${W} ${H}`}
-                    >
-                      <defs>
-                        <mask id={`cm-${selected.id}`}>
-                          <rect width={W} height={H} fill="white" />
-                          <rect
-                            x={selected.x} y={selected.y} width={selected.w} height={selected.h}
-                            fill="black"
-                            rx={selected.radius ?? 0}
-                            transform={`rotate(${selected.rotation} ${selected.x + selected.w / 2} ${selected.y + selected.h / 2})`}
-                          />
-                        </mask>
-                      </defs>
-                      <rect width={W} height={H} fill="rgba(0,0,0,0.52)" mask={`url(#cm-${selected.id})`} />
-                    </svg>
-                  )}
-
-                  {/* Frame border highlight in crop mode */}
-                  {toolPanel === "crop" && selected && (
-                    <div style={{
-                      position: "absolute", left: selected.x, top: selected.y, width: selected.w, height: selected.h,
-                      transform: `rotate(${selected.rotation}deg)`,
-                      border: `${2 / zoom}px solid white`, zIndex: 1099, pointerEvents: "none",
-                      borderRadius: selected.radius,
-                    }} />
-                  )}
-
                 </div>
 
                 {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ── */}
@@ -3452,6 +3421,20 @@ export function CanvaEditor({
                           />
                         ))}
                       </div>
+
+                      {/* Dim everything OUTSIDE the crop frame so the kept region is obvious.
+                          Rendered on top of the draggable image; the frame is the clear hole. */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: selected.x, top: selected.y, width: selected.w, height: selected.h,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
+                          boxShadow: "0 0 0 100000px rgba(0,0,0,0.55)",
+                          outline: `${2 / zoom}px solid white`,
+                          borderRadius: selected.radius,
+                          pointerEvents: "none",
+                        }}
+                      />
 
                       {/* Frame-resize handles (square) — resize the crop frame itself */}
                       <div
