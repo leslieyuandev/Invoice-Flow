@@ -46,4 +46,4 @@ EXPOSE 3000
 
 # Apply any pending migrations, then start the single Next.js app (all modules,
 # including the Maps Extractor, run in this one process).
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+CMD ["npm", "run", "start"]
