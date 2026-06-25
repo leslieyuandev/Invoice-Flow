@@ -47,6 +47,30 @@ export function elementBoxStyle(el: CanvaElement, asChild?: boolean): CSSPropert
   };
 }
 
+// Visual-crop image box that is GUARANTEED to cover the element box, so a cropped
+// image can never leave a transparent gap (and, with objectFit:cover, never stretch)
+// no matter how the crop values were produced (cropping, resizing, legacy data).
+export function coverCropBox(el: CanvaElement): { left: number; top: number; width: number; height: number } {
+  let bw = el.cropW ?? el.w;
+  let bh = el.cropH ?? el.h;
+  let bx = el.cropX ?? 0;
+  let by = el.cropY ?? 0;
+  // Scale the box up uniformly if it is too small to cover the frame.
+  const s = Math.max(el.w / bw, el.h / bh, 1);
+  if (s > 1) {
+    const cx = bx + bw / 2;
+    const cy = by + bh / 2;
+    bw *= s;
+    bh *= s;
+    bx = cx - bw / 2;
+    by = cy - bh / 2;
+  }
+  // Clamp position so the frame stays fully covered (no gaps on any edge).
+  bx = Math.min(0, Math.max(el.w - bw, bx));
+  by = Math.min(0, Math.max(el.h - bh, by));
+  return { left: bx, top: by, width: bw, height: bh };
+}
+
 // Static render of one element — used by the editor canvas, page thumbnails, and project cards
 export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boolean }) {
   const box = elementBoxStyle(el, asChild);
@@ -139,10 +163,11 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
       // Visual crop model (new) takes precedence over legacy t/r/b/l fractions
       let imgLeft: string, imgTop: string, fullW: string, fullH: string, imgTransform: string, imgOrigin: string;
       if (el.cropW !== undefined) {
-        imgLeft = `${el.cropX ?? 0}px`;
-        imgTop = `${el.cropY ?? 0}px`;
-        fullW = `${el.cropW}px`;
-        fullH = `${el.cropH ?? el.h}px`;
+        const cb = coverCropBox(el);
+        imgLeft = `${cb.left}px`;
+        imgTop = `${cb.top}px`;
+        fullW = `${cb.width}px`;
+        fullH = `${cb.height}px`;
         imgTransform = el.cropRotation ? `${flip ?? ""} rotate(${el.cropRotation}deg)` : (flip ?? "none");
         imgOrigin = "50% 50%";
       } else {
@@ -212,12 +237,13 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
       }
       const colorFilter = imageColorFilter(el);
       // Visual crop model for frames
-      const fImgStyle: React.CSSProperties = el.cropW !== undefined ? {
+      const fcb = el.cropW !== undefined ? coverCropBox(el) : null;
+      const fImgStyle: React.CSSProperties = fcb ? {
         position: "absolute",
-        left: `${el.cropX ?? 0}px`,
-        top: `${el.cropY ?? 0}px`,
-        width: `${el.cropW}px`,
-        height: `${el.cropH ?? el.h}px`,
+        left: `${fcb.left}px`,
+        top: `${fcb.top}px`,
+        width: `${fcb.width}px`,
+        height: `${fcb.height}px`,
         objectFit: "cover",
         filter: colorFilter || undefined,
         transform: el.cropRotation ? `${imageFlipTransform(el)} rotate(${el.cropRotation}deg)` : imageFlipTransform(el),
