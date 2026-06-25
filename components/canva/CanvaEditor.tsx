@@ -168,13 +168,6 @@ export function CanvaEditor({
   // Natural aspect ratio (naturalW/naturalH) of the image currently being cropped,
   // so the crop image rect is always kept undistorted.
   const cropNaturalRef = useRef<{ id: string; ratio: number } | null>(null);
-  // Frame-resize drag state while in crop mode (resizes the element box).
-  const frameCropRef = useRef<{
-    mode: CropDragState["mode"];
-    startX: number; startY: number;
-    fx: number; fy: number; fw: number; fh: number;
-    imgPageX: number; imgPageY: number; cw: number; ch: number;
-  } | null>(null);
   // Magic eraser
   const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
   // Pixel eraser
@@ -786,70 +779,6 @@ export function CanvaEditor({
     cropDragRef.current = null;
     window.removeEventListener("pointermove", onCropDragMove);
     window.removeEventListener("pointerup", onCropDragEnd);
-    const selId = selectedIdsRef.current[0];
-    if (selId) normalizeCrop(selId);
-  }
-
-  // ── Frame resize within crop mode ───────────────────────────────────────────
-  // Resize the crop FRAME (element box) while keeping the image visually fixed in
-  // page space, then re-cover so there are never gaps and the image never stretches.
-  function startFrameCropResize(e: React.PointerEvent, mode: CropDragState["mode"], el: CanvaElement) {
-    e.stopPropagation();
-    e.preventDefault();
-    const ratio = cropRatioFor(el);
-    // Start from the SAME box the overlay/renderer display (coverCropBox-normalized),
-    // not the raw stored values — otherwise the image jumps when a handle is grabbed
-    // and the result shows a different region than what was on screen.
-    const cb = el.cropW !== undefined
-      ? coverCropBox(el)
-      : (() => { const r = coverRect(el.w, el.h, ratio); return { left: r.cropX, top: r.cropY, width: r.cropW, height: r.cropH }; })();
-    pushHistory();
-    frameCropRef.current = {
-      mode, startX: e.clientX, startY: e.clientY,
-      fx: el.x, fy: el.y, fw: el.w, fh: el.h,
-      imgPageX: el.x + cb.left, imgPageY: el.y + cb.top, cw: cb.width, ch: cb.height,
-    };
-    window.addEventListener("pointermove", onFrameCropResizeMove);
-    window.addEventListener("pointerup", onFrameCropResizeEnd);
-  }
-
-  function onFrameCropResizeMove(e: PointerEvent) {
-    const d = frameCropRef.current;
-    const selId = selectedIdsRef.current[0];
-    if (!d || !selId) return;
-    const dx = (e.clientX - d.startX) / zoomRef.current;
-    const dy = (e.clientY - d.startY) / zoomRef.current;
-    const MIN = 30;
-    let nx = d.fx, ny = d.fy, nw = d.fw, nh = d.fh;
-    if (d.mode.includes("e")) nw = Math.max(MIN, d.fw + dx);
-    if (d.mode.includes("s")) nh = Math.max(MIN, d.fh + dy);
-    if (d.mode.includes("w")) { const w = Math.max(MIN, d.fw - dx); nx = d.fx + (d.fw - w); nw = w; }
-    if (d.mode.includes("n")) { const h = Math.max(MIN, d.fh - dy); ny = d.fy + (d.fh - h); nh = h; }
-
-    // Keep the frame on the page.
-    nw = Math.min(nw, W); nh = Math.min(nh, H);
-    nx = Math.max(0, Math.min(W - nw, nx));
-    ny = Math.max(0, Math.min(H - nh, ny));
-
-    // Keep the image fixed in page space; recompute its offset relative to the new frame.
-    let cw = Number.isFinite(d.cw) && d.cw > 0 ? d.cw : nw;
-    let ch = Number.isFinite(d.ch) && d.ch > 0 ? d.ch : nh;
-    const imgCx = d.imgPageX + cw / 2, imgCy = d.imgPageY + ch / 2;
-    // Grow the image (ratio-locked) if the new frame is larger than it, keeping centre.
-    const need = Math.max(nw / cw, nh / ch, 1);
-    if (need > 1) { cw *= need; ch *= need; }
-    let cropX = imgCx - cw / 2 - nx;
-    let cropY = imgCy - ch / 2 - ny;
-    // Clamp so the frame stays fully covered (no gaps).
-    cropX = Math.min(0, Math.max(nw - cw, cropX));
-    cropY = Math.min(0, Math.max(nh - ch, cropY));
-    patchEl(selId, { x: nx, y: ny, w: nw, h: nh, cropX, cropY, cropW: cw, cropH: ch });
-  }
-
-  function onFrameCropResizeEnd() {
-    frameCropRef.current = null;
-    window.removeEventListener("pointermove", onFrameCropResizeMove);
-    window.removeEventListener("pointerup", onFrameCropResizeEnd);
     const selId = selectedIdsRef.current[0];
     if (selId) normalizeCrop(selId);
   }
@@ -1708,7 +1637,7 @@ export function CanvaEditor({
 
           {cropTab === "crop" && (
             <>
-              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it. <span className="text-surface-500 font-medium">Round handles</span> scale the image; <span className="text-brand-600 font-medium">purple square handles</span> resize the frame. The image never distorts.</p>
+              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it; the <span className="text-surface-500 font-medium">round handles</span> zoom it. Use <span className="text-surface-500 font-medium">Aspect ratio</span> below to reshape the frame. The image never distorts or leaves gaps.</p>
 
               {/* Aspect ratio (reshapes the crop frame) */}
               <div>
@@ -3468,34 +3397,6 @@ export function CanvaEditor({
                         }}
                       />
 
-                      {/* Frame-resize handles (square) — resize the crop frame itself */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: selected.x, top: selected.y, width: selected.w, height: selected.h,
-                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
-                          pointerEvents: "none",
-                        }}
-                      >
-                        {handles.map((h) => (
-                          <div
-                            key={`f-${h.id}`}
-                            onPointerDown={(e) => startFrameCropResize(e, h.id, selected)}
-                            style={{
-                              position: "absolute",
-                              left: `calc(${h.cx * 100}% - ${HANDLE_SIZE / 2}px)`,
-                              top: `calc(${h.cy * 100}% - ${HANDLE_SIZE / 2}px)`,
-                              width: HANDLE_SIZE, height: HANDLE_SIZE,
-                              background: "#7c3aed",
-                              border: `${1.5 / zoom}px solid white`,
-                              borderRadius: 2 / zoom,
-                              cursor: h.cursor,
-                              touchAction: "none",
-                              pointerEvents: "auto",
-                            }}
-                          />
-                        ))}
-                      </div>
                     </div>
                   );
                 })()}
