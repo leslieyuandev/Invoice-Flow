@@ -176,7 +176,9 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
               top: imgTop,
               width: fullW,
               height: fullH,
-              objectFit: el.cropW !== undefined ? "fill" : "cover",
+              // Always "cover" so the image can never be distorted, regardless of
+              // how the crop box ratio relates to the image's natural ratio.
+              objectFit: "cover",
               filter: colorFilter,
               transform: imgTransform,
               transformOrigin: imgOrigin,
@@ -216,7 +218,7 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
         top: `${el.cropY ?? 0}px`,
         width: `${el.cropW}px`,
         height: `${el.cropH ?? el.h}px`,
-        objectFit: "fill",
+        objectFit: "cover",
         filter: colorFilter || undefined,
         transform: el.cropRotation ? `${imageFlipTransform(el)} rotate(${el.cropRotation}deg)` : imageFlipTransform(el),
         transformOrigin: "50% 50%",
