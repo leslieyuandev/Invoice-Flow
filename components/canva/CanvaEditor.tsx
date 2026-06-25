@@ -770,10 +770,21 @@ export function CanvaEditor({
     patchEl(selId, { cropX: newX, cropY: newY, cropW: newW, cropH: newH });
   }
 
+  // Bake the guaranteed-covering box into the stored crop so saved/exported designs
+  // can never show a gap, regardless of the render path.
+  function normalizeCrop(elId: string) {
+    const sel = pagesRef.current[pageIdxRef.current].elements.find((x) => x.id === elId);
+    if (!sel || sel.cropW === undefined) return;
+    const cb = coverCropBox(sel);
+    patchEl(elId, { cropX: cb.left, cropY: cb.top, cropW: cb.width, cropH: cb.height });
+  }
+
   function onCropDragEnd() {
     cropDragRef.current = null;
     window.removeEventListener("pointermove", onCropDragMove);
     window.removeEventListener("pointerup", onCropDragEnd);
+    const selId = selectedIdsRef.current[0];
+    if (selId) normalizeCrop(selId);
   }
 
   // ── Frame resize within crop mode ───────────────────────────────────────────
@@ -827,6 +838,8 @@ export function CanvaEditor({
     frameCropRef.current = null;
     window.removeEventListener("pointermove", onFrameCropResizeMove);
     window.removeEventListener("pointerup", onFrameCropResizeEnd);
+    const selId = selectedIdsRef.current[0];
+    if (selId) normalizeCrop(selId);
   }
 
   const onDragMove = useCallback(
@@ -1762,7 +1775,7 @@ export function CanvaEditor({
             </button>
             <button
               type="button"
-              onClick={() => setToolPanel(null)}
+              onClick={() => { normalizeCrop(selected.id); setToolPanel(null); }}
               className="flex-1 py-1.5 rounded-lg bg-brand-600 text-white text-xs hover:bg-brand-700 flex items-center justify-center gap-1"
             >
               <Check className="w-3.5 h-3.5" /> Done
