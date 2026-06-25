@@ -1710,6 +1710,31 @@ export function CanvaEditor({
             <>
               <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it. <span className="text-surface-500 font-medium">Round handles</span> scale the image; <span className="text-brand-600 font-medium">purple square handles</span> resize the frame. The image never distorts.</p>
 
+              {/* Live result preview — exactly what the cropped element will look like */}
+              {selected.src && (() => {
+                const scale = Math.min(176 / selected.w, 176 / selected.h);
+                const pw = selected.w * scale, ph = selected.h * scale;
+                const cb = coverCropBox(selected);
+                const flip = imageFlipTransform(selected);
+                return (
+                  <div>
+                    <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Result preview</p>
+                    <div className="mx-auto border border-surface-200 rounded" style={{ width: pw, height: ph, position: "relative", overflow: "hidden" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selected.src} alt="" draggable={false}
+                        style={{
+                          position: "absolute", left: cb.left * scale, top: cb.top * scale,
+                          width: cb.width * scale, height: cb.height * scale, objectFit: "cover",
+                          transform: `${flip ?? ""} ${selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : ""}`.trim() || undefined,
+                          transformOrigin: "50% 50%",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Aspect ratio (reshapes the crop frame) */}
               <div>
                 <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Aspect ratio</p>
