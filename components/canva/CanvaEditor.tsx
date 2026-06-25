@@ -797,14 +797,17 @@ export function CanvaEditor({
     e.stopPropagation();
     e.preventDefault();
     const ratio = cropRatioFor(el);
-    const c = el.cropW !== undefined
-      ? { cropX: el.cropX ?? 0, cropY: el.cropY ?? 0, cropW: el.cropW, cropH: el.cropH ?? el.w / ratio }
-      : coverRect(el.w, el.h, ratio);
+    // Start from the SAME box the overlay/renderer display (coverCropBox-normalized),
+    // not the raw stored values — otherwise the image jumps when a handle is grabbed
+    // and the result shows a different region than what was on screen.
+    const cb = el.cropW !== undefined
+      ? coverCropBox(el)
+      : (() => { const r = coverRect(el.w, el.h, ratio); return { left: r.cropX, top: r.cropY, width: r.cropW, height: r.cropH }; })();
     pushHistory();
     frameCropRef.current = {
       mode, startX: e.clientX, startY: e.clientY,
       fx: el.x, fy: el.y, fw: el.w, fh: el.h,
-      imgPageX: el.x + c.cropX, imgPageY: el.y + c.cropY, cw: c.cropW, ch: c.cropH,
+      imgPageX: el.x + cb.left, imgPageY: el.y + cb.top, cw: cb.width, ch: cb.height,
     };
     window.addEventListener("pointermove", onFrameCropResizeMove);
     window.addEventListener("pointerup", onFrameCropResizeEnd);
