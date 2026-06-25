@@ -28,7 +28,7 @@ import { MagicEraserModal } from "./MagicEraserModal";
 import { MagicLayersModal } from "./MagicLayersModal";
 import { PixelEraserModal } from "./PixelEraserModal";
 import { AnimationPanel } from "./AnimationPanel";
-import { useGoogleDrivePicker } from "@/lib/hooks/useGoogleDrivePicker";
+import { DriveBrowser } from "./DriveBrowser";
 
 // Rounded-corner indicator icon
 function CornerRadiusIcon({ className }: { className?: string }) {
@@ -126,9 +126,7 @@ export function CanvaEditor({
   const [fonts, setFonts] = useState<CanvaAsset[]>(fontAssets);
   const [uploading, setUploading] = useState(false);
   const [uploadingFont, setUploadingFont] = useState(false);
-  const [driveUploading, setDriveUploading] = useState(false);
-  const [driveProgress, setDriveProgress] = useState<string | null>(null);
-  const openGoogleDrivePicker = useGoogleDrivePicker();
+  const [uploadsTab, setUploadsTab] = useState<"uploads" | "drive">("uploads");
   // Triggers re-render (updating portal chrome position) when viewport is scrolled
   const [, vpScrollTick] = useReducer((n: number) => n + 1, 0);
   const [bgRemoving, setBgRemoving] = useState<string | null>(null);
@@ -1171,32 +1169,14 @@ export function CanvaEditor({
     if (succeeded > 1) toast.success(`${succeeded} images uploaded`);
   }
 
-  async function handleImportFromDrive() {
-    setDriveUploading(true);
-    try {
-      await openGoogleDrivePicker(
-        (assets) => {
-          const frameTargetId =
-            selectedIdsRef.current.length === 1 &&
-            page.elements.find((el) => el.id === selectedIdsRef.current[0])?.type === "frame"
-              ? selectedIdsRef.current[0]
-              : null;
-          assets.forEach((asset, i) => {
-            setImgAssets((prev) => [asset as CanvaAsset, ...prev]);
-            if (i === 0 && frameTargetId) commitPatch(frameTargetId, { src: asset.url });
-            else insertImage(asset.url);
-          });
-          if (assets.length > 1) toast.success(`${assets.length} images imported from Google Drive`);
-          else if (assets.length === 1) toast.success("Image imported from Google Drive");
-        },
-        (msg) => setDriveProgress(msg)
-      );
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google Drive import failed");
-    } finally {
-      setDriveUploading(false);
-      setDriveProgress(null);
-    }
+  // Image imported from the shared Google Drive browser → store + drop on canvas.
+  function handleDrivePick(asset: CanvaAsset) {
+    setImgAssets((prev) => (prev.some((a) => a.id === asset.id) ? prev : [asset, ...prev]));
+    const sel = selectedIdsRef.current.length === 1
+      ? page.elements.find((el) => el.id === selectedIdsRef.current[0])
+      : null;
+    if (sel?.type === "frame") commitPatch(sel.id, { src: asset.url });
+    else insertImage(asset.url);
   }
 
   async function handleFontUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -3008,20 +2988,21 @@ export function CanvaEditor({
 
             {panel === "uploads" && (
               <>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} loading={uploading}>
-                  <ImagePlus className="w-4 h-4" />
-                  {uploading && uploadProgress ? `Uploading ${uploadProgress}…` : "Upload Images"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2"
-                  loading={driveUploading}
-                  onClick={handleImportFromDrive}
-                >
-                  {/* Google Drive colour logo */}
-                  {!driveUploading && (
-                    <svg viewBox="0 0 87.3 78" className="w-4 h-4 shrink-0" aria-hidden>
+                {/* Source tabs: local uploads vs the shared Google Drive library */}
+                <div className="flex rounded-lg border border-surface-200 overflow-hidden text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setUploadsTab("uploads")}
+                    className={cn("flex-1 py-1.5 font-medium transition-colors", uploadsTab === "uploads" ? "bg-brand-600 text-white" : "text-surface-500 hover:bg-surface-50")}
+                  >
+                    My Uploads
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadsTab("drive")}
+                    className={cn("flex-1 py-1.5 font-medium transition-colors flex items-center justify-center gap-1.5", uploadsTab === "drive" ? "bg-brand-600 text-white" : "text-surface-500 hover:bg-surface-50")}
+                  >
+                    <svg viewBox="0 0 87.3 78" className="w-3.5 h-3.5 shrink-0" aria-hidden>
                       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0a15.92 15.92 0 0 0 2.1 8z" fill="#0066da"/>
                       <path d="M43.65 25-13.75 0 0 23.8l27.55-23.8z" fill="#00ac47"/>
                       <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25a15.92 15.92 0 0 0 2.2-8H60.5l5.85 13.35z" fill="#ea4335"/>
@@ -3029,12 +3010,17 @@ export function CanvaEditor({
                       <path d="M60.5 49.3H27.15L13.4 73.1c1.35.8 2.9 1.2 4.5 1.2h51.5c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
                       <path d="M73.4 15.55 57.9 3.3a16.27 16.27 0 0 0-8-2.1L43.65 25l16.85 24.3H87.3L80.6 37.15z" fill="#ffba00"/>
                     </svg>
-                  )}
-                  {driveUploading
-                    ? driveProgress
-                      ? `Importing ${driveProgress}…`
-                      : "Connecting…"
-                    : "Import from Google Drive"}
+                    Google Drive
+                  </button>
+                </div>
+
+                {uploadsTab === "drive" && <DriveBrowser onPick={handleDrivePick} />}
+
+                {uploadsTab === "uploads" && (
+                <>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()} loading={uploading}>
+                  <ImagePlus className="w-4 h-4" />
+                  {uploading && uploadProgress ? `Uploading ${uploadProgress}…` : "Upload Images"}
                 </Button>
                 <p className="text-[10px] text-surface-400 -mt-1">Select up to 10 images at once · PNG, JPG, WebP, SVG</p>
                 <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple className="hidden" onChange={handleUpload} />
@@ -3066,6 +3052,8 @@ export function CanvaEditor({
                   <p className="text-[11px] text-surface-400">No uploads yet. PNG, JPG, WebP, or SVG up to 10 MB.</p>
                 )}
                 <p className="text-[11px] text-surface-400">Your uploads are saved here — click any to reuse it in this or another design.</p>
+                </>
+                )}
               </>
             )}
 
