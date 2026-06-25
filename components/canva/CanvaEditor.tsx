@@ -3486,8 +3486,8 @@ export function CanvaEditor({
                           position: "absolute",
                           left: selected.x, top: selected.y, width: selected.w, height: selected.h,
                           transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
-                          boxShadow: "0 0 0 100000px rgba(0,0,0,0.55)",
-                          outline: `${2 / zoom}px solid white`,
+                          boxShadow: "0 0 0 100000px rgba(0,0,0,0.78)",
+                          outline: `${2.5 / zoom}px solid white`,
                           borderRadius: selected.radius,
                           pointerEvents: "none",
                         }}
