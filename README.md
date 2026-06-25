@@ -1,3 +1,20 @@
+---
+title: Maps Extractor
+emoji: 🗺️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 3000
+pinned: false
+short_description: Google Maps lead extractor (self-hosted Playwright scraper)
+---
+
+<!--
+  The YAML block above configures this Hugging Face Space (Docker SDK, app
+  served on port 3000). It is ignored by GitHub/Vercel. Deploy steps live in
+  DEPLOY-HF.md. This frontmatter only exists on the `hf-space` branch.
+-->
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
