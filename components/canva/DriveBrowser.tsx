@@ -119,10 +119,9 @@ export function DriveBrowser({ onPick }: Props) {
           <HardDrive className="w-3.5 h-3.5" /> Google Drive not connected
         </p>
         <p>
-          Add <code className="text-[10px]">GOOGLE_DRIVE_CLIENT_ID</code>,{" "}
-          <code className="text-[10px]">GOOGLE_DRIVE_CLIENT_SECRET</code> and{" "}
-          <code className="text-[10px]">GOOGLE_DRIVE_REFRESH_TOKEN</code> to the server env to enable
-          browsing the shared library.
+          Add a service-account key (<code className="text-[10px]">GOOGLE_DRIVE_SA_KEY_BASE64</code>)
+          and <code className="text-[10px]">GOOGLE_DRIVE_ROOT_FOLDER_ID</code> to the server env, then
+          share that Drive folder with the service-account email.
         </p>
       </div>
     );

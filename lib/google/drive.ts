@@ -1,16 +1,22 @@
-// Server-side Google Drive access for a single SHARED business account
-// (haloballoonevent@gmail.com). Uses a stored OAuth refresh token so every
-// app user browses the same Drive library without logging in themselves.
+// Server-side Google Drive access for a single SHARED business library.
 //
-// Required env vars (server-only — NOT NEXT_PUBLIC):
-//   GOOGLE_DRIVE_CLIENT_ID
-//   GOOGLE_DRIVE_CLIENT_SECRET
-//   GOOGLE_DRIVE_REFRESH_TOKEN
-//   GOOGLE_DRIVE_ROOT_FOLDER_ID  (optional — restrict browsing to one folder)
+// Two auth modes are supported (service account is recommended — it needs no
+// OAuth verification and never expires):
+//
+//  A) Service account (recommended):
+//       GOOGLE_DRIVE_SA_KEY_BASE64  — base64 of the service-account JSON key
+//       GOOGLE_DRIVE_ROOT_FOLDER_ID — the Drive folder shared with the SA email
+//
+//  B) OAuth refresh token (legacy — 7-day expiry unless the app is verified):
+//       GOOGLE_DRIVE_CLIENT_ID / _CLIENT_SECRET / _REFRESH_TOKEN
+//       GOOGLE_DRIVE_ROOT_FOLDER_ID (optional)
+
+import crypto from "crypto";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
+const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
 export interface DriveItem {
   id: string;
@@ -19,7 +25,26 @@ export interface DriveItem {
   isFolder: boolean;
 }
 
-export function driveConfigured(): boolean {
+interface ServiceAccountKey {
+  client_email: string;
+  private_key: string;
+}
+
+function serviceAccountKey(): ServiceAccountKey | null {
+  const b64 = process.env.GOOGLE_DRIVE_SA_KEY_BASE64;
+  const raw = process.env.GOOGLE_DRIVE_SA_KEY;
+  const json = b64 ? Buffer.from(b64, "base64").toString("utf8") : raw;
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as ServiceAccountKey;
+    if (parsed.client_email && parsed.private_key) return parsed;
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+function refreshTokenConfigured(): boolean {
   return Boolean(
     process.env.GOOGLE_DRIVE_CLIENT_ID &&
       process.env.GOOGLE_DRIVE_CLIENT_SECRET &&
@@ -27,8 +52,68 @@ export function driveConfigured(): boolean {
   );
 }
 
+export function driveConfigured(): boolean {
+  return Boolean(serviceAccountKey()) || refreshTokenConfigured();
+}
+
 export function driveRootFolder(): string {
   return process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || "root";
+}
+
+function base64url(input: Buffer | string): string {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+// Service-account JWT → access token (server-to-server, no user consent).
+async function getSaAccessToken(key: ServiceAccountKey): Promise<{ token: string; ttl: number }> {
+  const iat = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = base64url(
+    JSON.stringify({ iss: key.client_email, scope: SCOPE, aud: TOKEN_URL, iat, exp: iat + 3600 })
+  );
+  const signingInput = `${header}.${claims}`;
+  const signature = base64url(
+    crypto.createSign("RSA-SHA256").update(signingInput).sign(key.private_key.replace(/\\n/g, "\n"))
+  );
+  const assertion = `${signingInput}.${signature}`;
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Service-account auth failed (${res.status}) ${txt.slice(0, 200)}`);
+  }
+  const j = (await res.json()) as { access_token: string; expires_in?: number };
+  return { token: j.access_token, ttl: j.expires_in ?? 3600 };
+}
+
+// OAuth refresh token → access token.
+async function getRefreshAccessToken(): Promise<{ token: string; ttl: number }> {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET!,
+      refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN!,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Google token refresh failed (${res.status}) ${txt.slice(0, 200)}`);
+  }
+  const j = (await res.json()) as { access_token: string; expires_in?: number };
+  return { token: j.access_token, ttl: j.expires_in ?? 3600 };
 }
 
 // Cache the short-lived access token across warm invocations.
@@ -36,24 +121,10 @@ let cachedToken: { token: string; exp: number } | null = null;
 
 async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.exp > Date.now() + 60_000) return cachedToken.token;
-  const body = new URLSearchParams({
-    client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET!,
-    refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN!,
-    grant_type: "refresh_token",
-  });
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Google token refresh failed (${res.status}) ${txt.slice(0, 200)}`);
-  }
-  const j = (await res.json()) as { access_token: string; expires_in?: number };
-  cachedToken = { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 };
-  return cachedToken.token;
+  const sa = serviceAccountKey();
+  const { token, ttl } = sa ? await getSaAccessToken(sa) : await getRefreshAccessToken();
+  cachedToken = { token, exp: Date.now() + ttl * 1000 };
+  return token;
 }
 
 // List sub-folders + image files inside a folder, or search images by name.
