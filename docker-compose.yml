@@ -19,6 +19,7 @@ services:
 
   # ── Next.js application ──────────────────────────────────────────────────────
   app:
+    image: ghcr.io/leslieyuandev/invoice-flow:latest
     build:
       context: .
       dockerfile: Dockerfile
