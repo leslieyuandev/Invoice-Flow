@@ -826,9 +826,15 @@ export function CanvaEditor({
     if (d.mode.includes("w")) { const w = Math.max(MIN, d.fw - dx); nx = d.fx + (d.fw - w); nw = w; }
     if (d.mode.includes("n")) { const h = Math.max(MIN, d.fh - dy); ny = d.fy + (d.fh - h); nh = h; }
 
+    // Keep the frame on the page.
+    nw = Math.min(nw, W); nh = Math.min(nh, H);
+    nx = Math.max(0, Math.min(W - nw, nx));
+    ny = Math.max(0, Math.min(H - nh, ny));
+
     // Keep the image fixed in page space; recompute its offset relative to the new frame.
-    let cw = d.cw, ch = d.ch;
-    let imgCx = d.imgPageX + cw / 2, imgCy = d.imgPageY + ch / 2;
+    let cw = Number.isFinite(d.cw) && d.cw > 0 ? d.cw : nw;
+    let ch = Number.isFinite(d.ch) && d.ch > 0 ? d.ch : nh;
+    const imgCx = d.imgPageX + cw / 2, imgCy = d.imgPageY + ch / 2;
     // Grow the image (ratio-locked) if the new frame is larger than it, keeping centre.
     const need = Math.max(nw / cw, nh / ch, 1);
     if (need > 1) { cw *= need; ch *= need; }

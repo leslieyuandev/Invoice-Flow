@@ -51,12 +51,20 @@ export function elementBoxStyle(el: CanvaElement, asChild?: boolean): CSSPropert
 // image can never leave a transparent gap (and, with objectFit:cover, never stretch)
 // no matter how the crop values were produced (cropping, resizing, legacy data).
 export function coverCropBox(el: CanvaElement): { left: number; top: number; width: number; height: number } {
+  const full = { left: 0, top: 0, width: el.w, height: el.h };
   let bw = el.cropW ?? el.w;
   let bh = el.cropH ?? el.h;
   let bx = el.cropX ?? 0;
   let by = el.cropY ?? 0;
+  // Guard against degenerate/NaN crop values (which would render the image nowhere
+  // → a blank frame). Fall back to a plain full cover.
+  if (!Number.isFinite(bw) || bw <= 0) bw = el.w;
+  if (!Number.isFinite(bh) || bh <= 0) bh = el.h;
+  if (!Number.isFinite(bx)) bx = 0;
+  if (!Number.isFinite(by)) by = 0;
   // Scale the box up uniformly if it is too small to cover the frame.
   const s = Math.max(el.w / bw, el.h / bh, 1);
+  if (!Number.isFinite(s) || s <= 0) return full;
   if (s > 1) {
     const cx = bx + bw / 2;
     const cy = by + bh / 2;
@@ -68,6 +76,7 @@ export function coverCropBox(el: CanvaElement): { left: number; top: number; wid
   // Clamp position so the frame stays fully covered (no gaps on any edge).
   bx = Math.min(0, Math.max(el.w - bw, bx));
   by = Math.min(0, Math.max(el.h - bh, by));
+  if (!Number.isFinite(bx) || !Number.isFinite(by) || !Number.isFinite(bw) || !Number.isFinite(bh)) return full;
   return { left: bx, top: by, width: bw, height: bh };
 }
 
