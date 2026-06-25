@@ -168,6 +168,13 @@ export function CanvaEditor({
   // Natural aspect ratio (naturalW/naturalH) of the image currently being cropped,
   // so the crop image rect is always kept undistorted.
   const cropNaturalRef = useRef<{ id: string; ratio: number } | null>(null);
+  // Frame-resize drag state while in crop mode (resizes the element box).
+  const frameCropRef = useRef<{
+    mode: CropDragState["mode"];
+    startX: number; startY: number;
+    fx: number; fy: number; fw: number; fh: number;
+    imgPageX: number; imgPageY: number; cw: number; ch: number;
+  } | null>(null);
   // Magic eraser
   const [eraserEl, setEraserEl] = useState<CanvaElement | null>(null);
   // Pixel eraser
@@ -767,6 +774,59 @@ export function CanvaEditor({
     cropDragRef.current = null;
     window.removeEventListener("pointermove", onCropDragMove);
     window.removeEventListener("pointerup", onCropDragEnd);
+  }
+
+  // ── Frame resize within crop mode ───────────────────────────────────────────
+  // Resize the crop FRAME (element box) while keeping the image visually fixed in
+  // page space, then re-cover so there are never gaps and the image never stretches.
+  function startFrameCropResize(e: React.PointerEvent, mode: CropDragState["mode"], el: CanvaElement) {
+    e.stopPropagation();
+    e.preventDefault();
+    const ratio = cropRatioFor(el);
+    const c = el.cropW !== undefined
+      ? { cropX: el.cropX ?? 0, cropY: el.cropY ?? 0, cropW: el.cropW, cropH: el.cropH ?? el.w / ratio }
+      : coverRect(el.w, el.h, ratio);
+    pushHistory();
+    frameCropRef.current = {
+      mode, startX: e.clientX, startY: e.clientY,
+      fx: el.x, fy: el.y, fw: el.w, fh: el.h,
+      imgPageX: el.x + c.cropX, imgPageY: el.y + c.cropY, cw: c.cropW, ch: c.cropH,
+    };
+    window.addEventListener("pointermove", onFrameCropResizeMove);
+    window.addEventListener("pointerup", onFrameCropResizeEnd);
+  }
+
+  function onFrameCropResizeMove(e: PointerEvent) {
+    const d = frameCropRef.current;
+    const selId = selectedIdsRef.current[0];
+    if (!d || !selId) return;
+    const dx = (e.clientX - d.startX) / zoomRef.current;
+    const dy = (e.clientY - d.startY) / zoomRef.current;
+    const MIN = 30;
+    let nx = d.fx, ny = d.fy, nw = d.fw, nh = d.fh;
+    if (d.mode.includes("e")) nw = Math.max(MIN, d.fw + dx);
+    if (d.mode.includes("s")) nh = Math.max(MIN, d.fh + dy);
+    if (d.mode.includes("w")) { const w = Math.max(MIN, d.fw - dx); nx = d.fx + (d.fw - w); nw = w; }
+    if (d.mode.includes("n")) { const h = Math.max(MIN, d.fh - dy); ny = d.fy + (d.fh - h); nh = h; }
+
+    // Keep the image fixed in page space; recompute its offset relative to the new frame.
+    let cw = d.cw, ch = d.ch;
+    let imgCx = d.imgPageX + cw / 2, imgCy = d.imgPageY + ch / 2;
+    // Grow the image (ratio-locked) if the new frame is larger than it, keeping centre.
+    const need = Math.max(nw / cw, nh / ch, 1);
+    if (need > 1) { cw *= need; ch *= need; }
+    let cropX = imgCx - cw / 2 - nx;
+    let cropY = imgCy - ch / 2 - ny;
+    // Clamp so the frame stays fully covered (no gaps).
+    cropX = Math.min(0, Math.max(nw - cw, cropX));
+    cropY = Math.min(0, Math.max(nh - ch, cropY));
+    patchEl(selId, { x: nx, y: ny, w: nw, h: nh, cropX, cropY, cropW: cw, cropH: ch });
+  }
+
+  function onFrameCropResizeEnd() {
+    frameCropRef.current = null;
+    window.removeEventListener("pointermove", onFrameCropResizeMove);
+    window.removeEventListener("pointerup", onFrameCropResizeEnd);
   }
 
   const onDragMove = useCallback(
@@ -1612,7 +1672,7 @@ export function CanvaEditor({
 
           {cropTab === "crop" && (
             <>
-              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it within the frame. Drag the white handles to scale it. Pick a ratio to reshape the crop frame.</p>
+              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it. <span className="text-surface-500 font-medium">Round handles</span> scale the image; <span className="text-brand-600 font-medium">purple square handles</span> resize the frame. The image never distorts.</p>
 
               {/* Aspect ratio (reshapes the crop frame) */}
               <div>
@@ -3340,13 +3400,13 @@ export function CanvaEditor({
                           alt=""
                           draggable={false}
                           style={{
-                            width: "100%", height: "100%", objectFit: "fill", display: "block",
+                            width: "100%", height: "100%", objectFit: "cover", display: "block",
                             transform: selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : undefined,
                             transformOrigin: "50% 50%",
                             userSelect: "none", pointerEvents: "none",
                           }}
                         />
-                        {/* Resize handles */}
+                        {/* Image scale handles (round) — scale the image, ratio-locked */}
                         {handles.map((h) => (
                           <div
                             key={h.id}
@@ -3361,6 +3421,35 @@ export function CanvaEditor({
                               borderRadius: "50%",
                               cursor: h.cursor,
                               touchAction: "none",
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Frame-resize handles (square) — resize the crop frame itself */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: selected.x, top: selected.y, width: selected.w, height: selected.h,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {handles.map((h) => (
+                          <div
+                            key={`f-${h.id}`}
+                            onPointerDown={(e) => startFrameCropResize(e, h.id, selected)}
+                            style={{
+                              position: "absolute",
+                              left: `calc(${h.cx * 100}% - ${HANDLE_SIZE / 2}px)`,
+                              top: `calc(${h.cy * 100}% - ${HANDLE_SIZE / 2}px)`,
+                              width: HANDLE_SIZE, height: HANDLE_SIZE,
+                              background: "#7c3aed",
+                              border: `${1.5 / zoom}px solid white`,
+                              borderRadius: 2 / zoom,
+                              cursor: h.cursor,
+                              touchAction: "none",
+                              pointerEvents: "auto",
                             }}
                           />
                         ))}
