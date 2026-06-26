@@ -105,6 +105,64 @@ function applyFrameClip(
   }
 }
 
+// Visual-crop box, identical math to PageRenderer.coverCropBox, so exports match
+// exactly what the editor (and crop preview) shows. Returns the image rect in
+// element-local coordinates (origin = element top-left).
+function coverCropBoxFor(el: CanvaElement): { left: number; top: number; width: number; height: number } {
+  const full = { left: 0, top: 0, width: el.w, height: el.h };
+  let bw = el.cropW ?? el.w;
+  let bh = el.cropH ?? el.h;
+  let bx = el.cropX ?? 0;
+  let by = el.cropY ?? 0;
+  if (!Number.isFinite(bw) || bw <= 0) bw = el.w;
+  if (!Number.isFinite(bh) || bh <= 0) bh = el.h;
+  if (!Number.isFinite(bx)) bx = 0;
+  if (!Number.isFinite(by)) by = 0;
+  const s = Math.max(el.w / bw, el.h / bh, 1);
+  if (!Number.isFinite(s) || s <= 0) return full;
+  if (s > 1) {
+    const cx = bx + bw / 2;
+    const cy = by + bh / 2;
+    bw *= s; bh *= s;
+    bx = cx - bw / 2; by = cy - bh / 2;
+  }
+  bx = Math.min(0, Math.max(el.w - bw, bx));
+  by = Math.min(0, Math.max(el.h - bh, by));
+  if (![bx, by, bw, bh].every(Number.isFinite)) return full;
+  return { left: bx, top: by, width: bw, height: bh };
+}
+
+// Draw an image using the visual-crop model: the image is object-fit:cover within
+// the crop box (cropX/Y/W/H), positioned at (ox+left, oy+top), with optional flip
+// and crop-rotation applied around the box centre — matching the DOM renderer's
+// `transform: <flip> rotate(<cropRotation>)` (origin 50% 50%). The caller is
+// responsible for clipping (rounded rect / frame shape) to the element box.
+function drawVisualCrop(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  el: CanvaElement,
+  ox: number,
+  oy: number,
+) {
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  const cb = coverCropBoxFor(el);
+  // object-fit: cover of the natural image into the crop box.
+  const s = Math.max(cb.width / nw, cb.height / nh);
+  const srcW = cb.width / s;
+  const srcH = cb.height / s;
+  const srcX = (nw - srcW) / 2;
+  const srcY = (nh - srcH) / 2;
+  const cx = ox + cb.left + cb.width / 2;
+  const cy = oy + cb.top + cb.height / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(el.flipH ? -1 : 1, el.flipV ? -1 : 1);
+  if (el.cropRotation) ctx.rotate((el.cropRotation * Math.PI) / 180);
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, -cb.width / 2, -cb.height / 2, cb.width, cb.height);
+  ctx.restore();
+}
+
 async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
   ctx.save();
   ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
@@ -202,12 +260,18 @@ async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
       if (el.src) {
         try {
           const img = await loadImage(el.src);
-          const scale = Math.max(el.w / img.naturalWidth, el.h / img.naturalHeight);
-          const dw = img.naturalWidth * scale;
-          const dh = img.naturalHeight * scale;
           const cf = imageColorFilter(el);
           if (cf) ctx.filter = cf;
-          ctx.drawImage(img, lx + (el.w - dw) / 2, ly + (el.h - dh) / 2, dw, dh);
+          if (el.cropW !== undefined) {
+            // Visual crop model — same as the editor (element top-left is at lx,ly).
+            drawVisualCrop(ctx, img, el, lx, ly);
+          } else {
+            // No crop set: plain centre-cover of the whole image into the frame.
+            const scale = Math.max(el.w / img.naturalWidth, el.h / img.naturalHeight);
+            const dw = img.naturalWidth * scale;
+            const dh = img.naturalHeight * scale;
+            ctx.drawImage(img, lx + (el.w - dw) / 2, ly + (el.h - dh) / 2, dw, dh);
+          }
           ctx.filter = "none";
         } catch { /* ignore */ }
       } else {
@@ -219,16 +283,6 @@ async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
       if (el.src) {
         try {
           const img = await loadImage(el.src);
-          const nw = img.naturalWidth, nh = img.naturalHeight;
-          const crop = el.crop ?? { t: 0, r: 0, b: 0, l: 0 };
-          const srcX = crop.l * nw, srcY = crop.t * nh;
-          const srcW = Math.max(1, (1 - crop.l - crop.r) * nw);
-          const srcH = Math.max(1, (1 - crop.t - crop.b) * nh);
-          // cover fit of crop region into box
-          const scale = Math.max(el.w / srcW, el.h / srcH);
-          const visW = el.w / scale, visH = el.h / scale;
-          const sx = srcX + (srcW - visW) / 2, sy = srcY + (srcH - visH) / 2;
-
           // render rounded + filtered image to an offscreen canvas
           const off = document.createElement("canvas");
           off.width = Math.max(1, Math.round(el.w));
@@ -239,13 +293,27 @@ async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
             octx.clip();
             const cf = imageColorFilter(el);
             if (cf) octx.filter = cf;
-            octx.save();
-            if (el.flipH || el.flipV) {
-              octx.translate(el.flipH ? off.width : 0, el.flipV ? off.height : 0);
-              octx.scale(el.flipH ? -1 : 1, el.flipV ? -1 : 1);
+            if (el.cropW !== undefined) {
+              // Visual crop model (matches the editor / crop preview); handles flip + rotation.
+              drawVisualCrop(octx, img, el, 0, 0);
+            } else {
+              // Legacy t/r/b/l crop fractions (older designs).
+              const nw = img.naturalWidth, nh = img.naturalHeight;
+              const crop = el.crop ?? { t: 0, r: 0, b: 0, l: 0 };
+              const srcX = crop.l * nw, srcY = crop.t * nh;
+              const srcW = Math.max(1, (1 - crop.l - crop.r) * nw);
+              const srcH = Math.max(1, (1 - crop.t - crop.b) * nh);
+              const scale = Math.max(el.w / srcW, el.h / srcH);
+              const visW = el.w / scale, visH = el.h / scale;
+              const sx = srcX + (srcW - visW) / 2, sy = srcY + (srcH - visH) / 2;
+              octx.save();
+              if (el.flipH || el.flipV) {
+                octx.translate(el.flipH ? off.width : 0, el.flipV ? off.height : 0);
+                octx.scale(el.flipH ? -1 : 1, el.flipV ? -1 : 1);
+              }
+              octx.drawImage(img, sx, sy, visW, visH, 0, 0, off.width, off.height);
+              octx.restore();
             }
-            octx.drawImage(img, sx, sy, visW, visH, 0, 0, off.width, off.height);
-            octx.restore();
           }
           // draw offscreen onto main ctx with shadow following rounded alpha
           const sh = el.shadow && SHADOW_MAP[el.shadow];
