@@ -1,0 +1,6 @@
+# Never upload local env files to Vercel — env vars come from the Vercel dashboard.
+# (A bundled .env with MAPS_ONLY=true would wrongly turn the main app into the
+# maps-only view.)
+.env
+.env.*
+!.env.example

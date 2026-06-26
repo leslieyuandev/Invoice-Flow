@@ -13,6 +13,8 @@ const ALLOWED_PREFIXES = [
   "/instagram-extractor",
   "/api/instagram",
   "/api/auth",
+  "/sso", // cross-domain SSO consumer page
+  "/api/sso", // cross-domain SSO endpoints
   "/login",
   "/register",
 ];

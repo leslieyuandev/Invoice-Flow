@@ -13,7 +13,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   //    instance. When unset, the Instagram Scraper is hidden on the main app (it lives on the
   //    self-hosted box) — set it to show an external link there instead.
   const mapsOnly = process.env.MAPS_ONLY === "true";
-  const mapsExternalUrl = process.env.MAPS_EXTRACTOR_URL || null;
+  // When the Maps Extractor lives on another domain, route the sidebar link through our
+  // own /api/sso/start so the user is auto-logged-in there (no second login). The route
+  // falls back to the plain external URL if SSO isn't configured.
+  const mapsExternalUrl = process.env.MAPS_EXTRACTOR_URL ? "/api/sso/start" : null;
   const instagramExternalUrl = process.env.INSTAGRAM_EXTRACTOR_URL || null;
 
   return (

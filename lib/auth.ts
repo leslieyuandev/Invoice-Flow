@@ -5,6 +5,7 @@ import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { verifySsoToken } from "@/lib/sso";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -43,6 +44,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+
+        return { id: user.id, email: user.email, name: user.name };
+      },
+    }),
+    // Cross-domain SSO: the main app mints a short-lived signed token (see lib/sso.ts)
+    // for an already-authenticated user; this provider verifies it and starts a session
+    // on the self-hosted maps domain so the user isn't asked to log in twice.
+    CredentialsProvider({
+      id: "sso",
+      name: "sso",
+      credentials: { ssoToken: { label: "SSO Token", type: "text" } },
+      async authorize(credentials) {
+        const payload = verifySsoToken(credentials?.ssoToken as string | undefined);
+        if (!payload) return null;
+
+        const user = await db.user.findUnique({ where: { id: payload.sub } });
+        if (!user || user.email !== payload.email) return null;
 
         return { id: user.id, email: user.email, name: user.name };
       },

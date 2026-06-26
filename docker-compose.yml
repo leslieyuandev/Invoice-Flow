@@ -39,6 +39,8 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # Shared secret for cross-domain SSO from the main app (must match the main app's value).
+      SSO_SECRET: ${SSO_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-}
