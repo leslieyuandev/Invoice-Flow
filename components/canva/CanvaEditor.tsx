@@ -1750,11 +1750,15 @@ export function CanvaEditor({
             <>
               <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it; the <span className="text-surface-500 font-medium">round handles</span> zoom it. Use <span className="text-surface-500 font-medium">Aspect ratio</span> below to reshape the frame. The image never distorts or leaves gaps.</p>
 
-              {/* Live result preview — exactly what the cropped element will look like */}
+              {/* Live result preview — exactly what the cropped element will look like.
+                  Uses the SAME box computation as the crop overlay (coverCropBox when a visual
+                  crop exists, else coverRect) so the preview always tallies with the editor. */}
               {selected.src && (() => {
                 const scale = Math.min(176 / selected.w, 176 / selected.h);
                 const pw = selected.w * scale, ph = selected.h * scale;
-                const cb = coverCropBox(selected);
+                const cb = selected.cropW !== undefined
+                  ? coverCropBox(selected)
+                  : (() => { const c = coverRect(selected.w, selected.h, cropRatioFor(selected)); return { left: c.cropX, top: c.cropY, width: c.cropW, height: c.cropH }; })();
                 const flip = imageFlipTransform(selected);
                 return (
                   <div>
@@ -2365,7 +2369,7 @@ export function CanvaEditor({
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} precedence="default" />
 
       {/* ── "Select multiple" mode banner ── */}
-      {multiSelectMode && (
+      {multiSelectMode && !presentMode && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9700] flex items-center gap-3 bg-surface-900 text-white rounded-full shadow-lg pl-4 pr-1.5 py-1.5 text-xs">
           <BoxSelect className="w-4 h-4 shrink-0" />
           <span className="font-medium">{selectedIds.length} selected · tap elements to add or remove</span>
@@ -3668,14 +3672,16 @@ export function CanvaEditor({
                 {/* ── Selection chrome portal (rendered at document.body so it escapes all overflow clipping) ──
                     Hidden while a modal is open (Magic Eraser / Pixel Eraser / Magic Layers) so it doesn't
                     sit on top of them or swallow their pointer events, and while an animation preview plays. */}
-                {(eraserEl || pixelEraserEl || magicLayersEl)
+                {(eraserEl || pixelEraserEl || magicLayersEl || presentMode)
                   ? null
                   : selectedIds.length > 1
                     ? renderMultiSelectionChrome()
-                    : selected && editingId !== selected.id && toolPanel !== "crop" && animPlayingId !== selected.id && renderSelectionChrome(selected)}
+                    // Hide the box/handles while the ⋯ dropdown is open so the menu is never crossed by the selection line.
+                    : selected && editingId !== selected.id && toolPanel !== "crop" && animPlayingId !== selected.id && !toolbarMenuOpen && renderSelectionChrome(selected)}
 
                 {/* Floating selection toolbar (quick actions + ⋯ menu + Select multiple) */}
                 {!(eraserEl || pixelEraserEl || magicLayersEl) &&
+                  !presentMode &&
                   toolPanel !== "crop" &&
                   !(selected && editingId === selected.id) &&
                   !(selected && animPlayingId === selected.id) &&
