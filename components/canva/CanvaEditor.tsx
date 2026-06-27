@@ -38,6 +38,18 @@ function CornerRadiusIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Transparency (opacity) icon — checkerboard, like Canva's
+function TransparencyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 12h9V3M12 12h9M12 12v9" />
+      <rect x="3" y="3" width="9" height="9" fill="currentColor" stroke="none" opacity="0.9" />
+      <rect x="12" y="12" width="9" height="9" fill="currentColor" stroke="none" opacity="0.9" />
+    </svg>
+  );
+}
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { saveCanvaProjectAction } from "@/actions/canva";
@@ -158,6 +170,11 @@ export function CanvaEditor({
   multiSelectModeRef.current = multiSelectMode;
   // Spacing popover is keyed to the element id so it auto-closes when selection changes
   const [spacingFor, setSpacingFor] = useState<string | null>(null);
+  // Opacity popover (icon + draggable slider) — rendered as a body portal so it isn't
+  // clipped by the toolbar's overflow-x-auto (same approach as the eraser dropdown).
+  const [opacityFor, setOpacityFor] = useState<string | null>(null);
+  const [opacityPos, setOpacityPos] = useState<{ top: number; right: number } | null>(null);
+  const opacityBtnRef = useRef<HTMLButtonElement>(null);
   const [resizeOpen, setResizeOpen] = useState(false);
   const [resizeSearch, setResizeSearch] = useState("");
   const [customW, setCustomW] = useState(String(project.width));
@@ -256,10 +273,12 @@ export function CanvaEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolPanel, selected?.id, selected?.src]);
 
-  // Close the toolbar "⋯" dropdown whenever the selection changes.
+  // Close the toolbar "⋯" dropdown + popovers whenever the selection changes.
   useEffect(() => {
     setToolbarMenuOpen(false);
     setMenuSub(null);
+    setOpacityFor(null);
+    setSpacingFor(null);
   }, [selectedId]);
 
   // Register uploaded custom fonts so they render and export
@@ -552,6 +571,16 @@ export function CanvaEditor({
     const cur = el.textTransform ?? "none";
     const next = order[(order.indexOf(cur) + 1) % order.length];
     commitPatch(el.id, { textTransform: next });
+  }, [selectedId, commitPatch]);
+
+  // Cycle text alignment (left → center → right) on each click to save toolbar space.
+  const cycleAlign = useCallback(() => {
+    const el = pagesRef.current[pageIdxRef.current].elements.find((e) => e.id === selectedId);
+    if (!el || el.type !== "text") return;
+    const order: NonNullable<CanvaElement["textAlign"]>[] = ["left", "center", "right"];
+    const cur = el.textAlign ?? "left";
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    commitPatch(el.id, { textAlign: next });
   }, [selectedId, commitPatch]);
 
   const applyResize = useCallback(
@@ -2407,7 +2436,7 @@ export function CanvaEditor({
       </div>
 
       {/* ── Context toolbar (always present to reserve height — no layout shift) ── */}
-      <div className="flex items-center gap-2 px-3 border-b border-surface-200 bg-white shrink-0 overflow-x-auto h-12">
+      <div className="flex items-center gap-1.5 px-3 border-b border-surface-200 bg-white shrink-0 overflow-x-auto h-14">
         {selectedIds.length > 1 ? (
           <>
             <span className="text-xs font-medium text-surface-600 shrink-0">{selectedIds.length} selected</span>
@@ -2438,20 +2467,20 @@ export function CanvaEditor({
               <button
                 type="button"
                 onClick={() => setToolPanel((p) => (p === "fonts" ? null : "fonts"))}
-                className={cn("flex items-center gap-1.5 text-xs border rounded-md px-2 py-1.5 bg-white w-36 hover:border-surface-300", toolPanel === "fonts" ? "border-brand-400 ring-1 ring-brand-200" : "border-surface-200")}
+                className={cn("flex items-center gap-1.5 text-sm border rounded-md px-2.5 py-2 bg-white w-36 hover:border-surface-300", toolPanel === "fonts" ? "border-brand-400 ring-1 ring-brand-200" : "border-surface-200")}
                 title="Browse fonts"
               >
                 <span className="truncate flex-1 text-left" style={{ fontFamily: selected.fontFamily }}>{familyFromCss(selected.fontFamily)}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-surface-400 shrink-0" />
+                <ChevronDown className="w-4 h-4 text-surface-400 shrink-0" />
               </button>
               <input ref={fontInputRef} type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" className="hidden" onChange={handleFontUpload} />
               <div className="flex items-center border border-surface-200 rounded-md">
                 <button
                   type="button"
                   onClick={() => commitPatch(selected.id, { fontSize: Math.max(6, (selected.fontSize ?? 24) - 2) })}
-                  className="px-1.5 py-1.5 text-surface-500 hover:bg-surface-100 rounded-l-md"
+                  className="px-2 py-2 text-surface-500 hover:bg-surface-100 rounded-l-md"
                 >
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-4 h-4" />
                 </button>
                 <input
                   type="number"
@@ -2459,14 +2488,14 @@ export function CanvaEditor({
                   max={400}
                   value={selected.fontSize ?? 24}
                   onChange={(e) => commitPatch(selected.id, { fontSize: Number(e.target.value) })}
-                  className="w-12 text-xs text-center py-1.5 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-12 text-sm text-center py-2 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button
                   type="button"
                   onClick={() => commitPatch(selected.id, { fontSize: Math.min(400, (selected.fontSize ?? 24) + 2) })}
-                  className="px-1.5 py-1.5 text-surface-500 hover:bg-surface-100 rounded-r-md"
+                  className="px-2 py-2 text-surface-500 hover:bg-surface-100 rounded-r-md"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-4 h-4" />
                 </button>
               </div>
               <label className="flex items-center gap-1 text-xs text-surface-500" title="Text color">
@@ -2474,79 +2503,82 @@ export function CanvaEditor({
                   type="color"
                   value={selected.color ?? "#1a1a1a"}
                   onChange={(e) => commitPatch(selected.id, { color: e.target.value })}
-                  className="w-7 h-7 rounded cursor-pointer border border-surface-200"
+                  className="w-8 h-8 rounded cursor-pointer border border-surface-200"
                 />
               </label>
               <button
                 type="button"
                 title="Bold"
                 onClick={() => commitPatch(selected.id, { fontWeight: (selected.fontWeight ?? 400) >= 600 ? 400 : 700 })}
-                className={cn("p-1.5 rounded-md", (selected.fontWeight ?? 400) >= 600 ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", (selected.fontWeight ?? 400) >= 600 ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Bold className="w-4 h-4" />
+                <Bold className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Italic"
                 onClick={() => commitPatch(selected.id, { fontStyle: selected.fontStyle === "italic" ? "normal" : "italic" })}
-                className={cn("p-1.5 rounded-md", selected.fontStyle === "italic" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", selected.fontStyle === "italic" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Italic className="w-4 h-4" />
+                <Italic className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Underline"
                 onClick={() => commitPatch(selected.id, { underline: !selected.underline })}
-                className={cn("p-1.5 rounded-md", selected.underline ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", selected.underline ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Underline className="w-4 h-4" />
+                <Underline className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Strikethrough"
                 onClick={() => commitPatch(selected.id, { strike: !selected.strike })}
-                className={cn("p-1.5 rounded-md", selected.strike ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", selected.strike ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Strikethrough className="w-4 h-4" />
+                <Strikethrough className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Text case (aA)"
                 onClick={cycleCase}
                 className={cn(
-                  "px-1.5 py-1 rounded-md text-xs font-semibold",
+                  "px-2 py-1 rounded-md text-sm font-semibold",
                   (selected.textTransform ?? "none") !== "none" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100"
                 )}
               >
                 {selected.textTransform === "uppercase" ? "AA" : selected.textTransform === "capitalize" ? "Aa" : "aA"}
               </button>
-              {([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([al, Icon]) => (
-                <button
-                  key={al}
-                  type="button"
-                  title={`Align ${al}`}
-                  onClick={() => commitPatch(selected.id, { textAlign: al })}
-                  className={cn("p-1.5 rounded-md", selected.textAlign === al ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              ))}
+              {(() => {
+                const al = selected.textAlign ?? "left";
+                const AlignIcon = al === "center" ? AlignCenter : al === "right" ? AlignRight : AlignLeft;
+                return (
+                  <button
+                    type="button"
+                    title={`Align: ${al} (click to change)`}
+                    onClick={cycleAlign}
+                    className="p-2 rounded-md text-surface-500 hover:bg-surface-100"
+                  >
+                    <AlignIcon className="w-5 h-5" />
+                  </button>
+                );
+              })()}
               <button
                 type="button"
                 title="Bulleted list"
                 onClick={toggleBullets}
-                className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"
+                className="p-2 rounded-md text-surface-500 hover:bg-surface-100"
               >
-                <List className="w-4 h-4" />
+                <List className="w-5 h-5" />
               </button>
               <div className="relative">
                 <button
                   type="button"
                   title="Letter & line spacing"
                   onClick={() => setSpacingFor((o) => (o === selected.id ? null : selected.id))}
-                  className={cn("p-1.5 rounded-md", spacingFor === selected.id ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                  className={cn("p-2 rounded-md", spacingFor === selected.id ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
                 >
-                  <SlidersHorizontal className="w-4 h-4" />
+                  <SlidersHorizontal className="w-5 h-5" />
                 </button>
                 {spacingFor === selected.id && (
                   <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-surface-200 rounded-xl shadow-lg p-3 w-56 space-y-3">
@@ -2660,49 +2692,49 @@ export function CanvaEditor({
                 type="button"
                 title="Adjust (brightness, contrast…)"
                 onClick={() => setToolPanel((p) => (p === "adjust" ? null : "adjust"))}
-                className={cn("p-1.5 rounded-md", toolPanel === "adjust" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", toolPanel === "adjust" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Sun className="w-4 h-4" />
+                <Sun className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Filters"
                 onClick={() => setToolPanel((p) => (p === "filters" ? null : "filters"))}
-                className={cn("p-1.5 rounded-md", toolPanel === "filters" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", toolPanel === "filters" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Wand2 className="w-4 h-4" />
+                <Wand2 className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Crop"
                 onClick={() => setToolPanel((p) => (p === "crop" ? null : "crop"))}
-                className={cn("p-1.5 rounded-md", toolPanel === "crop" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", toolPanel === "crop" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Crop className="w-4 h-4" />
+                <Crop className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Flip horizontal"
                 onClick={() => commitPatch(selected.id, { flipH: !selected.flipH })}
-                className={cn("p-1.5 rounded-md", selected.flipH ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", selected.flipH ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <FlipHorizontal className="w-4 h-4" />
+                <FlipHorizontal className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Flip vertical"
                 onClick={() => commitPatch(selected.id, { flipV: !selected.flipV })}
-                className={cn("p-1.5 rounded-md", selected.flipV ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("p-2 rounded-md", selected.flipV ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <FlipVertical className="w-4 h-4" />
+                <FlipVertical className="w-5 h-5" />
               </button>
               <button
                 type="button"
                 title="Effects & shadows"
                 onClick={() => setToolPanel((p) => (p === "effects" ? null : "effects"))}
-                className={cn("flex items-center gap-1 px-2 py-1.5 rounded-md text-xs", toolPanel === "effects" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+                className={cn("flex items-center gap-1 px-2.5 py-2 rounded-md text-sm", toolPanel === "effects" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
               >
-                <Sparkles className="w-4 h-4" /> Effects
+                <Sparkles className="w-5 h-5" /> Effects
               </button>
               <button
                 type="button"
@@ -2711,7 +2743,7 @@ export function CanvaEditor({
                 disabled={bgRemoving !== null}
                 className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-surface-500 hover:bg-surface-100 disabled:opacity-50"
               >
-                {bgRemoving === selected.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
+                {bgRemoving === selected.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eraser className="w-5 h-5" />}
                 <span className="hidden lg:inline">Remove BG</span>
               </button>
               <div className="relative flex items-center rounded-md border border-surface-200">
@@ -2728,18 +2760,18 @@ export function CanvaEditor({
                   }}
                   className="flex items-center gap-1 px-2 py-1.5 text-xs text-surface-500 hover:bg-surface-100"
                 >
-                  <PenTool className="w-4 h-4" />
+                  <PenTool className="w-5 h-5" />
                   <span className="hidden lg:inline">Eraser</span>
-                  <ChevronDown className="w-3 h-3" />
+                  <ChevronDown className="w-3.5 h-3.5" />
                 </button>
               </div>
               <button
                 type="button"
                 title="Magic Layers — split image into background + foreground layers"
                 onClick={() => selected.src ? setMagicLayersEl(selected) : toast.error("No image to process")}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-surface-500 hover:bg-surface-100"
+                className="flex items-center gap-1 px-2.5 py-2 rounded-md text-sm text-surface-500 hover:bg-surface-100"
               >
-                <Layers className="w-4 h-4" />
+                <Layers className="w-5 h-5" />
                 <span className="hidden lg:inline">Magic Layers</span>
               </button>
               <label className="flex items-center gap-1.5 text-xs text-surface-500" title="Corner radius">
@@ -2781,39 +2813,43 @@ export function CanvaEditor({
             </>
           )}
 
-          <label className="flex items-center gap-1.5 text-xs text-surface-500 ml-1">
-            Opacity
-            <input
-              type="range"
-              min={5}
-              max={100}
-              value={Math.round((selected.opacity ?? 1) * 100)}
-              onChange={(e) => commitPatch(selected.id, { opacity: Number(e.target.value) / 100 })}
-              className="w-20 accent-brand-600"
-            />
-          </label>
+          <button
+            ref={opacityBtnRef}
+            type="button"
+            title="Transparency"
+            onClick={() => {
+              if (opacityFor !== selected.id && opacityBtnRef.current) {
+                const r = opacityBtnRef.current.getBoundingClientRect();
+                setOpacityPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+              }
+              setOpacityFor((o) => (o === selected.id ? null : selected.id));
+            }}
+            className={cn("p-2 rounded-md ml-1", opacityFor === selected.id ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+          >
+            <TransparencyIcon className="w-5 h-5" />
+          </button>
 
           <div className="w-px h-5 bg-surface-200 mx-1" />
           <button
             type="button"
             title="Position & arrange"
             onClick={() => setToolPanel((p) => (p === "position" ? null : "position"))}
-            className={cn("flex items-center gap-1 px-2 py-1.5 rounded-md text-xs", toolPanel === "position" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
+            className={cn("flex items-center gap-1 px-2.5 py-2 rounded-md text-sm", toolPanel === "position" ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:bg-surface-100")}
           >
-            <Move className="w-4 h-4" /> Position
+            <Move className="w-5 h-5" /> <span className="hidden lg:inline">Position</span>
           </button>
           <button
             type="button"
             onClick={() => setToolPanel((p) => (p === "animate" ? null : "animate"))}
-            className={cn("flex items-center gap-1 px-2 py-1.5 rounded-md text-xs hover:bg-surface-100", toolPanel === "animate" ? "text-brand-600 bg-brand-50" : "text-surface-500")}
+            className={cn("flex items-center gap-1 px-2.5 py-2 rounded-md text-sm hover:bg-surface-100", toolPanel === "animate" ? "text-brand-600 bg-brand-50" : "text-surface-500")}
           >
-            <Play className="w-4 h-4" />
+            <Play className="w-5 h-5" />
             <span className="hidden lg:inline">Animate</span>
           </button>
-          <button type="button" title="Bring forward" onClick={() => moveLayer(1)} className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"><ChevronUp className="w-4 h-4" /></button>
-          <button type="button" title="Send backward" onClick={() => moveLayer(-1)} className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"><ChevronDown className="w-4 h-4" /></button>
-          <button type="button" title="Duplicate (Ctrl+D)" onClick={duplicateSelected} className="p-1.5 rounded-md text-surface-500 hover:bg-surface-100"><Copy className="w-4 h-4" /></button>
-          <button type="button" title="Delete (Del)" onClick={deleteSelected} className="p-1.5 rounded-md text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+          <button type="button" title="Bring forward" onClick={() => moveLayer(1)} className="p-2 rounded-md text-surface-500 hover:bg-surface-100"><ChevronUp className="w-5 h-5" /></button>
+          <button type="button" title="Send backward" onClick={() => moveLayer(-1)} className="p-2 rounded-md text-surface-500 hover:bg-surface-100"><ChevronDown className="w-5 h-5" /></button>
+          <button type="button" title="Duplicate (Ctrl+D)" onClick={duplicateSelected} className="p-2 rounded-md text-surface-500 hover:bg-surface-100"><Copy className="w-5 h-5" /></button>
+          <button type="button" title="Delete (Del)" onClick={deleteSelected} className="p-2 rounded-md text-red-500 hover:bg-red-50"><Trash2 className="w-5 h-5" /></button>
         </>
         ) : (
           <span className="text-xs text-surface-400">Select an element to edit it, or choose a tool from the left panel.</span>
@@ -4087,6 +4123,32 @@ export function CanvaEditor({
           onClose={() => setMagicLayersEl(null)}
           onApplyLayers={handleApplyMagicLayers}
         />
+      )}
+
+      {/* Transparency (opacity) popover portal — rendered outside the overflow-x-auto toolbar */}
+      {opacityFor && selected && opacityFor === selected.id && opacityPos && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onPointerDown={() => setOpacityFor(null)} />
+          <div
+            style={{ position: "fixed", top: opacityPos.top, right: opacityPos.right, zIndex: 9999 }}
+            className="bg-white rounded-xl shadow-xl border border-surface-200 p-3 w-60"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between text-xs font-medium text-surface-600 mb-2">
+              <span>Transparency</span>
+              <span>{Math.round((selected.opacity ?? 1) * 100)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round((selected.opacity ?? 1) * 100)}
+              onChange={(e) => commitPatch(selected.id, { opacity: Number(e.target.value) / 100 })}
+              className="w-full h-2 accent-brand-600"
+            />
+          </div>
+        </>,
+        document.body
       )}
 
       {/* Eraser dropdown portal — rendered outside the overflow-x-auto toolbar */}
