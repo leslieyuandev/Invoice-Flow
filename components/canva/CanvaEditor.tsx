@@ -707,14 +707,18 @@ export function CanvaEditor({
     e.stopPropagation();
     e.preventDefault();
     const ratio = cropRatioFor(el);
-    const cropX = el.cropX ?? 0;
-    const cropY = el.cropY ?? 0;
-    const cropW = el.cropW ?? el.w;
-    const cropH = el.cropH ?? el.w / ratio;
+    // Start the drag from the box that is actually DISPLAYED (coverCropBox), which is
+    // what the overlay/handles are drawn on. Using the raw cropX/Y/W/H here would make
+    // pan/resize start from a different rectangle than the one on screen whenever the
+    // stored crop isn't already in covering form — causing the image to jump and the
+    // baked result to differ from what the user framed.
+    const disp = el.cropW !== undefined
+      ? coverCropBox(el)
+      : (() => { const c = coverRect(el.w, el.h, ratio); return { left: c.cropX, top: c.cropY, width: c.cropW, height: c.cropH }; })();
     pushHistory();
     cropDragRef.current = {
       mode, startX: e.clientX, startY: e.clientY,
-      startCropX: cropX, startCropY: cropY, startCropW: cropW, startCropH: cropH,
+      startCropX: disp.left, startCropY: disp.top, startCropW: disp.width, startCropH: disp.height,
     };
     window.addEventListener("pointermove", onCropDragMove);
     window.addEventListener("pointerup", onCropDragEnd);
