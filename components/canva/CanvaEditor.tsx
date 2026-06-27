@@ -1775,6 +1775,13 @@ export function CanvaEditor({
                         }}
                       />
                     </div>
+                    {/* TEMP crop diagnostic — remove after debugging */}
+                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
+{`el ${Math.round(selected.w)}x${Math.round(selected.h)} rot${selected.rotation}
+crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
+cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)}
+boxR ${(cb.width / cb.height).toFixed(3)} natR ${(cropNaturalRef.current?.id === selected.id ? cropNaturalRef.current.ratio : NaN).toFixed?.(3) ?? "?"} legacyCrop ${selected.crop ? "YES" : "no"}`}
+                    </pre>
                   </div>
                 );
               })()}
