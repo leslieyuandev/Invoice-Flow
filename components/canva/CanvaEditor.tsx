@@ -12,7 +12,7 @@ import {
   Underline, Strikethrough, List, SlidersHorizontal, Scaling, Lock,
   Link2, Paintbrush, ClipboardPaste, Search, ChevronRight, Layers, AlignVerticalJustifyCenter, Accessibility,
   FlipHorizontal, FlipVertical, Crop, Sparkles, Sun, Wand2, Move, FileType, FileImage, Eraser, Group, Ungroup,
-  Play, RotateCcw, PenTool, Check, ChevronLeft,
+  Play, RotateCcw, PenTool, Check, ChevronLeft, Home, MoreHorizontal, BoxSelect,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { FontBrowserPanel } from "./FontPicker";
@@ -117,7 +117,9 @@ export function CanvaEditor({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.5);
   const [panel, setPanel] = useState<PanelTab>("design");
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Collapsed by default so the canvas gets the full viewport on landing (esp. iPad).
+  // The icon rail (Design, Elements, Text, Uploads, Background) stays visible to reopen it.
+  const [panelOpen, setPanelOpen] = useState(false);
   const [elementsTab, setElementsTab] = useState<"shapes" | "graphics" | "frames">("shapes");
   const [graphicsCat, setGraphicsCat] = useState<string>("");
   const [balloonPresetIdx, setBalloonPresetIdx] = useState(0);
@@ -145,6 +147,15 @@ export function CanvaEditor({
   const [exportingAs, setExportingAs] = useState<"png" | "jpg" | "pdf" | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving">("saved");
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
+  // Floating selection toolbar (Canva-style) — the "⋯" dropdown open state.
+  const [toolbarMenuOpen, setToolbarMenuOpen] = useState(false);
+  // Which submenu (Layer / Align) is expanded inside the element menu (tap-to-expand, touch-friendly).
+  const [menuSub, setMenuSub] = useState<"layer" | "align" | null>(null);
+  // "Select multiple" mode — on iPad there's no Shift/Ctrl-click, so this mode makes
+  // every tap on an element add/remove it from the selection.
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const multiSelectModeRef = useRef(false);
+  multiSelectModeRef.current = multiSelectMode;
   // Spacing popover is keyed to the element id so it auto-closes when selection changes
   const [spacingFor, setSpacingFor] = useState<string | null>(null);
   const [resizeOpen, setResizeOpen] = useState(false);
@@ -245,6 +256,12 @@ export function CanvaEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolPanel, selected?.id, selected?.src]);
 
+  // Close the toolbar "⋯" dropdown whenever the selection changes.
+  useEffect(() => {
+    setToolbarMenuOpen(false);
+    setMenuSub(null);
+  }, [selectedId]);
+
   // Register uploaded custom fonts so they render and export
   useEffect(() => {
     fonts.forEach((f) => injectCustomFont(f.name, f.url));
@@ -266,7 +283,7 @@ export function CanvaEditor({
   function fitZoom() {
     const vp = viewportRef.current;
     if (!vp) return;
-    const z = Math.min((vp.clientWidth - 120) / W, (vp.clientHeight - 120) / H, 1);
+    const z = Math.min((vp.clientWidth - 48) / W, (vp.clientHeight - 48) / H, 1);
     setZoom(Math.max(0.05, Math.round(z * 100) / 100));
   }
 
@@ -491,6 +508,13 @@ export function CanvaEditor({
     commitPatch(el.id, { locked: !el.locked });
   }, [selectedId, commitPatch]);
 
+  // Enter "Select multiple" mode — on touch devices (iPad) there's no Shift/Ctrl-click,
+  // so this makes every subsequent tap on an element toggle it into the selection.
+  const enterMultiSelect = useCallback(() => {
+    setMultiSelectMode(true);
+    toast.info("Select multiple: tap elements to add or remove them, then tap Done");
+  }, []);
+
   const editLink = useCallback(() => {
     const el = pagesRef.current[pageIdxRef.current].elements.find((e) => e.id === selectedId);
     if (!el) return;
@@ -566,7 +590,7 @@ export function CanvaEditor({
       setTimeout(() => {
         const vp = viewportRef.current;
         if (!vp) return;
-        const z = Math.min((vp.clientWidth - 120) / newW, (vp.clientHeight - 120) / newH, 1);
+        const z = Math.min((vp.clientWidth - 48) / newW, (vp.clientHeight - 48) / newH, 1);
         setZoom(Math.max(0.05, Math.round(z * 100) / 100));
       }, 50);
       toast.success(`Canvas resized to ${newW} × ${newH}px`);
@@ -583,7 +607,7 @@ export function CanvaEditor({
       setEditingId(null);
       setCtxMenu(null);
 
-      const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      const additive = e.shiftKey || e.metaKey || e.ctrlKey || multiSelectModeRef.current;
       const els = pagesRef.current[pageIdxRef.current].elements;
       const mates = el.groupId ? els.filter((x) => x.groupId === el.groupId).map((x) => x.id) : [el.id];
 
@@ -1002,7 +1026,7 @@ export function CanvaEditor({
     e.stopPropagation();
     setEditingId(null);
     setCtxMenu(null);
-    if (!(e.shiftKey || e.metaKey || e.ctrlKey)) setSelectedIds([]);
+    if (!(e.shiftKey || e.metaKey || e.ctrlKey || multiSelectMode)) setSelectedIds([]);
     if (toolPanel !== "fonts") setToolPanel(null);
     const node = pageRef.current;
     if (!node) return;
@@ -1014,7 +1038,7 @@ export function CanvaEditor({
     setMarquee({ x: sx, y: sy, w: 0, h: 0 });
     window.addEventListener("pointermove", onMarqueeMove);
     window.addEventListener("pointerup", onMarqueeUp);
-  }, [onMarqueeMove, onMarqueeUp, toolPanel]);
+  }, [onMarqueeMove, onMarqueeUp, toolPanel, multiSelectMode]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -2034,6 +2058,212 @@ export function CanvaEditor({
     );
   }
 
+  // ── Shared element menu (used by right-click context menu AND the toolbar "⋯" dropdown) ──
+  // Submenus expand inline on tap so they work on touch devices (iPad), where hover flyouts don't.
+  function elementMenuItems(el: CanvaElement, close: () => void) {
+    const item = (
+      label: string,
+      icon: React.ReactNode,
+      onClick: () => void,
+      opts?: { shortcut?: string; danger?: boolean; disabled?: boolean; highlight?: boolean }
+    ) => (
+      <button
+        type="button"
+        disabled={opts?.disabled}
+        onClick={() => { onClick(); close(); }}
+        className={cn(
+          "flex items-center gap-2.5 w-full px-3 py-2 text-xs rounded-md text-left",
+          opts?.danger
+            ? "text-red-600 hover:bg-red-50"
+            : opts?.highlight
+              ? "text-brand-700 bg-brand-50 hover:bg-brand-100 font-medium"
+              : "text-surface-700 hover:bg-surface-100",
+          opts?.disabled && "opacity-40 pointer-events-none"
+        )}
+      >
+        {icon}
+        <span className="flex-1">{label}</span>
+        {opts?.shortcut && <span className="text-[10px] text-surface-400 bg-surface-100 rounded px-1 py-0.5">{opts.shortcut}</span>}
+      </button>
+    );
+    const subBtn = (label: string, icon: React.ReactNode, key: "layer" | "align") => (
+      <button
+        type="button"
+        onClick={() => setMenuSub((s) => (s === key ? null : key))}
+        className="flex items-center gap-2.5 w-full px-3 py-2 text-xs rounded-md text-left text-surface-700 hover:bg-surface-100"
+      >
+        {icon}
+        <span className="flex-1">{label}</span>
+        <ChevronRight className={cn("w-3.5 h-3.5 text-surface-400 transition-transform", menuSub === key && "rotate-90")} />
+      </button>
+    );
+    return (
+      <>
+        {item("Copy", <Copy className="w-3.5 h-3.5" />, () => { clipboard.current = { ...el }; }, { shortcut: "Ctrl+C" })}
+        {item("Copy style", <Paintbrush className="w-3.5 h-3.5" />, copyStyle, { shortcut: "Ctrl+Alt+C" })}
+        {item("Paste", <ClipboardPaste className="w-3.5 h-3.5" />, () => {
+          const src = clipboard.current;
+          if (src) addElement({ ...src, x: src.x + 24, y: src.y + 24 });
+        }, { shortcut: "Ctrl+V", disabled: !clipboard.current })}
+        {item("Paste style", <Paintbrush className="w-3.5 h-3.5" />, pasteStyle, { disabled: !styleClipboard.current })}
+        {item("Duplicate", <Copy className="w-3.5 h-3.5" />, duplicateSelected, { shortcut: "Ctrl+D" })}
+        {item("Delete", <Trash2 className="w-3.5 h-3.5" />, deleteSelected, { shortcut: "DELETE", danger: true })}
+
+        <div className="h-px bg-surface-100 my-1" />
+        {/* Select multiple — highlighted; the only practical way to multi-select on iPad */}
+        {item(
+          multiSelectMode ? "Selecting multiple…" : "Select multiple",
+          <BoxSelect className="w-3.5 h-3.5" />,
+          enterMultiSelect,
+          { highlight: true }
+        )}
+
+        {(selectedIds.length >= 2 || selectedEls.some((x) => x.groupId)) && (
+          <>
+            <div className="h-px bg-surface-100 my-1" />
+            {selectedIds.length >= 2 &&
+              item("Group", <Group className="w-3.5 h-3.5" />, groupSelected, { shortcut: "Ctrl+G" })}
+            {selectedEls.some((x) => x.groupId) &&
+              item("Ungroup", <Ungroup className="w-3.5 h-3.5" />, ungroupSelected, { shortcut: "Ctrl+Shift+G" })}
+          </>
+        )}
+
+        <div className="h-px bg-surface-100 my-1" />
+
+        {/* Layer (inline expand) */}
+        <div>
+          {subBtn("Layer", <Layers className="w-3.5 h-3.5" />, "layer")}
+          {menuSub === "layer" && (
+            <div className="ml-3 pl-2 border-l border-surface-100">
+              {item("Bring to front", <ChevronUp className="w-3.5 h-3.5" />, () => moveLayerToEnd(true))}
+              {item("Bring forward", <ChevronUp className="w-3.5 h-3.5" />, () => moveLayer(1))}
+              {item("Send backward", <ChevronDown className="w-3.5 h-3.5" />, () => moveLayer(-1))}
+              {item("Send to back", <ChevronDown className="w-3.5 h-3.5" />, () => moveLayerToEnd(false))}
+            </div>
+          )}
+        </div>
+
+        {/* Align to page (inline expand) */}
+        <div>
+          {subBtn("Align to page", <AlignVerticalJustifyCenter className="w-3.5 h-3.5" />, "align")}
+          {menuSub === "align" && (
+            <div className="ml-3 pl-2 border-l border-surface-100">
+              {item("Left", <AlignLeft className="w-3.5 h-3.5" />, () => alignToPage("left"))}
+              {item("Center", <AlignCenter className="w-3.5 h-3.5" />, () => alignToPage("center"))}
+              {item("Right", <AlignRight className="w-3.5 h-3.5" />, () => alignToPage("right"))}
+              {item("Top", <AlignLeft className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("top"))}
+              {item("Middle", <AlignCenter className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("middle"))}
+              {item("Bottom", <AlignRight className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("bottom"))}
+            </div>
+          )}
+        </div>
+
+        <div className="h-px bg-surface-100 my-1" />
+
+        {item(el.locked ? "Unlock" : "Lock", <Lock className="w-3.5 h-3.5" />, toggleLock, { shortcut: "Ctrl+Alt+L" })}
+        {item(el.link ? "Edit link" : "Link", <Link2 className="w-3.5 h-3.5" />, editLink, { shortcut: "Ctrl+K" })}
+        {item("Alternative text", <Accessibility className="w-3.5 h-3.5" />, editAltText)}
+      </>
+    );
+  }
+
+  // Screen-space bounding box of the current selection (single or multi), for anchoring the toolbar.
+  function selectionScreenBox() {
+    const pageNode = pageRef.current;
+    if (!pageNode) return null;
+    const bbox = selectedIds.length > 1
+      ? selectionBBox
+      : selected
+        ? { x: selected.x, y: selected.y, w: selected.w, h: selected.h }
+        : null;
+    if (!bbox) return null;
+    const rect = pageNode.getBoundingClientRect();
+    return {
+      left: rect.left + bbox.x * zoom,
+      top: rect.top + bbox.y * zoom,
+      width: bbox.w * zoom,
+      height: bbox.h * zoom,
+    };
+  }
+
+  // ── Floating selection toolbar (Canva-style quick actions above the selection) ──
+  function renderSelectionToolbar() {
+    if (selectedEls.length === 0) return null;
+    const box = selectionScreenBox();
+    if (!box) return null;
+    const el = selected; // null for a multi-selection
+    const TB_GAP = 12;
+    const TB_H = 40;
+    // Prefer above the selection; flip below if it would clip the top of the viewport.
+    let top = box.top - TB_H - TB_GAP;
+    if (top < 8) top = box.top + box.height + TB_GAP;
+    const centerX = Math.max(120, Math.min(window.innerWidth - 120, box.left + box.width / 2));
+
+    const btn = "p-2 rounded-md text-surface-600 hover:text-surface-900 hover:bg-surface-100 transition-colors";
+
+    const closeMenu = () => { setToolbarMenuOpen(false); setMenuSub(null); };
+
+    return createPortal(
+      <>
+        {/* Backdrop to close the ⋯ dropdown on outside tap */}
+        {toolbarMenuOpen && (
+          <div className="fixed inset-0 z-[9590]" onPointerDown={closeMenu} />
+        )}
+        <div
+          style={{ position: "fixed", top, left: centerX, transform: "translateX(-50%)", zIndex: 9600 }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-0.5 bg-white rounded-xl shadow-xl border border-surface-200 px-1 py-1">
+            {/* Select multiple — emphasized (text + icon) */}
+            <button
+              type="button"
+              onClick={() => (multiSelectMode ? setMultiSelectMode(false) : enterMultiSelect())}
+              title="Select multiple elements"
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
+                multiSelectMode ? "bg-brand-600 text-white hover:bg-brand-700" : "text-brand-700 bg-brand-50 hover:bg-brand-100"
+              )}
+            >
+              <BoxSelect className="w-4 h-4" />
+              <span className="hidden sm:inline">{multiSelectMode ? "Done" : "Select multiple"}</span>
+            </button>
+
+            <div className="w-px h-5 bg-surface-200 mx-0.5" />
+
+            {el && (
+              <button type="button" onClick={toggleLock} title={el.locked ? "Unlock" : "Lock"} className={cn(btn, el.locked && "text-brand-600")}>
+                <Lock className="w-4 h-4" />
+              </button>
+            )}
+            <button type="button" onClick={duplicateSelected} title="Duplicate (Ctrl+D)" className={btn}>
+              <Copy className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={deleteSelected} title="Delete (Del)" className="p-2 rounded-md text-red-500 hover:bg-red-50 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setMenuSub(null); setToolbarMenuOpen((v) => !v); }}
+              title="More actions"
+              className={cn(btn, toolbarMenuOpen && "bg-surface-100 text-surface-900")}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* ⋯ dropdown */}
+          {toolbarMenuOpen && el && (
+            <div className="absolute right-0 mt-1.5 bg-white rounded-xl shadow-xl border border-surface-200 py-1.5 px-1.5 w-56 max-h-[70vh] overflow-y-auto">
+              {elementMenuItems(el, closeMenu)}
+            </div>
+          )}
+        </div>
+      </>,
+      document.body
+    );
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   const zoomPct = Math.round(zoom * 100);
 
@@ -2051,9 +2281,27 @@ export function CanvaEditor({
     <div className="flex flex-col h-full overflow-hidden bg-surface-100">
       <link rel="stylesheet" href={GOOGLE_FONTS_URL} precedence="default" />
 
+      {/* ── "Select multiple" mode banner ── */}
+      {multiSelectMode && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[9700] flex items-center gap-3 bg-surface-900 text-white rounded-full shadow-lg pl-4 pr-1.5 py-1.5 text-xs">
+          <BoxSelect className="w-4 h-4 shrink-0" />
+          <span className="font-medium">{selectedIds.length} selected · tap elements to add or remove</span>
+          <button
+            type="button"
+            onClick={() => setMultiSelectMode(false)}
+            className="rounded-full bg-white/15 hover:bg-white/25 px-3 py-1 font-semibold transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-surface-200 bg-white shrink-0">
-        <Link href="/canva" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+        <Link href="/" title="Home — back to dashboard" aria-label="Home" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <Home className="w-4 h-4" />
+        </Link>
+        <Link href="/canva" title="Back to projects" aria-label="Back to projects" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <input
@@ -3160,7 +3408,7 @@ export function CanvaEditor({
           style={{ userSelect: "none" }}
           onPointerDown={() => { setSelectedId(null); setEditingId(null); if (toolPanel !== "fonts") setToolPanel(null); setEraserDropOpen(false); }}
         >
-          <div className="min-w-fit min-h-full flex items-center justify-center p-12">
+          <div className="min-w-fit min-h-full flex items-center justify-center p-4">
             <div style={{ width: W * zoom, height: H * zoom, flexShrink: 0 }}>
               <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left", position: "relative" }}>
                 {/* The page */}
@@ -3335,6 +3583,13 @@ export function CanvaEditor({
                   : selectedIds.length > 1
                     ? renderMultiSelectionChrome()
                     : selected && editingId !== selected.id && toolPanel !== "crop" && animPlayingId !== selected.id && renderSelectionChrome(selected)}
+
+                {/* Floating selection toolbar (quick actions + ⋯ menu + Select multiple) */}
+                {!(eraserEl || pixelEraserEl || magicLayersEl) &&
+                  toolPanel !== "crop" &&
+                  !(selected && editingId === selected.id) &&
+                  !(selected && animPlayingId === selected.id) &&
+                  renderSelectionToolbar()}
 
                 {/* ── Visual Crop Overlay — draggable image outside page div (avoids overflow:hidden) ── */}
                 {toolPanel === "crop" && selected && (selected.type === "image" || (selected.type === "frame" && selected.src)) && (() => {
@@ -3517,28 +3772,7 @@ export function CanvaEditor({
         if (!el) return null;
         const mx = Math.min(ctxMenu.x, window.innerWidth - 240);
         const my = Math.min(ctxMenu.y, window.innerHeight - 420);
-        const close = () => setCtxMenu(null);
-        const item = (
-          label: string,
-          icon: React.ReactNode,
-          onClick: () => void,
-          opts?: { shortcut?: string; danger?: boolean; disabled?: boolean }
-        ) => (
-          <button
-            type="button"
-            disabled={opts?.disabled}
-            onClick={() => { onClick(); close(); }}
-            className={cn(
-              "flex items-center gap-2.5 w-full px-3 py-1.5 text-xs rounded-md text-left",
-              opts?.danger ? "text-red-600 hover:bg-red-50" : "text-surface-700 hover:bg-surface-100",
-              opts?.disabled && "opacity-40 pointer-events-none"
-            )}
-          >
-            {icon}
-            <span className="flex-1">{label}</span>
-            {opts?.shortcut && <span className="text-[10px] text-surface-400 bg-surface-100 rounded px-1 py-0.5">{opts.shortcut}</span>}
-          </button>
-        );
+        const close = () => { setCtxMenu(null); setMenuSub(null); };
         return (
           <>
             <div
@@ -3547,70 +3781,11 @@ export function CanvaEditor({
               onContextMenu={(e) => { e.preventDefault(); close(); }}
             />
             <div
-              className="fixed z-[100] bg-white rounded-xl shadow-xl border border-surface-200 py-1.5 px-1.5 w-56"
+              className="fixed z-[100] bg-white rounded-xl shadow-xl border border-surface-200 py-1.5 px-1.5 w-56 max-h-[80vh] overflow-y-auto"
               style={{ left: mx, top: my }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              {item("Copy", <Copy className="w-3.5 h-3.5" />, () => { clipboard.current = { ...el }; }, { shortcut: "Ctrl+C" })}
-              {item("Copy style", <Paintbrush className="w-3.5 h-3.5" />, copyStyle, { shortcut: "Ctrl+Alt+C" })}
-              {item("Paste", <ClipboardPaste className="w-3.5 h-3.5" />, () => {
-                const src = clipboard.current;
-                if (src) addElement({ ...src, x: src.x + 24, y: src.y + 24 });
-              }, { shortcut: "Ctrl+V", disabled: !clipboard.current })}
-              {item("Paste style", <Paintbrush className="w-3.5 h-3.5" />, pasteStyle, { disabled: !styleClipboard.current })}
-              {item("Duplicate", <Copy className="w-3.5 h-3.5" />, duplicateSelected, { shortcut: "Ctrl+D" })}
-              {item("Delete", <Trash2 className="w-3.5 h-3.5" />, deleteSelected, { shortcut: "DELETE", danger: true })}
-
-              {(selectedIds.length >= 2 || selectedEls.some((x) => x.groupId)) && (
-                <>
-                  <div className="h-px bg-surface-100 my-1" />
-                  {selectedIds.length >= 2 &&
-                    item("Group", <Group className="w-3.5 h-3.5" />, groupSelected, { shortcut: "Ctrl+G" })}
-                  {selectedEls.some((x) => x.groupId) &&
-                    item("Ungroup", <Ungroup className="w-3.5 h-3.5" />, ungroupSelected, { shortcut: "Ctrl+Shift+G" })}
-                </>
-              )}
-
-              <div className="h-px bg-surface-100 my-1" />
-
-              {/* Layer submenu */}
-              <div className="relative group/layer">
-                <button type="button" className="flex items-center gap-2.5 w-full px-3 py-1.5 text-xs rounded-md text-left text-surface-700 hover:bg-surface-100">
-                  <Layers className="w-3.5 h-3.5" />
-                  <span className="flex-1">Layer</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-surface-400" />
-                </button>
-                <div className="hidden group-hover/layer:block absolute left-full top-0 -ml-0.5 bg-white rounded-xl shadow-xl border border-surface-200 py-1.5 px-1.5 w-44">
-                  {item("Bring to front", <ChevronUp className="w-3.5 h-3.5" />, () => moveLayerToEnd(true))}
-                  {item("Bring forward", <ChevronUp className="w-3.5 h-3.5" />, () => moveLayer(1))}
-                  {item("Send backward", <ChevronDown className="w-3.5 h-3.5" />, () => moveLayer(-1))}
-                  {item("Send to back", <ChevronDown className="w-3.5 h-3.5" />, () => moveLayerToEnd(false))}
-                </div>
-              </div>
-
-              {/* Align to page submenu */}
-              <div className="relative group/align">
-                <button type="button" className="flex items-center gap-2.5 w-full px-3 py-1.5 text-xs rounded-md text-left text-surface-700 hover:bg-surface-100">
-                  <AlignVerticalJustifyCenter className="w-3.5 h-3.5" />
-                  <span className="flex-1">Align to page</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-surface-400" />
-                </button>
-                <div className="hidden group-hover/align:block absolute left-full top-0 -ml-0.5 bg-white rounded-xl shadow-xl border border-surface-200 py-1.5 px-1.5 w-40">
-                  {item("Left", <AlignLeft className="w-3.5 h-3.5" />, () => alignToPage("left"))}
-                  {item("Center", <AlignCenter className="w-3.5 h-3.5" />, () => alignToPage("center"))}
-                  {item("Right", <AlignRight className="w-3.5 h-3.5" />, () => alignToPage("right"))}
-                  <div className="h-px bg-surface-100 my-1" />
-                  {item("Top", <AlignLeft className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("top"))}
-                  {item("Middle", <AlignCenter className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("middle"))}
-                  {item("Bottom", <AlignRight className="w-3.5 h-3.5 rotate-90" />, () => alignToPage("bottom"))}
-                </div>
-              </div>
-
-              <div className="h-px bg-surface-100 my-1" />
-
-              {item(el.locked ? "Unlock" : "Lock", <Lock className="w-3.5 h-3.5" />, toggleLock)}
-              {item(el.link ? "Edit link" : "Link", <Link2 className="w-3.5 h-3.5" />, editLink, { shortcut: "Ctrl+K" })}
-              {item("Alternative text", <Accessibility className="w-3.5 h-3.5" />, editAltText)}
+              {elementMenuItems(el, close)}
             </div>
           </>
         );

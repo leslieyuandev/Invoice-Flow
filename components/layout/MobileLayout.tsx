@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
@@ -17,6 +18,21 @@ interface MobileLayoutProps {
 export function MobileLayout({ children, userName, userEmail, mapsOnly, mapsExternalUrl, instagramExternalUrl }: MobileLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+
+  // The Canva design editor (/canva/<id>) runs full-screen so iPad users get the
+  // whole viewport to design in: no app sidebar, no mobile top bar. The editor's own
+  // Home button (top-left) is the way back to the dashboard/sidebar. The /canva grid
+  // page keeps the normal chrome.
+  const isCanvaEditor = /^\/canva\/[^/]+$/.test(pathname);
+
+  if (isCanvaEditor) {
+    return (
+      <LanguageProvider>
+        <div className="h-dvh overflow-hidden bg-surface-50">{children}</div>
+      </LanguageProvider>
+    );
+  }
 
   return (
     <LanguageProvider>
