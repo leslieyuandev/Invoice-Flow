@@ -151,9 +151,15 @@ export function CanvaEditor({
   const [downloadFormat, setDownloadFormat] = useState<"pdf" | "png" | "jpg">("pdf");
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [addPageOpen, setAddPageOpen] = useState(false);
-  const [pageOver, setPageOver] = useState<number | null>(null);
+  // Page reorder: insertAt = the gap index (0..n) where the dragged page will land;
+  // lineLeft = the insertion line's x (in the strip row's coordinate space).
   const [draggingPageId, setDraggingPageId] = useState<string | null>(null);
-  const pageDragRef = useRef<{ from: number; startX: number; moved: boolean } | null>(null);
+  const [insertAt, setInsertAt] = useState<number | null>(null);
+  const [lineLeft, setLineLeft] = useState<number | null>(null);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const insertAtRef = useRef<number | null>(null);
+  const pageStripRef = useRef<HTMLDivElement>(null);
+  const pageDragRef = useRef<{ from: number; startX: number; startY: number; moved: boolean; offX: number; offY: number; w: number; h: number } | null>(null);
   const [guides, setGuides] = useState<{ v: number | null; h: number | null }>({ v: null, h: null });
   const [showGrid, setShowGrid] = useState(false);
   const [exportingAs, setExportingAs] = useState<"png" | "jpg" | "pdf" | null>(null);
@@ -1459,24 +1465,58 @@ export function CanvaEditor({
     setAddPageOpen(false);
   }
 
-  // Pointer-based page reorder (works on touch + mouse) — freezes the page while dragging
+  // Pointer-based page reorder (works on touch + mouse). Shows a floating ghost that
+  // follows the pointer + a vertical insertion line at the gap where the page will land.
   function onPagePointerDown(i: number, e: React.PointerEvent) {
-    pageDragRef.current = { from: i, startX: e.clientX, moved: false };
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pageDragRef.current = {
+      from: i,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      offX: e.clientX - rect.left,
+      offY: e.clientY - rect.top,
+      w: rect.width,
+      h: rect.height,
+    };
     window.addEventListener("pointermove", onPagePointerMove);
     window.addEventListener("pointerup", onPagePointerUp);
+  }
+  // Where would the dragged page land, and where to draw the insertion line, given a pointer X?
+  function computeInsert(clientX: number): { idx: number; lineLeft: number } | null {
+    const row = pageStripRef.current;
+    if (!row) return null;
+    const rowRect = row.getBoundingClientRect();
+    const thumbs = Array.from(row.querySelectorAll<HTMLElement>("[data-page-index]"));
+    if (!thumbs.length) return null;
+    const GAP = 12; // matches the strip's gap-3
+    let idx = thumbs.length;
+    for (let k = 0; k < thumbs.length; k++) {
+      const r = thumbs[k].getBoundingClientRect();
+      if (clientX < r.left + r.width / 2) { idx = k; break; }
+    }
+    let lineLeft: number;
+    if (idx === 0) lineLeft = thumbs[0].getBoundingClientRect().left - rowRect.left - GAP / 2;
+    else if (idx >= thumbs.length) lineLeft = thumbs[thumbs.length - 1].getBoundingClientRect().right - rowRect.left + GAP / 2;
+    else {
+      const prev = thumbs[idx - 1].getBoundingClientRect();
+      const cur = thumbs[idx].getBoundingClientRect();
+      lineLeft = (prev.right + cur.left) / 2 - rowRect.left;
+    }
+    return { idx, lineLeft };
   }
   function onPagePointerMove(e: PointerEvent) {
     const d = pageDragRef.current;
     if (!d) return;
-    if (!d.moved && Math.abs(e.clientX - d.startX) < 6) return;
+    if (!d.moved && Math.abs(e.clientX - d.startX) < 6 && Math.abs(e.clientY - d.startY) < 6) return;
     if (!d.moved) {
       d.moved = true;
       setDraggingPageId(pagesRef.current[d.from]?.id ?? null);
       document.body.style.overflow = "hidden"; // freeze background scroll
     }
-    const target = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest("[data-page-index]");
-    const idx = target ? Number(target.getAttribute("data-page-index")) : null;
-    setPageOver(Number.isInteger(idx) ? idx : null);
+    setGhostPos({ x: e.clientX - d.offX, y: e.clientY - d.offY });
+    const ins = computeInsert(e.clientX);
+    if (ins) { insertAtRef.current = ins.idx; setInsertAt(ins.idx); setLineLeft(ins.lineLeft); }
   }
   function onPagePointerUp() {
     const d = pageDragRef.current;
@@ -1484,14 +1524,21 @@ export function CanvaEditor({
     window.removeEventListener("pointerup", onPagePointerUp);
     pageDragRef.current = null;
     document.body.style.overflow = "";
+    const ins = insertAtRef.current;
+    insertAtRef.current = null;
     setDraggingPageId(null);
-    setPageOver((over) => {
-      if (d) {
-        if (d.moved && over != null) reorderPages(d.from, over);
-        else if (!d.moved) { setPageIdx(d.from); setSelectedId(null); setEditingId(null); }
+    setInsertAt(null);
+    setLineLeft(null);
+    setGhostPos(null);
+    if (d) {
+      if (d.moved && ins != null) {
+        // Removing the dragged page first shifts indices after it down by one.
+        const to = ins > d.from ? ins - 1 : ins;
+        reorderPages(d.from, to);
+      } else if (!d.moved) {
+        setPageIdx(d.from); setSelectedId(null); setEditingId(null);
       }
-      return null;
-    });
+    }
   }
 
   // ── Export ──────────────────────────────────────────────────────────────────
@@ -3739,25 +3786,46 @@ export function CanvaEditor({
         {/* Scrollable thumbnails — kept separate from action buttons so the dropdown isn't clipped.
             The inner w-max + mx-auto keeps the pages centered when they fit, and scrolls when they don't. */}
         <div className="flex-1 min-w-0 overflow-x-auto">
-          <div className="flex items-center gap-3 px-4 py-3.5 w-max mx-auto">
-            {pages.map((p, i) => (
+          <div ref={pageStripRef} className="relative flex items-center gap-3 px-4 py-3.5 w-max mx-auto">
+            {pages.map((p, i) => {
+              const isDragging = draggingPageId === p.id;
+              const thumbW = Math.min(168, (84 * W) / H);
+              return (
+                <div
+                  key={p.id}
+                  data-page-index={i}
+                  onPointerDown={(e) => onPagePointerDown(i, e)}
+                  title="Tap to open · drag to reorder"
+                  className={cn(
+                    "relative rounded-lg overflow-hidden border-2 shrink-0 cursor-grab active:cursor-grabbing select-none transition-all duration-200 ease-out",
+                    i === pageIdx ? "border-brand-500 ring-2 ring-brand-200" : "border-surface-200 hover:border-surface-300",
+                    // The dragged page leaves a subtle placeholder gap in its original slot.
+                    isDragging && "opacity-40"
+                  )}
+                  style={{ touchAction: "none" }}
+                >
+                  {isDragging ? (
+                    <div style={{ width: thumbW, height: thumbW * (H / W) }} className="bg-surface-200" />
+                  ) : (
+                    <PageRenderer page={p} width={W} height={H} displayWidth={thumbW} />
+                  )}
+                  <span className="absolute bottom-1 left-1.5 text-[11px] font-semibold text-surface-600 bg-white/85 rounded px-1 py-0.5 pointer-events-none">{i + 1}</span>
+                </div>
+              );
+            })}
+
+            {/* Insertion line — shows exactly where the dragged page will land */}
+            {draggingPageId && lineLeft != null && (
               <div
-                key={p.id}
-                data-page-index={i}
-                onPointerDown={(e) => onPagePointerDown(i, e)}
-                title="Tap to open · drag to reorder"
-                className={cn(
-                  "relative rounded-lg overflow-hidden border-2 shrink-0 cursor-grab active:cursor-grabbing select-none transition-all duration-200 ease-out",
-                  i === pageIdx ? "border-brand-500 ring-2 ring-brand-200" : "border-surface-200 hover:border-surface-300",
-                  draggingPageId === p.id && "opacity-50 scale-95 shadow-xl z-10",
-                  draggingPageId && draggingPageId !== p.id && pageOver === i && "ring-2 ring-brand-500 ml-5"
-                )}
-                style={{ touchAction: "none" }}
+                className="pointer-events-none absolute top-1.5 bottom-1.5 z-20 transition-[left] duration-150 ease-out"
+                style={{ left: lineLeft - 1.5 }}
               >
-                <PageRenderer page={p} width={W} height={H} displayWidth={Math.min(168, (84 * W) / H)} />
-                <span className="absolute bottom-1 left-1.5 text-[11px] font-semibold text-surface-600 bg-white/85 rounded px-1 py-0.5 pointer-events-none">{i + 1}</span>
+                <div className="relative h-full w-[3px] rounded-full bg-brand-500">
+                  <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-brand-500" />
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-brand-500" />
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -4124,6 +4192,23 @@ export function CanvaEditor({
           onApplyLayers={handleApplyMagicLayers}
         />
       )}
+
+      {/* Floating page-thumbnail ghost that follows the pointer while reordering */}
+      {draggingPageId && ghostPos && (() => {
+        const gp = pages.find((p) => p.id === draggingPageId);
+        if (!gp) return null;
+        const gw = pageDragRef.current?.w ?? Math.min(168, (84 * W) / H);
+        const gh = pageDragRef.current?.h ?? gw * (H / W);
+        return createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999] rounded-lg overflow-hidden border-2 border-brand-500 shadow-2xl"
+            style={{ left: ghostPos.x, top: ghostPos.y, width: gw, height: gh, transform: "rotate(-3deg)", opacity: 0.95 }}
+          >
+            <PageRenderer page={gp} width={W} height={H} displayWidth={gw} />
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* Transparency (opacity) popover portal — rendered outside the overflow-x-auto toolbar */}
       {opacityFor && selected && opacityFor === selected.id && opacityPos && createPortal(
