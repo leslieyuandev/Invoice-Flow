@@ -608,15 +608,17 @@ export function CanvaEditor({
       setCtxMenu(null);
 
       const additive = e.shiftKey || e.metaKey || e.ctrlKey || multiSelectModeRef.current;
+      const isTouch = e.pointerType === "touch" || e.pointerType === "pen";
       const els = pagesRef.current[pageIdxRef.current].elements;
       const mates = el.groupId ? els.filter((x) => x.groupId === el.groupId).map((x) => x.id) : [el.id];
 
       // Resolve the resulting selection synchronously so the drag can capture group origins
       let nextSel: string[];
       const cur = selectedIdsRef.current;
+      const wasSelected = cur.includes(el.id);
       if (additive) {
-        nextSel = cur.includes(el.id) ? cur.filter((id) => !mates.includes(id)) : [...new Set([...cur, ...mates])];
-      } else if (cur.includes(el.id)) {
+        nextSel = wasSelected ? cur.filter((id) => !mates.includes(id)) : [...new Set([...cur, ...mates])];
+      } else if (wasSelected) {
         nextSel = cur; // keep multi-selection so the whole group can be dragged
       } else {
         nextSel = mates;
@@ -630,6 +632,11 @@ export function CanvaEditor({
         return el.type === "image" && nextSel.length === 1 ? tp : null;
       });
       if (el.locked) return; // selectable (to unlock) but not movable
+
+      // Touch (iPad): the first tap only SELECTS — an element must be selected before it can be
+      // dragged. This prevents accidentally moving an element you only meant to tap/pan past.
+      // A mouse keeps the classic press-and-drag-to-move in a single gesture.
+      if (isTouch && (additive || !wasSelected)) return;
 
       const groupOrigins = els.filter((x) => nextSel.includes(x.id) && !x.locked).map((x) => ({ id: x.id, x: x.x, y: x.y }));
       dragRef.current = {
@@ -2298,16 +2305,16 @@ export function CanvaEditor({
 
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-surface-200 bg-white shrink-0">
-        <Link href="/" title="Home — back to dashboard" aria-label="Home" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-          <Home className="w-4 h-4" />
+        <Link href="/" title="Home — back to dashboard" aria-label="Home" className="p-2.5 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <Home className="w-5 h-5" />
         </Link>
-        <Link href="/canva" title="Back to projects" aria-label="Back to projects" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-          <ArrowLeft className="w-4 h-4" />
+        <Link href="/canva" title="Back to projects" aria-label="Back to projects" className="p-2.5 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <input
           value={title}
           onChange={(e) => { setTitle(e.target.value); setSaveState("dirty"); }}
-          className="text-sm font-semibold text-surface-900 bg-transparent border border-transparent hover:border-surface-200 focus:border-brand-400 rounded-md px-2 py-1 focus:outline-none w-36 sm:w-56"
+          className="text-base font-semibold text-surface-900 bg-transparent border border-transparent hover:border-surface-200 focus:border-brand-400 rounded-md px-2 py-1 focus:outline-none w-24 sm:w-32 lg:w-56"
         />
         <span className="text-xs text-surface-400 hidden md:inline">
           {saveState === "saving" ? "Saving…" : saveState === "dirty" ? "Unsaved changes" : "Saved"}
@@ -2315,16 +2322,16 @@ export function CanvaEditor({
 
         <div className="flex-1" />
 
-        <button type="button" onClick={undo} title="Undo (Ctrl+Z)" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-          <Undo2 className="w-4 h-4" />
+        <button type="button" onClick={undo} title="Undo (Ctrl+Z)" className="p-2.5 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <Undo2 className="w-5 h-5" />
         </button>
-        <button type="button" onClick={redo} title="Redo (Ctrl+Y)" className="p-1.5 rounded-md text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-          <Redo2 className="w-4 h-4" />
+        <button type="button" onClick={redo} title="Redo (Ctrl+Y)" className="p-2.5 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+          <Redo2 className="w-5 h-5" />
         </button>
 
         {/* Zoom slider — visible on lg+ (iPad landscape and desktop) */}
-        <div className="hidden lg:flex items-center gap-1.5 border border-surface-200 rounded-md px-2 py-1">
-          <ZoomOut className="w-3.5 h-3.5 text-surface-400 shrink-0" />
+        <div className="hidden lg:flex items-center gap-1.5 border border-surface-200 rounded-lg px-2.5 py-1.5">
+          <ZoomOut className="w-4 h-4 text-surface-400 shrink-0" />
           <input
             type="range"
             min={10}
@@ -2335,8 +2342,8 @@ export function CanvaEditor({
             className="w-28 xl:w-44 accent-brand-600"
             aria-label="Zoom"
           />
-          <ZoomIn className="w-3.5 h-3.5 text-surface-400 shrink-0" />
-          <div className="flex items-center w-11">
+          <ZoomIn className="w-4 h-4 text-surface-400 shrink-0" />
+          <div className="flex items-center w-12">
             <input
               key={zoomPct}
               type="text"
@@ -2345,29 +2352,29 @@ export function CanvaEditor({
               onKeyDown={(e) => { if (e.key === "Enter") { applyZoomText((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).blur(); } }}
               onBlur={(e) => applyZoomText(e.target.value)}
               onFocus={(e) => e.target.select()}
-              className="w-8 text-xs text-surface-700 text-right bg-transparent focus:outline-none"
+              className="w-9 text-sm text-surface-700 text-right bg-transparent focus:outline-none"
               aria-label="Zoom percentage"
             />
-            <span className="text-xs text-surface-500">%</span>
+            <span className="text-sm text-surface-500">%</span>
           </div>
-          <button type="button" onClick={fitZoom} title="Fit to screen" className="p-0.5 text-surface-500 hover:text-surface-900 shrink-0"><Maximize className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={fitZoom} title="Fit to screen" className="p-1 text-surface-500 hover:text-surface-900 shrink-0"><Maximize className="w-4 h-4" /></button>
         </div>
 
         {/* Compact zoom controls for mobile (below lg) */}
-        <div className="flex lg:hidden items-center gap-0.5 border border-surface-200 rounded-md px-1 py-1">
-          <button type="button" title="Zoom out" onClick={() => setZoomCentered(Math.max(0.1, zoom - 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-            <ZoomOut className="w-3.5 h-3.5" />
+        <div className="flex lg:hidden items-center gap-0.5 border border-surface-200 rounded-lg px-1 py-1">
+          <button type="button" title="Zoom out" onClick={() => setZoomCentered(Math.max(0.1, zoom - 0.1))} className="p-2 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+            <ZoomOut className="w-5 h-5" />
           </button>
           <button
             type="button"
             onClick={fitZoom}
             title="Fit to screen"
-            className="text-xs text-surface-700 px-1 min-w-[2.5rem] text-center hover:bg-surface-100 rounded"
+            className="text-sm text-surface-700 px-1 min-w-[2.75rem] text-center hover:bg-surface-100 rounded"
           >
             {zoomPct}%
           </button>
-          <button type="button" title="Zoom in" onClick={() => setZoomCentered(Math.min(1.5, zoom + 0.1))} className="p-1 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
-            <ZoomIn className="w-3.5 h-3.5" />
+          <button type="button" title="Zoom in" onClick={() => setZoomCentered(Math.min(1.5, zoom + 0.1))} className="p-2 rounded text-surface-500 hover:text-surface-900 hover:bg-surface-100">
+            <ZoomIn className="w-5 h-5" />
           </button>
         </div>
 
@@ -2375,26 +2382,26 @@ export function CanvaEditor({
           type="button"
           onClick={() => setShowGrid((g) => !g)}
           title="Toggle grid & snap-to-grid"
-          className={cn("p-1.5 rounded-md", showGrid ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:text-surface-900 hover:bg-surface-100")}
+          className={cn("p-2.5 rounded-lg", showGrid ? "bg-brand-50 text-brand-600" : "text-surface-500 hover:text-surface-900 hover:bg-surface-100")}
         >
-          <Grid3x3 className="w-4 h-4" />
+          <Grid3x3 className="w-5 h-5" />
         </button>
 
-        <Button size="sm" variant="outline" onClick={() => { setCustomW(String(W)); setCustomH(String(H)); setResizeOpen(true); }}>
-          <Scaling className="w-4 h-4" />
+        <Button variant="outline" onClick={() => { setCustomW(String(W)); setCustomH(String(H)); setResizeOpen(true); }}>
+          <Scaling className="w-5 h-5" />
           <span className="hidden xl:inline">Resize</span>
         </Button>
 
-        <Button size="sm" variant="outline" onClick={() => void handleSave()} loading={saveState === "saving"}>
-          <Save className="w-4 h-4" />
+        <Button variant="outline" onClick={() => void handleSave()} loading={saveState === "saving"}>
+          <Save className="w-5 h-5" />
           <span className="hidden xl:inline">Save</span>
         </Button>
-        <Button size="sm" onClick={() => { setSelectedPages(new Set(pages.map((_, i) => i))); setDownloadOpen(true); }} disabled={exportingAs !== null} loading={exportingAs !== null}>
-          <Download className="w-4 h-4" />
+        <Button onClick={() => { setSelectedPages(new Set(pages.map((_, i) => i))); setDownloadOpen(true); }} disabled={exportingAs !== null} loading={exportingAs !== null}>
+          <Download className="w-5 h-5" />
           <span className="hidden xl:inline">Download</span>
         </Button>
-        <Button size="sm" variant="outline" onClick={() => { setPresentIdx(pageIdx); setPresentMode(true); }} title="Present full screen (Ctrl+Alt+P)">
-          <Play className="w-4 h-4" />
+        <Button variant="outline" onClick={() => { setPresentIdx(pageIdx); setPresentMode(true); }} title="Present full screen (Ctrl+Alt+P)">
+          <Play className="w-5 h-5" />
           <span className="hidden xl:inline">Present</span>
         </Button>
       </div>
@@ -3693,37 +3700,40 @@ export function CanvaEditor({
 
       {/* ── Pages strip (drag thumbnails to reorder) ── */}
       <div className="flex border-t border-surface-200 bg-white shrink-0" onDragOver={(e) => e.stopPropagation()} onDrop={(e) => e.stopPropagation()}>
-        {/* Scrollable thumbnails — kept separate from action buttons so the dropdown isn't clipped */}
-        <div className="flex items-center gap-1.5 pl-3 py-2 overflow-x-auto flex-1 min-w-0">
-          {pages.map((p, i) => (
-            <div
-              key={p.id}
-              data-page-index={i}
-              onPointerDown={(e) => onPagePointerDown(i, e)}
-              title="Tap to open · drag to reorder"
-              className={cn(
-                "relative rounded-md overflow-hidden border-2 shrink-0 cursor-grab active:cursor-grabbing select-none transition-all duration-150 ease-out",
-                i === pageIdx ? "border-brand-500" : "border-surface-200 hover:border-surface-300",
-                draggingPageId === p.id && "opacity-50 scale-95 shadow-lg z-10",
-                draggingPageId && draggingPageId !== p.id && pageOver === i && "ring-2 ring-brand-500 ml-3"
-              )}
-              style={{ touchAction: "none" }}
-            >
-              <PageRenderer page={p} width={W} height={H} displayWidth={(56 * W) / H > 120 ? 120 : (56 * W) / H} />
-              <span className="absolute bottom-0.5 left-1 text-[9px] font-semibold text-surface-500 bg-white/80 rounded px-0.5 pointer-events-none">{i + 1}</span>
-            </div>
-          ))}
+        {/* Scrollable thumbnails — kept separate from action buttons so the dropdown isn't clipped.
+            The inner w-max + mx-auto keeps the pages centered when they fit, and scrolls when they don't. */}
+        <div className="flex-1 min-w-0 overflow-x-auto">
+          <div className="flex items-center gap-3 px-4 py-3.5 w-max mx-auto">
+            {pages.map((p, i) => (
+              <div
+                key={p.id}
+                data-page-index={i}
+                onPointerDown={(e) => onPagePointerDown(i, e)}
+                title="Tap to open · drag to reorder"
+                className={cn(
+                  "relative rounded-lg overflow-hidden border-2 shrink-0 cursor-grab active:cursor-grabbing select-none transition-all duration-200 ease-out",
+                  i === pageIdx ? "border-brand-500 ring-2 ring-brand-200" : "border-surface-200 hover:border-surface-300",
+                  draggingPageId === p.id && "opacity-50 scale-95 shadow-xl z-10",
+                  draggingPageId && draggingPageId !== p.id && pageOver === i && "ring-2 ring-brand-500 ml-5"
+                )}
+                style={{ touchAction: "none" }}
+              >
+                <PageRenderer page={p} width={W} height={H} displayWidth={Math.min(168, (84 * W) / H)} />
+                <span className="absolute bottom-1 left-1.5 text-[11px] font-semibold text-surface-600 bg-white/85 rounded px-1 py-0.5 pointer-events-none">{i + 1}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Fixed action buttons — NOT inside overflow-x-auto, so the template dropdown renders above without clipping */}
-        <div className="flex items-center gap-1 px-2 py-2 border-l border-surface-100 shrink-0 relative">
+        <div className="flex items-center gap-1.5 px-2.5 py-2 border-l border-surface-100 shrink-0 relative">
           {/* Add blank + template chooser */}
-          <button type="button" onClick={addPage} title="Add blank page" className="p-2 rounded-l-md border border-dashed border-surface-300 text-surface-400 hover:text-surface-700 hover:border-surface-400">
-            <Plus className="w-4 h-4" />
+          <button type="button" onClick={addPage} title="Add blank page" className="p-2.5 rounded-l-md border border-dashed border-surface-300 text-surface-400 hover:text-surface-700 hover:border-surface-400">
+            <Plus className="w-5 h-5" />
           </button>
           <div className="relative">
-            <button type="button" onClick={() => setAddPageOpen((o) => !o)} title="Add page from template" className={cn("p-2 rounded-r-md border border-l-0 border-dashed border-surface-300", addPageOpen ? "bg-brand-50 text-brand-600" : "text-surface-400 hover:text-surface-700 hover:border-surface-400")}>
-              <ChevronUp className="w-4 h-4" />
+            <button type="button" onClick={() => setAddPageOpen((o) => !o)} title="Add page from template" className={cn("p-2.5 rounded-r-md border border-l-0 border-dashed border-surface-300", addPageOpen ? "bg-brand-50 text-brand-600" : "text-surface-400 hover:text-surface-700 hover:border-surface-400")}>
+              <ChevronUp className="w-5 h-5" />
             </button>
             {addPageOpen && (
               <>
@@ -3751,11 +3761,11 @@ export function CanvaEditor({
             )}
           </div>
 
-          <button type="button" onClick={duplicatePage} title="Duplicate page" className="p-2 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100">
-            <Copy className="w-4 h-4" />
+          <button type="button" onClick={duplicatePage} title="Duplicate page" className="p-2.5 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100">
+            <Copy className="w-5 h-5" />
           </button>
-          <button type="button" onClick={deletePage} disabled={pages.length <= 1} title="Delete page" className="p-2 rounded-md text-surface-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30">
-            <Trash2 className="w-4 h-4" />
+          <button type="button" onClick={deletePage} disabled={pages.length <= 1} title="Delete page" className="p-2.5 rounded-md text-surface-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30">
+            <Trash2 className="w-5 h-5" />
           </button>
           {exportingAs === "pdf" && (
             <span className="flex items-center gap-1.5 text-xs text-surface-500 pl-1">
