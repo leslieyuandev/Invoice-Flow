@@ -89,6 +89,7 @@ model User {
   mapsPlaces        MapsPlace[]
   instagramJobs     InstagramScrapeJob[]
   instagramPosts    InstagramPost[]
+  products          Product[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,6 +123,52 @@ model Client {
   @@index([userId])
   @@index([userId, email])
   @@index([userId, deletedAt])
+}
+
+// ─── Product catalog ─────────────────────────────────────────────────────────
+// Reusable sellable items. listPrice is the DEFAULT selling price suggested when
+// the product is added to an invoice/quotation — it is editable per line, never
+// permanent. costPrice is the internal cost basis used to gauge margin.
+
+model Product {
+  id     String @id @default(cuid())
+  userId String
+
+  // Product information
+  name         String
+  sku          String?
+  category     String?
+  vendorName   String?
+  manufacturer String?
+  isActive     Boolean @default(true)
+
+  salesStartDate DateTime?
+  salesEndDate   DateTime?
+
+  // Price information — all monetary amounts stored in cents
+  currency  String  @default("MYR")
+  costPrice Int?    // internal cost basis (cents)
+  listPrice Int     // default selling price (cents); editable per line item
+  taxRate   Decimal? @db.Decimal(5, 2)
+  taxable   Boolean  @default(true)
+
+  // Stock information
+  unit            String?  // usage unit, e.g. Unit / Box / Hour
+  quantityInStock Decimal? @db.Decimal(12, 3)
+  reorderLevel    Decimal? @db.Decimal(12, 3)
+
+  description String? @db.Text
+
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@index([userId, isActive])
 }
 
 enum QuotationStatus {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown, ClipboardList, Stamp, Gift, Palette, MapPin, Camera, ExternalLink, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Settings, Zap, X, PanelLeft, Languages, ScrollText, Calendar, Package, Sparkles, ChevronDown, ClipboardList, Stamp, Gift, Palette, MapPin, Camera, ExternalLink, LogOut, Boxes } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
@@ -54,6 +54,7 @@ export function Sidebar({ mobileOpen = false, onClose, collapsed = false, onTogg
     { href: "/invoices",   label: t("nav.invoices"),    icon: FileText },
     { href: "/quotations", label: "Quotations",         icon: ClipboardList },
     { href: "/clients",    label: t("nav.clients"),     icon: Users },
+    { href: "/products",   label: "Products",           icon: Boxes },
   ];
 
   const creativeLinks = [
