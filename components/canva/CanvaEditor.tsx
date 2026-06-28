@@ -89,13 +89,15 @@ interface CtxMenuState {
 }
 
 interface CropDragState {
+  // "image" handles scale the photo (ratio-locked); "frame" handles resize the crop
+  // rectangle (free aspect, photo stays put). "pan" drags the photo.
+  target: "image" | "frame";
   mode: "pan" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
   startX: number;
   startY: number;
-  startCropX: number;
-  startCropY: number;
-  startCropW: number;
-  startCropH: number;
+  rot: number;            // element rotation (deg) for un-rotating pointer deltas
+  fx: number; fy: number; fw: number; fh: number;   // frame (element box) at drag start, page coords
+  cx: number; cy: number; cw: number; ch: number;   // image crop box at drag start, element-local
 }
 
 interface HistoryEntry {
@@ -181,6 +183,8 @@ export function CanvaEditor({
   const [opacityFor, setOpacityFor] = useState<string | null>(null);
   const [opacityPos, setOpacityPos] = useState<{ top: number; right: number } | null>(null);
   const opacityBtnRef = useRef<HTMLButtonElement>(null);
+  // Rule-of-thirds 3×3 grid shown while actively dragging a crop handle.
+  const [cropGrid, setCropGrid] = useState(false);
   const [resizeOpen, setResizeOpen] = useState(false);
   const [resizeSearch, setResizeSearch] = useState("");
   const [customW, setCustomW] = useState(String(project.width));
@@ -778,25 +782,25 @@ export function CanvaEditor({
 
   function startCropDrag(
     e: React.PointerEvent,
+    target: CropDragState["target"],
     mode: CropDragState["mode"],
     el: CanvaElement,
   ) {
     e.stopPropagation();
     e.preventDefault();
     const ratio = cropRatioFor(el);
-    // Start the drag from the box that is actually DISPLAYED (coverCropBox), which is
-    // what the overlay/handles are drawn on. Using the raw cropX/Y/W/H here would make
-    // pan/resize start from a different rectangle than the one on screen whenever the
-    // stored crop isn't already in covering form — causing the image to jump and the
-    // baked result to differ from what the user framed.
+    // Snapshot the box that is actually DISPLAYED (coverCropBox) so dragging starts from the
+    // exact rectangle on screen and the baked result matches what the user framed.
     const disp = el.cropW !== undefined
       ? coverCropBox(el)
       : (() => { const c = coverRect(el.w, el.h, ratio); return { left: c.cropX, top: c.cropY, width: c.cropW, height: c.cropH }; })();
     pushHistory();
     cropDragRef.current = {
-      mode, startX: e.clientX, startY: e.clientY,
-      startCropX: disp.left, startCropY: disp.top, startCropW: disp.width, startCropH: disp.height,
+      target, mode, startX: e.clientX, startY: e.clientY, rot: el.rotation || 0,
+      fx: el.x, fy: el.y, fw: el.w, fh: el.h,
+      cx: disp.left, cy: disp.top, cw: disp.width, ch: disp.height,
     };
+    setCropGrid(true);
     window.addEventListener("pointermove", onCropDragMove);
     window.addEventListener("pointerup", onCropDragEnd);
   }
@@ -805,45 +809,66 @@ export function CanvaEditor({
     const d = cropDragRef.current;
     const selId = selectedIdsRef.current[0];
     if (!d || !selId) return;
-    const sel = pagesRef.current[pageIdxRef.current].elements.find((x) => x.id === selId);
-    if (!sel) return;
-    const dx = (e.clientX - d.startX) / zoomRef.current;
-    const dy = (e.clientY - d.startY) / zoomRef.current;
-    const ratio = d.startCropW / d.startCropH; // locked image ratio (never distort)
+    // Pointer delta in element-local axes (un-rotate so crop works on rotated images too).
+    const rx = (e.clientX - d.startX) / zoomRef.current;
+    const ry = (e.clientY - d.startY) / zoomRef.current;
+    const rad = (d.rot * Math.PI) / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const dx = rx * cos + ry * sin;
+    const dy = -rx * sin + ry * cos;
 
+    // ── Resize the CROP FRAME (free aspect). The photo stays put in absolute coords;
+    // only the kept rectangle (element box) changes, clamped inside the photo (no gaps).
+    if (d.target === "frame") {
+      const imgL = d.cx, imgT = d.cy, imgR = d.cx + d.cw, imgB = d.cy + d.ch; // photo edges, element-local at start
+      const MIN = 20;
+      let l = 0, t = 0, r = d.fw, b = d.fh; // frame edges in start-frame-local coords
+      if (d.mode.includes("w")) l = Math.min(r - MIN, Math.max(imgL, dx));
+      if (d.mode.includes("e")) r = Math.max(l + MIN, Math.min(imgR, d.fw + dx));
+      if (d.mode.includes("n")) t = Math.min(b - MIN, Math.max(imgT, dy));
+      if (d.mode.includes("s")) b = Math.max(t + MIN, Math.min(imgB, d.fh + dy));
+      const nfw = r - l, nfh = b - t;
+      // New element position: the frame's top-left moved by (l,t) in element-local axes → rotate to page.
+      const nx = d.fx + (l * cos - t * sin);
+      const ny = d.fy + (l * sin + t * cos);
+      // Photo top-left was at element-local (cx,cy); relative to the NEW frame origin it's (cx-l, cy-t).
+      patchEl(selId, {
+        x: Math.round(nx), y: Math.round(ny), w: Math.round(nfw), h: Math.round(nfh),
+        cropX: d.cx - l, cropY: d.cy - t, cropW: d.cw, cropH: d.ch,
+      });
+      return;
+    }
+
+    // ── Move the PHOTO (pan) — keep it covering the frame.
+    const ratio = d.cw / d.ch; // locked image ratio (never distort)
     if (d.mode === "pan") {
-      // Pan only — keep the image covering the frame (no empty gaps).
-      let newX = d.startCropX + dx;
-      let newY = d.startCropY + dy;
-      newX = Math.min(0, Math.max(sel.w - d.startCropW, newX));
-      newY = Math.min(0, Math.max(sel.h - d.startCropH, newY));
+      let newX = d.cx + dx;
+      let newY = d.cy + dy;
+      newX = Math.min(0, Math.max(d.fw - d.cw, newX));
+      newY = Math.min(0, Math.max(d.fh - d.ch, newY));
       patchEl(selId, { cropX: newX, cropY: newY });
       return;
     }
 
-    // Resize — scale the image uniformly (ratio-locked) so it never stretches.
-    let newW = d.startCropW;
-    if (d.mode === "e" || d.mode === "ne" || d.mode === "se") newW = d.startCropW + dx;
-    else if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newW = d.startCropW - dx;
-    else if (d.mode === "s") newW = (d.startCropH + dy) * ratio;
-    else if (d.mode === "n") newW = (d.startCropH - dy) * ratio;
+    // ── Scale the PHOTO (ratio-locked) so it never stretches.
+    let newW = d.cw;
+    if (d.mode === "e" || d.mode === "ne" || d.mode === "se") newW = d.cw + dx;
+    else if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newW = d.cw - dx;
+    else if (d.mode === "s") newW = (d.ch + dy) * ratio;
+    else if (d.mode === "n") newW = (d.ch - dy) * ratio;
 
-    // Never shrink below the size needed to cover the frame.
-    const minW = Math.max(sel.w, sel.h * ratio);
+    const minW = Math.max(d.fw, d.fh * ratio); // never shrink below covering the frame
     newW = Math.max(minW, newW);
     const newH = newW / ratio;
 
-    // Anchor the side/corner opposite the handle so resize feels natural.
-    let newX = d.startCropX;
-    let newY = d.startCropY;
-    if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newX = d.startCropX + (d.startCropW - newW);
-    else if (d.mode === "n" || d.mode === "s") newX = d.startCropX + (d.startCropW - newW) / 2;
-    if (d.mode === "n" || d.mode === "ne" || d.mode === "nw") newY = d.startCropY + (d.startCropH - newH);
-    else if (d.mode === "e" || d.mode === "w") newY = d.startCropY + (d.startCropH - newH) / 2;
+    let newX = d.cx, newY = d.cy;
+    if (d.mode === "w" || d.mode === "nw" || d.mode === "sw") newX = d.cx + (d.cw - newW);
+    else if (d.mode === "n" || d.mode === "s") newX = d.cx + (d.cw - newW) / 2;
+    if (d.mode === "n" || d.mode === "ne" || d.mode === "nw") newY = d.cy + (d.ch - newH);
+    else if (d.mode === "e" || d.mode === "w") newY = d.cy + (d.ch - newH) / 2;
 
-    // Clamp so the frame stays fully covered.
-    newX = Math.min(0, Math.max(sel.w - newW, newX));
-    newY = Math.min(0, Math.max(sel.h - newH, newY));
+    newX = Math.min(0, Math.max(d.fw - newW, newX));
+    newY = Math.min(0, Math.max(d.fh - newH, newY));
     patchEl(selId, { cropX: newX, cropY: newY, cropW: newW, cropH: newH });
   }
 
@@ -860,6 +885,7 @@ export function CanvaEditor({
     cropDragRef.current = null;
     window.removeEventListener("pointermove", onCropDragMove);
     window.removeEventListener("pointerup", onCropDragEnd);
+    setCropGrid(false);
     const selId = selectedIdsRef.current[0];
     if (selId) normalizeCrop(selId);
   }
@@ -1110,7 +1136,7 @@ export function CanvaEditor({
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         return;
       }
-      if (mod && e.altKey && e.key.toLowerCase() === "p") { e.preventDefault(); setPresentIdx(pageIdxRef.current); setPresentMode(true); return; }
+      if (mod && e.altKey && e.key.toLowerCase() === "p") { e.preventDefault(); setPresentIdx(pageIdxRef.current); setPresentMode(true); document.documentElement.requestFullscreen?.().catch(() => {}); return; }
       if (inField) {
         if (e.key === "Escape") (target as HTMLInputElement).blur();
         return;
@@ -1155,9 +1181,6 @@ export function CanvaEditor({
 
   // ── Present mode: fullscreen lifecycle ─────────────────────────────────────
   useEffect(() => {
-    if (presentMode && presentRootRef.current) {
-      presentRootRef.current.requestFullscreen?.().catch(() => {});
-    }
     if (!presentMode) {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       setPresentDrawActive(false);
@@ -1782,7 +1805,7 @@ export function CanvaEditor({
 
           {cropTab === "crop" && (
             <>
-              <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it; the <span className="text-surface-500 font-medium">round handles</span> zoom it. Use <span className="text-surface-500 font-medium">Aspect ratio</span> below to reshape the frame. The image never distorts or leaves gaps.</p>
+              <p className="text-xs text-surface-400 leading-relaxed">Drag the photo to move it. <span className="text-surface-500 font-medium">Round handles</span> scale the photo; <span className="text-surface-500 font-medium">square handles</span> crop the frame. A 3×3 grid shows while you adjust. The kept (bright) area is exactly the result — no distortion or gaps.</p>
 
               {/* Live result preview — renders through the SAME ElementView component the
                   canvas (and export) use, so the preview is byte-identical to the result. */}
@@ -2502,7 +2525,7 @@ export function CanvaEditor({
           <Download className="w-5 h-5" />
           <span className="hidden xl:inline">Download</span>
         </Button>
-        <Button variant="outline" onClick={() => { setPresentIdx(pageIdx); setPresentMode(true); }} title="Present full screen (Ctrl+Alt+P)">
+        <Button variant="outline" onClick={() => { setPresentIdx(pageIdx); setPresentMode(true); document.documentElement.requestFullscreen?.().catch(() => {}); }} title="Present full screen (Ctrl+Alt+P)">
           <Play className="w-5 h-5" />
           <span className="hidden xl:inline">Present</span>
         </Button>
@@ -3722,83 +3745,117 @@ export function CanvaEditor({
                   const eRot = selected.rotation;
                   const eCx = selected.x + selected.w / 2;
                   const eCy = selected.y + selected.h / 2;
-                  const HANDLE_SIZE = Math.max(8, 10 / zoom);
-                  const handles: { id: CropDragState["mode"]; cx: number; cy: number; cursor: string }[] = [
-                    { id: "nw", cx: 0,   cy: 0,   cursor: "nw-resize" },
-                    { id: "n",  cx: 0.5, cy: 0,   cursor: "n-resize"  },
-                    { id: "ne", cx: 1,   cy: 0,   cursor: "ne-resize" },
-                    { id: "w",  cx: 0,   cy: 0.5, cursor: "w-resize"  },
-                    { id: "e",  cx: 1,   cy: 0.5, cursor: "e-resize"  },
-                    { id: "sw", cx: 0,   cy: 1,   cursor: "sw-resize" },
-                    { id: "s",  cx: 0.5, cy: 1,   cursor: "s-resize"  },
-                    { id: "se", cx: 1,   cy: 1,   cursor: "se-resize" },
+                  const HS = Math.max(9, 11 / zoom);   // frame (square) handle size
+                  const RS = Math.max(11, 14 / zoom);  // image (round) handle size
+                  const imgLeft = selected.x + cropX;
+                  const imgTop = selected.y + cropY;
+                  const imgOrigin = `${eCx - imgLeft}px ${eCy - imgTop}px`;
+                  // Round handles scale the PHOTO (ratio-locked) — corners only.
+                  const imageCorners = [
+                    { id: "nw" as const, cx: 0, cy: 0, cursor: "nwse-resize" },
+                    { id: "ne" as const, cx: 1, cy: 0, cursor: "nesw-resize" },
+                    { id: "sw" as const, cx: 0, cy: 1, cursor: "nesw-resize" },
+                    { id: "se" as const, cx: 1, cy: 1, cursor: "nwse-resize" },
+                  ];
+                  // Square handles resize the CROP FRAME (free aspect) — 8 positions.
+                  const frameHandles = [
+                    { id: "nw" as const, cx: 0,   cy: 0,   cursor: "nwse-resize" },
+                    { id: "n"  as const, cx: 0.5, cy: 0,   cursor: "ns-resize"   },
+                    { id: "ne" as const, cx: 1,   cy: 0,   cursor: "nesw-resize" },
+                    { id: "w"  as const, cx: 0,   cy: 0.5, cursor: "ew-resize"   },
+                    { id: "e"  as const, cx: 1,   cy: 0.5, cursor: "ew-resize"   },
+                    { id: "sw" as const, cx: 0,   cy: 1,   cursor: "nesw-resize" },
+                    { id: "s"  as const, cx: 0.5, cy: 1,   cursor: "ns-resize"   },
+                    { id: "se" as const, cx: 1,   cy: 1,   cursor: "nwse-resize" },
                   ];
                   return (
                     <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, overflow: "visible", zIndex: 1097 }}>
-                      {/* Draggable image */}
+                      {/* Photo — drag anywhere on it to pan */}
                       <div
                         style={{
-                          position: "absolute",
-                          left: selected.x + cropX,
-                          top: selected.y + cropY,
-                          width: cropW,
-                          height: cropH,
-                          transform: `rotate(${eRot}deg)`,
-                          transformOrigin: `${eCx - (selected.x + cropX)}px ${eCy - (selected.y + cropY)}px`,
-                          border: `${1.5 / zoom}px dashed rgba(255,255,255,0.7)`,
-                          cursor: "move",
-                          touchAction: "none",
+                          position: "absolute", left: imgLeft, top: imgTop, width: cropW, height: cropH,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: imgOrigin,
+                          border: `${1.5 / zoom}px dashed rgba(255,255,255,0.65)`, cursor: "move", touchAction: "none",
                         }}
-                        onPointerDown={(e) => startCropDrag(e, "pan", selected)}
+                        onPointerDown={(e) => startCropDrag(e, "image", "pan", selected)}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={selected.src}
-                          alt=""
-                          draggable={false}
+                          src={selected.src} alt="" draggable={false}
                           style={{
                             width: "100%", height: "100%", objectFit: "cover", display: "block",
-                            // Must match the renderer's transform (incl. flip) so the crop overlay
-                            // is WYSIWYG — otherwise a flipped image inverts left/right vs the result.
                             transform: `${imageFlipTransform(selected) ?? ""} ${selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : ""}`.trim() || undefined,
-                            transformOrigin: "50% 50%",
-                            userSelect: "none", pointerEvents: "none",
+                            transformOrigin: "50% 50%", userSelect: "none", pointerEvents: "none",
                           }}
                         />
-                        {/* Image scale handles (round) — scale the image, ratio-locked */}
-                        {handles.map((h) => (
+                      </div>
+
+                      {/* Dim everything OUTSIDE the crop frame (the bright hole = exactly the kept result) */}
+                      <div
+                        style={{
+                          position: "absolute", left: selected.x, top: selected.y, width: selected.w, height: selected.h,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
+                          boxShadow: "0 0 0 100000px rgba(0,0,0,0.55)", borderRadius: selected.radius, pointerEvents: "none",
+                        }}
+                      />
+
+                      {/* Crop frame: white outline + 3×3 grid (while adjusting) + square resize handles */}
+                      <div
+                        style={{
+                          position: "absolute", left: selected.x, top: selected.y, width: selected.w, height: selected.h,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%", pointerEvents: "none",
+                        }}
+                      >
+                        <div style={{ position: "absolute", inset: 0, outline: `${2 / zoom}px solid #fff`, boxShadow: `0 0 0 ${1 / zoom}px rgba(0,0,0,0.25)` }} />
+                        {cropGrid && (
+                          <>
+                            <div style={{ position: "absolute", left: "33.333%", top: 0, bottom: 0, width: 1 / zoom, background: "rgba(255,255,255,0.55)" }} />
+                            <div style={{ position: "absolute", left: "66.666%", top: 0, bottom: 0, width: 1 / zoom, background: "rgba(255,255,255,0.55)" }} />
+                            <div style={{ position: "absolute", top: "33.333%", left: 0, right: 0, height: 1 / zoom, background: "rgba(255,255,255,0.55)" }} />
+                            <div style={{ position: "absolute", top: "66.666%", left: 0, right: 0, height: 1 / zoom, background: "rgba(255,255,255,0.55)" }} />
+                          </>
+                        )}
+                        {frameHandles.map((h) => {
+                          const horiz = h.cx === 0.5; // top/bottom edge → horizontal bar
+                          const vert = h.cy === 0.5;  // left/right edge → vertical bar
+                          return (
+                            <div
+                              key={h.id}
+                              onPointerDown={(e) => startCropDrag(e, "frame", h.id, selected)}
+                              style={{
+                                position: "absolute",
+                                left: `calc(${h.cx * 100}% - ${(horiz ? HS : HS) / 2}px)`,
+                                top: `calc(${h.cy * 100}% - ${(vert ? HS : HS) / 2}px)`,
+                                width: horiz ? HS * 2.2 : HS, height: vert ? HS * 2.2 : HS,
+                                marginLeft: horiz ? -HS * 0.6 : 0, marginTop: vert ? -HS * 0.6 : 0,
+                                background: "#fff", borderRadius: 2 / zoom, boxShadow: `0 0 ${2.5 / zoom}px rgba(0,0,0,0.5)`,
+                                cursor: h.cursor, pointerEvents: "auto", touchAction: "none",
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Photo scale handles (round) — rendered last so they sit above the dim */}
+                      <div
+                        style={{
+                          position: "absolute", left: imgLeft, top: imgTop, width: cropW, height: cropH,
+                          transform: `rotate(${eRot}deg)`, transformOrigin: imgOrigin, pointerEvents: "none",
+                        }}
+                      >
+                        {imageCorners.map((h) => (
                           <div
                             key={h.id}
-                            onPointerDown={(e) => startCropDrag(e, h.id, selected)}
+                            onPointerDown={(e) => startCropDrag(e, "image", h.id, selected)}
                             style={{
                               position: "absolute",
-                              left: `calc(${h.cx * 100}% - ${HANDLE_SIZE / 2}px)`,
-                              top: `calc(${h.cy * 100}% - ${HANDLE_SIZE / 2}px)`,
-                              width: HANDLE_SIZE, height: HANDLE_SIZE,
-                              background: "white",
-                              border: `${1.5 / zoom}px solid #7c3aed`,
-                              borderRadius: "50%",
-                              cursor: h.cursor,
-                              touchAction: "none",
+                              left: `calc(${h.cx * 100}% - ${RS / 2}px)`, top: `calc(${h.cy * 100}% - ${RS / 2}px)`,
+                              width: RS, height: RS, background: "#fff", border: `${2 / zoom}px solid #7c3aed`, borderRadius: "50%",
+                              boxShadow: `0 0 ${2.5 / zoom}px rgba(0,0,0,0.5)`, cursor: h.cursor, pointerEvents: "auto", touchAction: "none",
                             }}
                           />
                         ))}
                       </div>
-
-                      {/* Dim everything OUTSIDE the crop frame so the kept region is obvious.
-                          Rendered on top of the draggable image; the frame is the clear hole. */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: selected.x, top: selected.y, width: selected.w, height: selected.h,
-                          transform: `rotate(${eRot}deg)`, transformOrigin: "50% 50%",
-                          boxShadow: "0 0 0 100000px rgba(0,0,0,0.78)",
-                          outline: `${2.5 / zoom}px solid white`,
-                          borderRadius: selected.radius,
-                          pointerEvents: "none",
-                        }}
-                      />
-
                     </div>
                   );
                 })()}
@@ -4171,18 +4228,34 @@ export function CanvaEditor({
           ctx.stroke();
         }
 
+        // Custom directional cursors for half-screen navigation
+        const LEFT_CURSOR = `url("data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><polygon points="28,8 12,20 28,32" fill="white" stroke="black" stroke-width="2.5" stroke-linejoin="round"/></svg>')}") 20 20, w-resize`;
+        const RIGHT_CURSOR = `url("data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><polygon points="12,8 28,20 12,32" fill="white" stroke="black" stroke-width="2.5" stroke-linejoin="round"/></svg>')}") 20 20, e-resize`;
+
         return (
           <div
             ref={(el) => { presentRootRef.current = el; if (el) el.focus(); }}
             className="fixed inset-0 z-[9000] bg-black select-none flex flex-col"
             style={{ cursor: presentDrawActive ? (isLaser ? "none" : "crosshair") : "default" }}
             onMouseMove={(e) => {
-              if (isLaser && presentDrawActive) {
-                setPresentLaserPos({ x: e.clientX, y: e.clientY });
-                setPresentLaserVisible(true);
+              if (presentDrawActive) {
+                if (isLaser) {
+                  setPresentLaserPos({ x: e.clientX, y: e.clientY });
+                  setPresentLaserVisible(true);
+                }
+                return;
+              }
+              // Imperatively set cursor based on which screen half the mouse is on
+              const el = presentRootRef.current;
+              if (!el) return;
+              const isLeft = e.clientX < window.innerWidth / 2;
+              if (isLeft) {
+                el.style.cursor = presentIdx > 0 ? LEFT_CURSOR : "default";
+              } else {
+                el.style.cursor = presentIdx < pages.length - 1 ? RIGHT_CURSOR : "default";
               }
             }}
-            onMouseLeave={() => setPresentLaserVisible(false)}
+            onMouseLeave={() => { setPresentLaserVisible(false); }}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 if (presentDrawActive) { setPresentDrawActive(false); setPresentDrawToolsOpen(false); return; }
@@ -4200,35 +4273,17 @@ export function CanvaEditor({
             {/* ── Slide area ── */}
             <div className="flex-1 relative flex items-center justify-center overflow-hidden">
 
-              {/* Half-screen navigation zones (only when not drawing) */}
+              {/* Half-screen click zones for navigation (cursor set imperatively via onMouseMove) */}
               {!presentDrawActive && (
                 <>
                   <div
-                    className="absolute left-0 top-0 bottom-0 z-10 w-1/2 group"
-                    style={{ cursor: presentIdx > 0 ? "w-resize" : "default" }}
+                    className="absolute left-0 top-0 bottom-0 z-10 w-1/2"
                     onClick={() => { if (presentIdx > 0) setPresentIdx((i) => i - 1); }}
-                  >
-                    {presentIdx > 0 && (
-                      <div className="absolute left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                        <div className="p-3 rounded-full bg-black/40 text-white backdrop-blur-sm">
-                          <ChevronLeft className="w-8 h-8" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  />
                   <div
-                    className="absolute right-0 top-0 bottom-0 z-10 w-1/2 group"
-                    style={{ cursor: presentIdx < pages.length - 1 ? "e-resize" : "default" }}
+                    className="absolute right-0 top-0 bottom-0 z-10 w-1/2"
                     onClick={() => { if (presentIdx < pages.length - 1) setPresentIdx((i) => i + 1); }}
-                  >
-                    {presentIdx < pages.length - 1 && (
-                      <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                        <div className="p-3 rounded-full bg-black/40 text-white backdrop-blur-sm">
-                          <ChevronRight className="w-8 h-8" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  />
                 </>
               )}
 
