@@ -257,6 +257,7 @@ async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
     }
     case "frame": {
       applyFrameClip(ctx, el.clipPath, lx, ly, el.w, el.h);
+      if (el.bgFill && el.bgFill !== "transparent") { ctx.fillStyle = el.bgFill; ctx.fillRect(lx, ly, el.w, el.h); }
       if (el.src) {
         try {
           const img = await loadImage(el.src);
@@ -291,6 +292,7 @@ async function drawElement(ctx: CanvasRenderingContext2D, el: CanvaElement) {
           if (octx) {
             roundRectPath(octx, 0, 0, off.width, off.height, el.radius ?? 0);
             octx.clip();
+            if (el.bgFill && el.bgFill !== "transparent") { octx.fillStyle = el.bgFill; octx.fillRect(0, 0, off.width, off.height); }
             const cf = imageColorFilter(el);
             if (cf) octx.filter = cf;
             if (el.cropW !== undefined) {

@@ -53,6 +53,7 @@ export interface CanvaElement {
   cropW?: number;        // image display width (px, ≥ element w for full coverage)
   cropH?: number;        // image display height (px, ≥ element h for full coverage)
   cropRotation?: number; // image rotation within frame (degrees)
+  bgFill?: string;       // solid color painted behind an image/frame (fills transparent areas)
   shadow?: string;      // shadow preset id
   imageEffect?: string; // image effect/style preset id
 

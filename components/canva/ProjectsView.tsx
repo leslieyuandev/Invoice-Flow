@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Copy, Trash2, Palette, Star } from "lucide-react";
+import { Plus, Copy, Trash2, Palette, Star, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -41,6 +41,8 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
   const [customW, setCustomW] = useState("1080");
   const [customH, setCustomH] = useState("1080");
   const [viewFilter, setViewFilter] = useState<"all" | "starred">("all");
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   // Optimistic starred state: map of projectId → starred bool
   const [starredMap, setStarredMap] = useState<Record<string, boolean>>(
     () => Object.fromEntries(projects.map((p) => [p.id, p.starred]))
@@ -129,6 +131,27 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
     }
   }
 
+  async function handleImportPptx(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset so same file can be re-selected
+    setImporting(true);
+    const toastId = toast.loading(`Importing "${file.name}"…`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/canva/import-pptx", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error ?? "Import failed");
+      toast.success("Import complete!", { id: toastId });
+      router.push(`/canva/${json.projectId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Import failed", { id: toastId });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleToggleStar(e: React.MouseEvent, p: ProjectListItem) {
     e.stopPropagation();
     const next = !starredMap[p.id];
@@ -153,10 +176,27 @@ export function ProjectsView({ projects }: { projects: ProjectListItem[] }) {
           <h1 className="text-lg font-semibold text-surface-900">Canva Project</h1>
           <p className="text-xs text-surface-500">Design social posts, presentations, docs, whiteboards, and more</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Create Design
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".pptx"
+            className="hidden"
+            onChange={handleImportPptx}
+          />
+          <Button
+            variant="outline"
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            <Upload className="w-4 h-4" />
+            {importing ? "Importing…" : "Import PPTX"}
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Create Design
+          </Button>
+        </div>
       </div>
 
       {/* Filter tabs */}

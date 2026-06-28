@@ -197,6 +197,7 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
             overflow: "hidden",
             borderRadius: el.radius,
             filter: shadowFilter,
+            background: el.bgFill,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -268,7 +269,7 @@ export function ElementView({ el, asChild }: { el: CanvaElement; asChild?: boole
         transformOrigin: "center",
       };
       return (
-        <div style={{ ...box, overflow: "hidden", clipPath: frameClip }}>
+        <div style={{ ...box, overflow: "hidden", clipPath: frameClip, background: el.bgFill }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={el.src} alt={el.altText ?? ""} draggable={false} style={fImgStyle} />
         </div>

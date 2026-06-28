@@ -1812,27 +1812,41 @@ export function CanvaEditor({
               {selected.src && (() => {
                 const scale = Math.min(176 / selected.w, 176 / selected.h);
                 const pw = selected.w * scale, ph = selected.h * scale;
-                const cb = coverCropBox(selected);
-                const covers = cb.left <= 0.5 && cb.top <= 0.5 && cb.left + cb.width >= selected.w - 0.5 && cb.top + cb.height >= selected.h - 0.5;
-                const isPng = /\.png(\?|$)/i.test(selected.src ?? "") || (selected.src ?? "").startsWith("data:image/png");
                 return (
                   <div>
                     <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Result preview</p>
-                    <div className="mx-auto border border-surface-200 rounded overflow-hidden" style={{ width: pw, height: ph, backgroundImage: "linear-gradient(45deg,#ddd 25%,transparent 25%,transparent 75%,#ddd 75%),linear-gradient(45deg,#ddd 25%,#fff 25%,#fff 75%,#ddd 75%)", backgroundSize: "12px 12px", backgroundPosition: "0 0,6px 6px" }}>
+                    <div className="mx-auto border border-surface-200 rounded overflow-hidden" style={{ width: pw, height: ph, backgroundImage: "linear-gradient(45deg,#eee 25%,transparent 25%,transparent 75%,#eee 75%),linear-gradient(45deg,#eee 25%,#fff 25%,#fff 75%,#eee 75%)", backgroundSize: "10px 10px", backgroundPosition: "0 0,5px 5px" }}>
                       <div style={{ width: selected.w, height: selected.h, transform: `scale(${scale})`, transformOrigin: "top left", position: "relative" }}>
                         <ElementView el={{ ...selected, x: 0, y: 0, rotation: 0, opacity: 1 }} />
                       </div>
                     </div>
-                    {/* TEMP crop diagnostic — remove after debugging */}
-                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
-{`el ${Math.round(selected.w)}x${Math.round(selected.h)} rot${selected.rotation} cropRot${selected.cropRotation ?? 0}
-crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
-cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)}
-covers:${covers ? "YES" : "NO"} png:${isPng ? "YES" : "no"} flip:${selected.flipH ? "H" : ""}${selected.flipV ? "V" : ""}`}
-                    </pre>
                   </div>
                 );
               })()}
+
+              {/* Background fill — fills any transparent areas of the photo (e.g. a PNG with
+                  see-through regions) so the crop result never shows blank. */}
+              <div>
+                <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Background fill</p>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-surface-600" title="Fill transparent areas with this color">
+                    <input
+                      type="color"
+                      value={selected.bgFill && selected.bgFill !== "transparent" ? selected.bgFill : "#ffffff"}
+                      onChange={(e) => commitPatch(selected.id, { bgFill: e.target.value })}
+                      className="w-8 h-8 rounded cursor-pointer border border-surface-200"
+                    />
+                    Color
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => commitPatch(selected.id, { bgFill: undefined })}
+                    className={cn("text-xs px-2 py-1.5 rounded-md border", !selected.bgFill || selected.bgFill === "transparent" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-surface-200 text-surface-500 hover:bg-surface-50")}
+                  >
+                    None (transparent)
+                  </button>
+                </div>
+              </div>
 
               {/* Aspect ratio (reshapes the crop frame) */}
               <div>
@@ -3786,6 +3800,7 @@ covers:${covers ? "YES" : "NO"} png:${isPng ? "YES" : "no"} flip:${selected.flip
                           position: "absolute", left: imgLeft, top: imgTop, width: cropW, height: cropH,
                           transform: `rotate(${eRot}deg)`, transformOrigin: imgOrigin,
                           border: `${1.5 / zoom}px dashed rgba(255,255,255,0.65)`, cursor: "move", touchAction: "none",
+                          background: selected.bgFill,
                         }}
                         onPointerDown={(e) => startCropDrag(e, "image", "pan", selected)}
                       >
