@@ -4357,9 +4357,9 @@ covers:${covers ? "YES" : "NO"} png:${isPng ? "YES" : "no"} flip:${selected.flip
               </div>
             </div>
 
-            {/* ── Bottom toolbar ── */}
+            {/* ── Bottom toolbar — z-[30] raises its backdrop-blur stacking context above canvas (z-20) and nav zones (z-10) ── */}
             <div
-              className="relative shrink-0 flex items-center justify-center gap-1 bg-gray-900/95 backdrop-blur-sm border-t border-white/10 px-4"
+              className="relative z-[30] shrink-0 flex items-center justify-center gap-1 bg-gray-900/95 backdrop-blur-sm border-t border-white/10 px-4"
               style={{ height: TOOLBAR_H }}
               onClick={(e) => e.stopPropagation()}
             >
