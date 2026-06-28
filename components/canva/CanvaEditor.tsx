@@ -1812,14 +1812,24 @@ export function CanvaEditor({
               {selected.src && (() => {
                 const scale = Math.min(176 / selected.w, 176 / selected.h);
                 const pw = selected.w * scale, ph = selected.h * scale;
+                const cb = coverCropBox(selected);
+                const covers = cb.left <= 0.5 && cb.top <= 0.5 && cb.left + cb.width >= selected.w - 0.5 && cb.top + cb.height >= selected.h - 0.5;
+                const isPng = /\.png(\?|$)/i.test(selected.src ?? "") || (selected.src ?? "").startsWith("data:image/png");
                 return (
                   <div>
                     <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Result preview</p>
-                    <div className="mx-auto border border-surface-200 rounded overflow-hidden" style={{ width: pw, height: ph }}>
+                    <div className="mx-auto border border-surface-200 rounded overflow-hidden" style={{ width: pw, height: ph, backgroundImage: "linear-gradient(45deg,#ddd 25%,transparent 25%,transparent 75%,#ddd 75%),linear-gradient(45deg,#ddd 25%,#fff 25%,#fff 75%,#ddd 75%)", backgroundSize: "12px 12px", backgroundPosition: "0 0,6px 6px" }}>
                       <div style={{ width: selected.w, height: selected.h, transform: `scale(${scale})`, transformOrigin: "top left", position: "relative" }}>
                         <ElementView el={{ ...selected, x: 0, y: 0, rotation: 0, opacity: 1 }} />
                       </div>
                     </div>
+                    {/* TEMP crop diagnostic — remove after debugging */}
+                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
+{`el ${Math.round(selected.w)}x${Math.round(selected.h)} rot${selected.rotation} cropRot${selected.cropRotation ?? 0}
+crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
+cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)}
+covers:${covers ? "YES" : "NO"} png:${isPng ? "YES" : "no"} flip:${selected.flipH ? "H" : ""}${selected.flipV ? "V" : ""}`}
+                    </pre>
                   </div>
                 );
               })()}
@@ -4238,21 +4248,9 @@ export function CanvaEditor({
             className="fixed inset-0 z-[9000] bg-black select-none flex flex-col"
             style={{ cursor: presentDrawActive ? (isLaser ? "none" : "crosshair") : "default" }}
             onMouseMove={(e) => {
-              if (presentDrawActive) {
-                if (isLaser) {
-                  setPresentLaserPos({ x: e.clientX, y: e.clientY });
-                  setPresentLaserVisible(true);
-                }
-                return;
-              }
-              // Imperatively set cursor based on which screen half the mouse is on
-              const el = presentRootRef.current;
-              if (!el) return;
-              const isLeft = e.clientX < window.innerWidth / 2;
-              if (isLeft) {
-                el.style.cursor = presentIdx > 0 ? LEFT_CURSOR : "default";
-              } else {
-                el.style.cursor = presentIdx < pages.length - 1 ? RIGHT_CURSOR : "default";
+              if (isLaser && presentDrawActive) {
+                setPresentLaserPos({ x: e.clientX, y: e.clientY });
+                setPresentLaserVisible(true);
               }
             }}
             onMouseLeave={() => { setPresentLaserVisible(false); }}
@@ -4273,15 +4271,18 @@ export function CanvaEditor({
             {/* ── Slide area ── */}
             <div className="flex-1 relative flex items-center justify-center overflow-hidden">
 
-              {/* Half-screen click zones for navigation (cursor set imperatively via onMouseMove) */}
+              {/* Half-screen click zones — cursor lives here so it only applies when hovering these zones,
+                  not on the draw-tools popup or toolbar (which sit above at z-[50]) */}
               {!presentDrawActive && (
                 <>
                   <div
                     className="absolute left-0 top-0 bottom-0 z-10 w-1/2"
+                    style={{ cursor: presentIdx > 0 ? LEFT_CURSOR : "default" }}
                     onClick={() => { if (presentIdx > 0) setPresentIdx((i) => i - 1); }}
                   />
                   <div
                     className="absolute right-0 top-0 bottom-0 z-10 w-1/2"
+                    style={{ cursor: presentIdx < pages.length - 1 ? RIGHT_CURSOR : "default" }}
                     onClick={() => { if (presentIdx < pages.length - 1) setPresentIdx((i) => i + 1); }}
                   />
                 </>
