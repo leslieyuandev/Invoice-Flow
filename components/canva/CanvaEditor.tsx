@@ -188,7 +188,6 @@ export function CanvaEditor({
   const opacityBtnRef = useRef<HTMLButtonElement>(null);
   // Rule-of-thirds 3×3 grid shown while actively dragging a crop handle.
   const [cropGrid, setCropGrid] = useState(false);
-  const [cropDiag, setCropDiag] = useState<{ nw: number; nh: number; transpPct: number; ok: boolean } | null>(null);
   const [resizeOpen, setResizeOpen] = useState(false);
   const [resizeSearch, setResizeSearch] = useState("");
   const [customW, setCustomW] = useState(String(project.width));
@@ -286,7 +285,6 @@ export function CanvaEditor({
     if (toolPanel !== "crop" || !selected || !selected.src) return;
     const id = selected.id;
     const img = new window.Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       const ratio = img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
       cropNaturalRef.current = { id, ratio };
@@ -294,23 +292,7 @@ export function CanvaEditor({
       if (cur && cur.cropW === undefined) {
         patchEl(id, coverRect(cur.w, cur.h, ratio));
       }
-      // DIAGNOSTIC: sample the image for transparent pixels (downscaled grid).
-      try {
-        const c = document.createElement("canvas");
-        const S = 40; c.width = S; c.height = S;
-        const cx = c.getContext("2d");
-        if (cx) {
-          cx.drawImage(img, 0, 0, S, S);
-          const data = cx.getImageData(0, 0, S, S).data;
-          let transp = 0;
-          for (let i = 3; i < data.length; i += 4) if (data[i] < 250) transp++;
-          setCropDiag({ nw: img.naturalWidth, nh: img.naturalHeight, transpPct: Math.round((transp / (S * S)) * 100), ok: true });
-        }
-      } catch {
-        setCropDiag({ nw: img.naturalWidth, nh: img.naturalHeight, transpPct: -1, ok: false });
-      }
     };
-    img.onerror = () => setCropDiag({ nw: 0, nh: 0, transpPct: -1, ok: false });
     img.src = selected.src;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolPanel, selected?.id, selected?.src]);
@@ -1866,14 +1848,6 @@ export function CanvaEditor({
                         <ElementView el={{ ...selected, x: 0, y: 0, rotation: 0, opacity: 1 }} />
                       </div>
                     </div>
-                    {/* TEMP crop diagnostic — remove after debugging */}
-                    {(() => { const cb = coverCropBox(selected); const covers = cb.left <= 0.5 && cb.top <= 0.5 && cb.left + cb.width >= selected.w - 0.5 && cb.top + cb.height >= selected.h - 0.5; return (
-                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
-{`el ${Math.round(selected.w)}x${Math.round(selected.h)} crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
-cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)} covers:${covers ? "YES" : "NO"}
-natural ${cropDiag ? `${cropDiag.nw}x${cropDiag.nh}` : "?"} transparent:${cropDiag ? (cropDiag.transpPct < 0 ? "CORS-blocked" : cropDiag.transpPct + "%") : "?"}`}
-                    </pre>
-                    ); })()}
                   </div>
                 );
               })()}
