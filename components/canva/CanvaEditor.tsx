@@ -4408,10 +4408,10 @@ export function CanvaEditor({
                   <span className="text-xs font-medium hidden sm:inline">Draw</span>
                 </button>
 
-                {/* Draw tools popup */}
+                {/* Draw tools popup — z-[50] sits above the nav-zone divs (z-10) */}
                 {presentDrawToolsOpen && (
                   <div
-                    className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 bg-gray-800/95 backdrop-blur-sm rounded-2xl p-3 flex items-center gap-2.5 shadow-2xl border border-white/10"
+                    className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-[50] bg-gray-800/95 backdrop-blur-sm rounded-2xl p-3 flex items-center gap-2.5 shadow-2xl border border-white/10"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Pen / Marker tools */}
