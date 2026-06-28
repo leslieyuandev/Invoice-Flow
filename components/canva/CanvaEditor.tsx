@@ -161,6 +161,9 @@ export function CanvaEditor({
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const insertAtRef = useRef<number | null>(null);
   const pageStripRef = useRef<HTMLDivElement>(null);
+  // Horizontal nav for the page strip — arrows appear when pages overflow the viewport.
+  const pageScrollRef = useRef<HTMLDivElement>(null);
+  const [pageNav, setPageNav] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
   const pageDragRef = useRef<{ from: number; startX: number; startY: number; moved: boolean; offX: number; offY: number; w: number; h: number } | null>(null);
   const [guides, setGuides] = useState<{ v: number | null; h: number | null }>({ v: null, h: null });
   const [showGrid, setShowGrid] = useState(false);
@@ -185,6 +188,7 @@ export function CanvaEditor({
   const opacityBtnRef = useRef<HTMLButtonElement>(null);
   // Rule-of-thirds 3×3 grid shown while actively dragging a crop handle.
   const [cropGrid, setCropGrid] = useState(false);
+  const [cropDiag, setCropDiag] = useState<{ nw: number; nh: number; transpPct: number; ok: boolean } | null>(null);
   const [resizeOpen, setResizeOpen] = useState(false);
   const [resizeSearch, setResizeSearch] = useState("");
   const [customW, setCustomW] = useState(String(project.width));
@@ -282,6 +286,7 @@ export function CanvaEditor({
     if (toolPanel !== "crop" || !selected || !selected.src) return;
     const id = selected.id;
     const img = new window.Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const ratio = img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
       cropNaturalRef.current = { id, ratio };
@@ -289,7 +294,23 @@ export function CanvaEditor({
       if (cur && cur.cropW === undefined) {
         patchEl(id, coverRect(cur.w, cur.h, ratio));
       }
+      // DIAGNOSTIC: sample the image for transparent pixels (downscaled grid).
+      try {
+        const c = document.createElement("canvas");
+        const S = 40; c.width = S; c.height = S;
+        const cx = c.getContext("2d");
+        if (cx) {
+          cx.drawImage(img, 0, 0, S, S);
+          const data = cx.getImageData(0, 0, S, S).data;
+          let transp = 0;
+          for (let i = 3; i < data.length; i += 4) if (data[i] < 250) transp++;
+          setCropDiag({ nw: img.naturalWidth, nh: img.naturalHeight, transpPct: Math.round((transp / (S * S)) * 100), ok: true });
+        }
+      } catch {
+        setCropDiag({ nw: img.naturalWidth, nh: img.naturalHeight, transpPct: -1, ok: false });
+      }
     };
+    img.onerror = () => setCropDiag({ nw: 0, nh: 0, transpPct: -1, ok: false });
     img.src = selected.src;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolPanel, selected?.id, selected?.src]);
@@ -1468,6 +1489,31 @@ export function CanvaEditor({
   }
 
   // ── Pages ───────────────────────────────────────────────────────────────────
+  // Recompute whether the strip can scroll further left/right (drives the nav arrows).
+  const updatePageNav = useCallback(() => {
+    const el = pageScrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setPageNav({ left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 });
+  }, []);
+
+  const scrollPageStrip = useCallback((dir: -1 | 1) => {
+    const el = pageScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(240, el.clientWidth * 0.8), behavior: "smooth" });
+  }, []);
+
+  // Keep arrow visibility in sync as pages are added/removed or the window resizes.
+  useEffect(() => {
+    updatePageNav();
+    const el = pageScrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(updatePageNav);
+    ro.observe(el);
+    window.addEventListener("resize", updatePageNav);
+    return () => { ro.disconnect(); window.removeEventListener("resize", updatePageNav); };
+  }, [updatePageNav, pages.length]);
+
   function addPage() {
     pushHistory();
     setPages((ps) => [...ps, newPage(page.background)]);
@@ -1820,6 +1866,14 @@ export function CanvaEditor({
                         <ElementView el={{ ...selected, x: 0, y: 0, rotation: 0, opacity: 1 }} />
                       </div>
                     </div>
+                    {/* TEMP crop diagnostic — remove after debugging */}
+                    {(() => { const cb = coverCropBox(selected); const covers = cb.left <= 0.5 && cb.top <= 0.5 && cb.left + cb.width >= selected.w - 0.5 && cb.top + cb.height >= selected.h - 0.5; return (
+                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
+{`el ${Math.round(selected.w)}x${Math.round(selected.h)} crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
+cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)} covers:${covers ? "YES" : "NO"}
+natural ${cropDiag ? `${cropDiag.nw}x${cropDiag.nh}` : "?"} transparent:${cropDiag ? (cropDiag.transpPct < 0 ? "CORS-blocked" : cropDiag.transpPct + "%") : "?"}`}
+                    </pre>
+                    ); })()}
                   </div>
                 );
               })()}
@@ -3895,7 +3949,31 @@ export function CanvaEditor({
       <div className="flex border-t border-surface-200 bg-white shrink-0" onDragOver={(e) => e.stopPropagation()} onDrop={(e) => e.stopPropagation()}>
         {/* Scrollable thumbnails — kept separate from action buttons so the dropdown isn't clipped.
             The inner w-max + mx-auto keeps the pages centered when they fit, and scrolls when they don't. */}
-        <div className="flex-1 min-w-0 overflow-x-auto">
+        <div className="flex-1 min-w-0 relative">
+          {/* Horizontal nav arrows — only shown when pages overflow in that direction. */}
+          {pageNav.left && (
+            <button
+              type="button"
+              onClick={() => scrollPageStrip(-1)}
+              title="Previous pages"
+              aria-label="Scroll to previous pages"
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 grid place-items-center w-8 h-8 rounded-full bg-white/95 border border-surface-200 shadow-md text-surface-600 hover:text-surface-900 hover:border-surface-300"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+          {pageNav.right && (
+            <button
+              type="button"
+              onClick={() => scrollPageStrip(1)}
+              title="Next pages"
+              aria-label="Scroll to next pages"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 grid place-items-center w-8 h-8 rounded-full bg-white/95 border border-surface-200 shadow-md text-surface-600 hover:text-surface-900 hover:border-surface-300"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+          <div ref={pageScrollRef} onScroll={updatePageNav} className="overflow-x-auto">
           <div ref={pageStripRef} className="relative flex items-center gap-3 px-4 py-3.5 w-max mx-auto">
             {pages.map((p, i) => {
               const isDragging = draggingPageId === p.id;
@@ -3936,6 +4014,7 @@ export function CanvaEditor({
                 </div>
               </div>
             )}
+          </div>
           </div>
         </div>
 
