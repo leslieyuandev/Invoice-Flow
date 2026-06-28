@@ -189,6 +189,17 @@ export function CanvaEditor({
   // Present mode
   const [presentMode, setPresentMode] = useState(false);
   const [presentIdx, setPresentIdx] = useState(0);
+  // Present mode – draw tools
+  const [presentDrawActive, setPresentDrawActive] = useState(false);
+  const [presentDrawToolsOpen, setPresentDrawToolsOpen] = useState(false);
+  const [presentTool, setPresentTool] = useState<'pen-blue' | 'pen-white' | 'highlight-yellow' | 'highlight-pink' | 'eraser' | 'laser'>('pen-blue');
+  const [presentLaserPos, setPresentLaserPos] = useState({ x: 0, y: 0 });
+  const [presentLaserVisible, setPresentLaserVisible] = useState(false);
+  const [presentFsActive, setPresentFsActive] = useState(false);
+  const presentCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const presentIsDrawingRef = useRef(false);
+  const presentCurrentStrokeRef = useRef<{ x: number; y: number }[]>([]);
+  const presentRootRef = useRef<HTMLDivElement | null>(null);
   // Frame Maker
   const [showFrameMaker, setShowFrameMaker] = useState(false);
   const [fmPts, setFmPts] = useState<{ x: number; y: number }[]>([
@@ -1094,7 +1105,11 @@ export function CanvaEditor({
         void handleSave();
         return;
       }
-      if (e.key === "Escape" && presentMode) { setPresentMode(false); return; }
+      if (e.key === "Escape" && presentMode) {
+        setPresentMode(false); setPresentDrawActive(false); setPresentDrawToolsOpen(false);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        return;
+      }
       if (mod && e.altKey && e.key.toLowerCase() === "p") { e.preventDefault(); setPresentIdx(pageIdxRef.current); setPresentMode(true); return; }
       if (inField) {
         if (e.key === "Escape") (target as HTMLInputElement).blur();
@@ -1137,6 +1152,25 @@ export function CanvaEditor({
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, undo, redo, duplicateSelected, deleteSelected, addElement, commitPatch, copyStyle, editLink, groupSelected, ungroupSelected, pushHistory, setPageAt, presentMode]);
+
+  // ── Present mode: fullscreen lifecycle ─────────────────────────────────────
+  useEffect(() => {
+    if (presentMode && presentRootRef.current) {
+      presentRootRef.current.requestFullscreen?.().catch(() => {});
+    }
+    if (!presentMode) {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      setPresentDrawActive(false);
+      setPresentDrawToolsOpen(false);
+      setPresentFsActive(false);
+    }
+  }, [presentMode]);
+
+  useEffect(() => {
+    const onChange = () => setPresentFsActive(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
 
   // ── Save (manual + autosave) ────────────────────────────────────────────────
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1750,38 +1784,19 @@ export function CanvaEditor({
             <>
               <p className="text-xs text-surface-400 leading-relaxed">Drag the image to pan it; the <span className="text-surface-500 font-medium">round handles</span> zoom it. Use <span className="text-surface-500 font-medium">Aspect ratio</span> below to reshape the frame. The image never distorts or leaves gaps.</p>
 
-              {/* Live result preview — exactly what the cropped element will look like.
-                  Uses the SAME box computation as the crop overlay (coverCropBox when a visual
-                  crop exists, else coverRect) so the preview always tallies with the editor. */}
+              {/* Live result preview — renders through the SAME ElementView component the
+                  canvas (and export) use, so the preview is byte-identical to the result. */}
               {selected.src && (() => {
                 const scale = Math.min(176 / selected.w, 176 / selected.h);
                 const pw = selected.w * scale, ph = selected.h * scale;
-                const cb = selected.cropW !== undefined
-                  ? coverCropBox(selected)
-                  : (() => { const c = coverRect(selected.w, selected.h, cropRatioFor(selected)); return { left: c.cropX, top: c.cropY, width: c.cropW, height: c.cropH }; })();
-                const flip = imageFlipTransform(selected);
                 return (
                   <div>
                     <p className="text-[10px] font-semibold text-surface-400 uppercase tracking-wide mb-1.5">Result preview</p>
-                    <div className="mx-auto border border-surface-200 rounded" style={{ width: pw, height: ph, position: "relative", overflow: "hidden" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={selected.src} alt="" draggable={false}
-                        style={{
-                          position: "absolute", left: cb.left * scale, top: cb.top * scale,
-                          width: cb.width * scale, height: cb.height * scale, objectFit: "cover",
-                          transform: `${flip ?? ""} ${selected.cropRotation ? `rotate(${selected.cropRotation}deg)` : ""}`.trim() || undefined,
-                          transformOrigin: "50% 50%",
-                        }}
-                      />
+                    <div className="mx-auto border border-surface-200 rounded overflow-hidden" style={{ width: pw, height: ph }}>
+                      <div style={{ width: selected.w, height: selected.h, transform: `scale(${scale})`, transformOrigin: "top left", position: "relative" }}>
+                        <ElementView el={{ ...selected, x: 0, y: 0, rotation: 0, opacity: 1 }} />
+                      </div>
                     </div>
-                    {/* TEMP crop diagnostic — remove after debugging */}
-                    <pre className="mt-1 text-[8px] leading-tight text-surface-400 whitespace-pre-wrap break-all">
-{`el ${Math.round(selected.w)}x${Math.round(selected.h)} rot${selected.rotation}
-crop x${Math.round(selected.cropX ?? NaN)} y${Math.round(selected.cropY ?? NaN)} w${Math.round(selected.cropW ?? NaN)} h${Math.round(selected.cropH ?? NaN)}
-cb x${Math.round(cb.left)} y${Math.round(cb.top)} w${Math.round(cb.width)} h${Math.round(cb.height)}
-boxR ${(cb.width / cb.height).toFixed(3)} natR ${(cropNaturalRef.current?.id === selected.id ? cropNaturalRef.current.ratio : NaN).toFixed?.(3) ?? "?"} legacyCrop ${selected.crop ? "YES" : "no"}`}
-                    </pre>
                   </div>
                 );
               })()}
@@ -4089,86 +4104,394 @@ boxR ${(cb.width / cb.height).toFixed(3)} natR ${(cropNaturalRef.current?.id ===
       {/* ── Present Mode (fullscreen slideshow) ── */}
       {presentMode && (() => {
         const pg = pages[Math.min(presentIdx, pages.length - 1)];
-        const ratio = pg ? Math.min(window.innerWidth / W, window.innerHeight / H) : 1;
+        if (!pg) return null;
+        const TOOLBAR_H = 68;
+        const vw = presentFsActive ? window.screen.width : window.innerWidth;
+        const vh = presentFsActive ? window.screen.height : window.innerHeight;
+        const ratio = Math.min(vw / W, (vh - TOOLBAR_H) / H);
+        const slideW = W * ratio;
+        const slideH = H * ratio;
+        const isLaser = presentTool === "laser";
+        const isEraser = presentTool === "eraser";
+
+        const DRAW_TOOLS = [
+          { id: "pen-blue" as const,         color: "#3B82F6", width: 3,  opacity: 1,   label: "Blue pen" },
+          { id: "pen-white" as const,        color: "#FFFFFF", width: 3,  opacity: 1,   label: "White pen" },
+          { id: "highlight-yellow" as const, color: "#FCD34D", width: 22, opacity: 0.45, label: "Yellow marker" },
+          { id: "highlight-pink" as const,   color: "#F9A8D4", width: 22, opacity: 0.45, label: "Pink marker" },
+          { id: "laser" as const,            color: "#EF4444", width: 0,  opacity: 1,   label: "Laser pointer" },
+        ];
+        const activeTool = DRAW_TOOLS.find((t) => t.id === presentTool) ?? DRAW_TOOLS[0];
+
+        function startDraw(x: number, y: number) {
+          if (!presentDrawActive || isLaser) return;
+          presentIsDrawingRef.current = true;
+          presentCurrentStrokeRef.current = [{ x, y }];
+          const ctx = presentCanvasRef.current?.getContext("2d");
+          if (!ctx) return;
+          if (isEraser) {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.globalAlpha = 1;
+            ctx.lineWidth = 24;
+          } else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.globalAlpha = activeTool.opacity;
+            ctx.strokeStyle = activeTool.color;
+            ctx.lineWidth = activeTool.width;
+          }
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+        }
+
+        function moveDraw(x: number, y: number) {
+          if (!presentIsDrawingRef.current || !presentDrawActive || isLaser) return;
+          const ctx = presentCanvasRef.current?.getContext("2d");
+          if (!ctx) return;
+          const pts = presentCurrentStrokeRef.current;
+          pts.push({ x, y });
+          if (pts.length < 2) return;
+          const prev = pts[pts.length - 2];
+          if (isEraser) {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.globalAlpha = 1;
+            ctx.lineWidth = 24;
+          } else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.globalAlpha = activeTool.opacity;
+            ctx.strokeStyle = activeTool.color;
+            ctx.lineWidth = activeTool.width;
+          }
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+
         return (
           <div
-            className="fixed inset-0 z-[9000] bg-black flex flex-col items-center justify-center select-none"
-            onClick={() => { if (pages.length > 1) setPresentIdx((i) => (i + 1) % pages.length); }}
+            ref={(el) => { presentRootRef.current = el; if (el) el.focus(); }}
+            className="fixed inset-0 z-[9000] bg-black select-none flex flex-col"
+            style={{ cursor: presentDrawActive ? (isLaser ? "none" : "crosshair") : "default" }}
+            onMouseMove={(e) => {
+              if (isLaser && presentDrawActive) {
+                setPresentLaserPos({ x: e.clientX, y: e.clientY });
+                setPresentLaserVisible(true);
+              }
+            }}
+            onMouseLeave={() => setPresentLaserVisible(false)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") { setPresentMode(false); return; }
-              if (e.key === "ArrowRight" || e.key === "ArrowDown") setPresentIdx((i) => Math.min(pages.length - 1, i + 1));
-              if (e.key === "ArrowLeft" || e.key === "ArrowUp") setPresentIdx((i) => Math.max(0, i - 1));
+              if (e.key === "Escape") {
+                if (presentDrawActive) { setPresentDrawActive(false); setPresentDrawToolsOpen(false); return; }
+                setPresentMode(false);
+                if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+                return;
+              }
+              if (!presentDrawActive) {
+                if (e.key === "ArrowRight" || e.key === "ArrowDown") setPresentIdx((i) => Math.min(pages.length - 1, i + 1));
+                if (e.key === "ArrowLeft" || e.key === "ArrowUp") setPresentIdx((i) => Math.max(0, i - 1));
+              }
             }}
             tabIndex={0}
-            ref={(el) => { if (el) el.focus(); }}
           >
-            {/* Slide */}
-            <div
-              style={{ width: W * ratio, height: H * ratio, flexShrink: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ transform: `scale(${ratio})`, transformOrigin: "top left" }}>
-                <div style={{ width: W, height: H, background: pg.background, overflow: "hidden", position: "relative" }}>
-                  {pg.elements.map((el, idx) => {
-                    const anim = el.animation;
-                    if (!anim || anim.trigger === "exit") {
-                      return <ElementView key={el.id} el={el} />;
-                    }
-                    const keyframeName = getAnimKeyframeName(anim);
-                    const duration = getAnimDuration(anim.speed ?? 0.5);
-                    const delay = anim.type === "succession" ? idx * 0.15 : 0;
-                    return (
-                      <div
-                        key={`${presentIdx}-${el.id}`}
-                        style={{
-                          position: "absolute",
-                          left: el.x,
-                          top: el.y,
-                          width: el.w,
-                          height: el.h,
-                          animation: `${keyframeName} ${duration}s ease both ${delay}s`,
-                        }}
-                      >
-                        <ElementView el={el} asChild />
+            {/* ── Slide area ── */}
+            <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+
+              {/* Half-screen navigation zones (only when not drawing) */}
+              {!presentDrawActive && (
+                <>
+                  <div
+                    className="absolute left-0 top-0 bottom-0 z-10 w-1/2 group"
+                    style={{ cursor: presentIdx > 0 ? "w-resize" : "default" }}
+                    onClick={() => { if (presentIdx > 0) setPresentIdx((i) => i - 1); }}
+                  >
+                    {presentIdx > 0 && (
+                      <div className="absolute left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        <div className="p-3 rounded-full bg-black/40 text-white backdrop-blur-sm">
+                          <ChevronLeft className="w-8 h-8" />
+                        </div>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+                  <div
+                    className="absolute right-0 top-0 bottom-0 z-10 w-1/2 group"
+                    style={{ cursor: presentIdx < pages.length - 1 ? "e-resize" : "default" }}
+                    onClick={() => { if (presentIdx < pages.length - 1) setPresentIdx((i) => i + 1); }}
+                  >
+                    {presentIdx < pages.length - 1 && (
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        <div className="p-3 rounded-full bg-black/40 text-white backdrop-blur-sm">
+                          <ChevronRight className="w-8 h-8" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Slide + draw canvas */}
+              <div style={{ width: slideW, height: slideH, position: "relative", flexShrink: 0 }}>
+                {/* Slide content */}
+                <div style={{ transform: `scale(${ratio})`, transformOrigin: "top left", pointerEvents: "none" }}>
+                  <div style={{ width: W, height: H, background: pg.background, overflow: "hidden", position: "relative" }}>
+                    {pg.elements.map((el, idx) => {
+                      const anim = el.animation;
+                      if (!anim || anim.trigger === "exit") {
+                        return <ElementView key={el.id} el={el} />;
+                      }
+                      const keyframeName = getAnimKeyframeName(anim);
+                      const duration = getAnimDuration(anim.speed ?? 0.5);
+                      const delay = anim.type === "succession" ? idx * 0.15 : 0;
+                      return (
+                        <div
+                          key={`${presentIdx}-${el.id}`}
+                          style={{
+                            position: "absolute",
+                            left: el.x, top: el.y,
+                            width: el.w, height: el.h,
+                            animation: `${keyframeName} ${duration}s ease both ${delay}s`,
+                          }}
+                        >
+                          <ElementView el={el} asChild />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* Draw canvas overlay */}
+                <canvas
+                  key={`canvas-${presentIdx}`}
+                  ref={presentCanvasRef}
+                  width={slideW}
+                  height={slideH}
+                  style={{
+                    position: "absolute", top: 0, left: 0,
+                    width: slideW, height: slideH,
+                    pointerEvents: presentDrawActive && !isLaser ? "auto" : "none",
+                    zIndex: 20,
+                  }}
+                  onMouseDown={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    startDraw(e.clientX - r.left, e.clientY - r.top);
+                  }}
+                  onMouseMove={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    moveDraw(e.clientX - r.left, e.clientY - r.top);
+                  }}
+                  onMouseUp={() => { presentIsDrawingRef.current = false; }}
+                  onMouseLeave={() => { presentIsDrawingRef.current = false; }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    const t = e.touches[0];
+                    const r = e.currentTarget.getBoundingClientRect();
+                    startDraw(t.clientX - r.left, t.clientY - r.top);
+                  }}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    const t = e.touches[0];
+                    const r = e.currentTarget.getBoundingClientRect();
+                    moveDraw(t.clientX - r.left, t.clientY - r.top);
+                  }}
+                  onTouchEnd={() => { presentIsDrawingRef.current = false; }}
+                />
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-6 py-4 bg-gradient-to-t from-black/60 to-transparent pointer-events-none">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setPresentIdx((i) => Math.max(0, i - 1)); }}
+            {/* ── Bottom toolbar ── */}
+            <div
+              className="relative shrink-0 flex items-center justify-center gap-1 bg-gray-900/95 backdrop-blur-sm border-t border-white/10 px-4"
+              style={{ height: TOOLBAR_H }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Prev */}
+              <button type="button"
+                onClick={() => setPresentIdx((i) => Math.max(0, i - 1))}
                 disabled={presentIdx === 0}
-                className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 transition-colors"
-                aria-label="Previous"
+                className="p-2.5 rounded-full text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="text-white/70 text-sm font-medium">{presentIdx + 1} / {pages.length}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setPresentIdx((i) => Math.min(pages.length - 1, i + 1)); }}
+
+              {/* Page counter */}
+              <span className="text-white/60 text-sm font-medium tabular-nums px-2 min-w-[56px] text-center">
+                {presentIdx + 1} / {pages.length}
+              </span>
+
+              {/* Next */}
+              <button type="button"
+                onClick={() => setPresentIdx((i) => Math.min(pages.length - 1, i + 1))}
                 disabled={presentIdx === pages.length - 1}
-                className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 transition-colors"
-                aria-label="Next"
+                className="p-2.5 rounded-full text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
+
+              <div className="h-6 w-px bg-white/20 mx-2" />
+
+              {/* Draw tools button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !presentDrawToolsOpen;
+                    setPresentDrawToolsOpen(next);
+                    if (next) setPresentDrawActive(true);
+                  }}
+                  className={cn(
+                    "p-2.5 rounded-full text-white transition-colors flex items-center gap-1.5",
+                    presentDrawActive
+                      ? "bg-white/20 ring-2 ring-white/40"
+                      : "hover:bg-white/10"
+                  )}
+                  title="Draw on page"
+                >
+                  <PenTool className="w-5 h-5" />
+                  <span className="text-xs font-medium hidden sm:inline">Draw</span>
+                </button>
+
+                {/* Draw tools popup */}
+                {presentDrawToolsOpen && (
+                  <div
+                    className="absolute bottom-[calc(100%+10px)] left-1/2 -translate-x-1/2 bg-gray-800/95 backdrop-blur-sm rounded-2xl p-3 flex items-center gap-2.5 shadow-2xl border border-white/10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Pen / Marker tools */}
+                    {DRAW_TOOLS.map((tool) => (
+                      <button
+                        key={tool.id}
+                        type="button"
+                        title={tool.label}
+                        onClick={() => { setPresentTool(tool.id); setPresentDrawActive(true); }}
+                        className={cn(
+                          "relative flex items-center justify-center rounded-full transition-all duration-150",
+                          tool.id.startsWith("highlight") ? "w-12 h-8" : "w-10 h-10",
+                          presentTool === tool.id
+                            ? "ring-2 ring-white ring-offset-1 ring-offset-gray-800 scale-110"
+                            : "hover:scale-105 opacity-80 hover:opacity-100"
+                        )}
+                        style={{
+                          background: tool.id === "laser"
+                            ? "transparent"
+                            : tool.id === "pen-white"
+                            ? "#374151"
+                            : tool.id.startsWith("highlight")
+                            ? `${tool.color}55`
+                            : tool.color,
+                        }}
+                      >
+                        {tool.id === "laser" ? (
+                          <span
+                            className="w-5 h-5 rounded-full bg-red-500"
+                            style={{ boxShadow: "0 0 0 3px rgba(239,68,68,0.3), 0 0 12px rgba(239,68,68,0.7)" }}
+                          />
+                        ) : tool.id === "pen-white" ? (
+                          <span className="w-4 h-4 rounded-full bg-white border border-gray-500" />
+                        ) : tool.id.startsWith("highlight") ? (
+                          <span
+                            className="rounded w-7 h-4"
+                            style={{ background: tool.color, opacity: 0.8 }}
+                          />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full bg-white/30" />
+                        )}
+                      </button>
+                    ))}
+
+                    <div className="h-6 w-px bg-white/20 mx-0.5" />
+
+                    {/* Eraser */}
+                    <button
+                      type="button"
+                      title="Eraser"
+                      onClick={() => { setPresentTool("eraser"); setPresentDrawActive(true); }}
+                      className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center text-white transition-all",
+                        presentTool === "eraser"
+                          ? "bg-white/25 ring-2 ring-white scale-110"
+                          : "bg-white/10 hover:bg-white/20"
+                      )}
+                    >
+                      <Eraser className="w-4 h-4" />
+                    </button>
+
+                    {/* Clear all */}
+                    <button
+                      type="button"
+                      title="Clear all drawings"
+                      onClick={() => {
+                        const ctx = presentCanvasRef.current?.getContext("2d");
+                        if (ctx) ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                      }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-all"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+
+                    {/* Close draw mode */}
+                    <button
+                      type="button"
+                      title="Stop drawing"
+                      onClick={() => { setPresentDrawActive(false); setPresentDrawToolsOpen(false); }}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all ml-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="h-6 w-px bg-white/20 mx-2" />
+
+              {/* Fullscreen toggle */}
+              <button
+                type="button"
+                title={presentFsActive ? "Exit fullscreen" : "Enter fullscreen"}
+                onClick={() => {
+                  if (!document.fullscreenElement) {
+                    presentRootRef.current?.requestFullscreen?.().catch(() => {});
+                  } else {
+                    document.exitFullscreen().catch(() => {});
+                  }
+                }}
+                className="p-2.5 rounded-full text-white hover:bg-white/10 transition-colors"
+              >
+                <Maximize className="w-5 h-5" />
+              </button>
+
+              {/* Exit */}
+              <button
+                type="button"
+                title="Exit presentation (Esc)"
+                onClick={() => {
+                  setPresentMode(false); setPresentDrawActive(false); setPresentDrawToolsOpen(false);
+                  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+                }}
+                className="p-2.5 rounded-full text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Exit button */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setPresentMode(false); }}
-              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors"
-              aria-label="Exit presentation"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {/* Laser pointer dot (portal so it tracks screen coordinates) */}
+            {isLaser && presentDrawActive && presentLaserVisible && createPortal(
+              <div
+                className="pointer-events-none fixed z-[99999]"
+                style={{ left: presentLaserPos.x, top: presentLaserPos.y, transform: "translate(-50%, -50%)" }}
+              >
+                <div
+                  className="w-5 h-5 rounded-full bg-red-500"
+                  style={{
+                    boxShadow: "0 0 0 4px rgba(239,68,68,0.35), 0 0 16px rgba(239,68,68,0.8), 0 0 32px rgba(239,68,68,0.4)",
+                    animation: "present-laser-pulse 1.2s ease-in-out infinite",
+                  }}
+                />
+              </div>,
+              document.body
+            )}
           </div>
         );
       })()}
